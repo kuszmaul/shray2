@@ -13,12 +13,19 @@ static Allocation *heap;
 
 static int Shray_rank;
 static int Shray_size;
-static size_t segfaultCounter = 0;
-static size_t barrierCounter = 0;
+static size_t segfaultCounter;
+static size_t barrierCounter;
+static size_t ShrayPagesz;
 
 /*****************************************************
  * Helper functions
  *****************************************************/
+
+/* Returns ceil(a / b) */
+inline size_t roundUp(size_t a, size_t b)
+{
+    return (a + b - 1) / b;
+}
 
 int inRange(void *address, Allocation* alloc)
 {
@@ -48,7 +55,7 @@ RDMA findOwner(void *segfault)
 
     rdma.owner = difference / current->bytesPerBlock;
     rdma.offset = difference % current->bytesPerBlock + 
-        (rdma.owner * current->bytesPerBlock) % PAGESIZE;
+        (rdma.owner * current->bytesPerBlock) % ShrayPagesz;
 
     rdma.win = current->win;
 
@@ -57,32 +64,28 @@ RDMA findOwner(void *segfault)
 
 void SegvHandler(int sig, siginfo_t *si, void *unused)
 {
-    segfaultCounter++;
+    SEGFAULTCOUNT
     void *address = si->si_addr;
+    DBUG_PRINT("Segfault at %p.", address)
 
     /* Evict the previous cache line. */
     if (cache.addresses[cache.firstIn] != NULL) {
-        DEBUG_PRINT_COMM(("P(%d): evict %p", Shray_rank, cache.addresses[cache.firstIn]));
-        MPROTECT_SAFE(mprotect(cache.addresses[cache.firstIn], PAGESIZE, PROT_NONE));
+        MPROTECT_SAFE(mprotect(cache.addresses[cache.firstIn], ShrayPagesz, PROT_NONE));
     }
 
     /* Admit the current cache line. */
-    cache.addresses[cache.firstIn] = (void *)((uintptr_t)address / PAGESIZE * PAGESIZE);
-    MPROTECT_SAFE(mprotect(cache.addresses[cache.firstIn], PAGESIZE, PROT_READ | PROT_WRITE));
+    cache.addresses[cache.firstIn] = (void *)((uintptr_t)address / ShrayPagesz * ShrayPagesz);
+    MPROTECT_SAFE(mprotect(cache.addresses[cache.firstIn], ShrayPagesz, PROT_READ | PROT_WRITE));
 
     /* Copy the remote page */
     RDMA rdma = findOwner(cache.addresses[cache.firstIn]);
 
-    DEBUG_PRINT_COMM(("P(%d): Get %p (offset %zu) from P(%d)\n", Shray_rank, 
-                cache.addresses[cache.firstIn], rdma.offset, rdma.owner));
-
     MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, rdma.owner, 0, *rdma.win));
 
-    MPI_SAFE(MPI_Get(cache.addresses[cache.firstIn], PAGESIZE, MPI_BYTE, rdma.owner, 
-            rdma.offset, PAGESIZE, MPI_BYTE, *rdma.win));
+    MPI_SAFE(MPI_Get(cache.addresses[cache.firstIn], ShrayPagesz, MPI_BYTE, rdma.owner, 
+            rdma.offset, ShrayPagesz, MPI_BYTE, *rdma.win));
 
     MPI_SAFE(MPI_Win_unlock(rdma.owner, *rdma.win));
-    DEBUG_PRINT_COMM(("P(%d): Get completed\n", Shray_rank));
 
     cache.firstIn = (cache.firstIn + 1) % cache.numberOfLines;
 }
@@ -125,10 +128,20 @@ void ShrayInit(int *argc, char ***argv, size_t cacheSize)
     MPI_Comm_size(MPI_COMM_WORLD, &Shray_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &Shray_rank);
 
+    segfaultCounter = 0;
+    barrierCounter = 0;
+
+    int pagesz = sysconf (_SC_PAGE_SIZE);
+    if (pagesz == -1) {
+        perror("Querying system page size failed.");
+    }
+    ShrayPagesz = (size_t)pagesz;
+ 
+
     heap = createAllocation();
 
     cache.firstIn = 0;
-    cache.numberOfLines = cacheSize / PAGESIZE;
+    cache.numberOfLines = cacheSize / ShrayPagesz;
     if ((cache.addresses = malloc(cache.numberOfLines * sizeof(void *))) == NULL) {
         perror("Allocating cache addresses has failed\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
@@ -155,16 +168,16 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     alloc->bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
 
     /* Protect all pages that we do not own, and register what we do. */
-    size_t firstPage = Shray_rank * alloc->bytesPerBlock / PAGESIZE;
-    size_t lastPage = (Shray_rank == Shray_size - 1) ? alloc->size / PAGESIZE :
-        (Shray_rank + 1) * alloc->bytesPerBlock / PAGESIZE;
-    size_t segmentSize = (lastPage - firstPage + 1) * PAGESIZE;
+    size_t firstPage = Shray_rank * alloc->bytesPerBlock / ShrayPagesz;
+    size_t lastPage = (Shray_rank == Shray_size - 1) ? alloc->size / ShrayPagesz :
+        (Shray_rank + 1) * alloc->bytesPerBlock / ShrayPagesz;
+    size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
     if (segmentSize == 0) {
         fprintf(stderr, "A processor has no data\n");
         MPI_Abort(MPI_COMM_WORLD, 5);
     }
 
-    void *start = (void *)((uintptr_t)alloc->location + firstPage * PAGESIZE);
+    void *start = (void *)((uintptr_t)alloc->location + firstPage * ShrayPagesz);
     MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
     MPI_SAFE(MPI_Win_create(start, segmentSize, 1, MPI_INFO_NULL, MPI_COMM_WORLD, alloc->win));
 
@@ -173,7 +186,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
 
-    barrierCounter++;
+    BARRIERCOUNT
 
     return alloc->location;
 }
@@ -192,6 +205,8 @@ size_t ShrayEnd(size_t firstDimension)
 void ShraySync(void *array)
 {    
     MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
+    BARRIERCOUNT
+
     Allocation *current = heap;
 
     while (current != NULL && current->location != array) {
@@ -203,32 +218,32 @@ void ShraySync(void *array)
     }
 
     /* Synchronise in case the first or last page is co-owned with someone else. */
-    size_t firstPage = Shray_rank * current->bytesPerBlock / PAGESIZE;
+    size_t firstPage = Shray_rank * current->bytesPerBlock / ShrayPagesz;
     size_t lastPage = (Shray_rank == Shray_size - 1) ? 
-        current->size / PAGESIZE :
-        (Shray_rank + 1) * current->bytesPerBlock / PAGESIZE;
+        current->size / ShrayPagesz :
+        (Shray_rank + 1) * current->bytesPerBlock / ShrayPagesz;
 
     size_t firstByte = Shray_rank * current->bytesPerBlock;
     size_t lastByte = (Shray_rank + 1) * current->bytesPerBlock - 1;
 
     /* Get the last page of the previous rank, and copy its contents to our copy of that 
      * page. */
-    if ((firstByte % PAGESIZE != 0) && (Shray_rank != 0)) {
+    if ((firstByte % ShrayPagesz != 0) && (Shray_rank != 0)) {
         size_t theirFirstPage = (Shray_rank - 1) * current->bytesPerBlock / 
-            PAGESIZE;
+            ShrayPagesz;
         size_t theirLastPage = (Shray_rank * current->bytesPerBlock - 1) / 
-            PAGESIZE;
+            ShrayPagesz;
 
         void *destination = (void *)((uintptr_t)(current->location) + 
-                firstPage * PAGESIZE);
+                firstPage * ShrayPagesz);
 
         /* From this byte on, we own it, before this byte the previous rank does. */
-        size_t pageBoundary = Shray_rank * current->bytesPerBlock % PAGESIZE;
+        size_t pageBoundary = Shray_rank * current->bytesPerBlock % ShrayPagesz;
 
         MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, Shray_rank - 1, 0, *(current->win)));
     
         MPI_SAFE(MPI_Get(destination, pageBoundary, MPI_BYTE, Shray_rank - 1, 
-                    (theirLastPage - theirFirstPage) * PAGESIZE, 
+                    (theirLastPage - theirFirstPage) * ShrayPagesz, 
                     pageBoundary, MPI_BYTE, *(current->win)));
     
         MPI_SAFE(MPI_Win_unlock(Shray_rank - 1, *(current->win)));
@@ -236,19 +251,19 @@ void ShraySync(void *array)
 
     /* Get the first page of the next rank, and copy its contents to our copy of that 
      * page. */
-    if ((lastByte % PAGESIZE != PAGESIZE - 1) && 
+    if ((lastByte % ShrayPagesz != ShrayPagesz - 1) && 
             (Shray_rank != Shray_size - 1)) {
 
         void *destination = (void *)((uintptr_t)current->location + 
                 (Shray_rank + 1) * current->bytesPerBlock);
 
         /* Before this byte, we own it, after this byte the next rank does. */
-        size_t pageBoundary = lastByte % PAGESIZE;
+        size_t pageBoundary = lastByte % ShrayPagesz;
 
         MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, Shray_rank + 1, 0, *(current->win)));
     
-        MPI_SAFE(MPI_Get(destination, PAGESIZE - pageBoundary - 1, MPI_BYTE, 
-                    Shray_rank + 1, pageBoundary + 1, PAGESIZE - 
+        MPI_SAFE(MPI_Get(destination, ShrayPagesz - pageBoundary - 1, MPI_BYTE, 
+                    Shray_rank + 1, pageBoundary + 1, ShrayPagesz - 
                     pageBoundary - 1, MPI_BYTE, *(current->win)));
     
         MPI_SAFE(MPI_Win_unlock(Shray_rank + 1, *(current->win)));
@@ -257,18 +272,20 @@ void ShraySync(void *array)
     /* Protect only the pages we own. */
     MPROTECT_SAFE(mprotect(current->location, current->size, PROT_NONE));
 
-    size_t segmentSize = (lastPage - firstPage + 1) * PAGESIZE;
+    size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
 
-    void *start = (void *)((uintptr_t)current->location + firstPage * PAGESIZE);
+    void *start = (void *)((uintptr_t)current->location + firstPage * ShrayPagesz);
     MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
 
     MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
-    barrierCounter += 2;
+    BARRIERCOUNT
 }
 
 void ShrayFree(void *address)
 {
     MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
+    BARRIERCOUNT
+
     /* indirect iterates through the links of the nodes, e.g. the pointers
      * to the next allocation. Double pointer is necessary because there is no 
      * link to heap (the head of the list). */
@@ -288,15 +305,16 @@ void ShrayFree(void *address)
         *indirect = (*indirect)->next;
         free(deleteThis);
     }
+
     MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
-    barrierCounter += 2;
+    BARRIERCOUNT
 }
 
 void ShrayReport(void)
 {
     fprintf(stderr, 
             "Shray report P(%d): %zu segfaults, %zu barriers, %zu bytes communicated.\n",
-            Shray_rank, segfaultCounter, barrierCounter, segfaultCounter * PAGESIZE);
+            Shray_rank, segfaultCounter, barrierCounter, segfaultCounter * ShrayPagesz);
 }
 
 void ShrayFinalize(void)

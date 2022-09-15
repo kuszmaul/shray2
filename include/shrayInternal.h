@@ -4,12 +4,14 @@
 #include <signal.h>
 #include <stdint.h>
 #include <time.h>
+#include <unistd.h>
 #include <mpi.h>
 #define __USE_GNU
 #include <sys/mman.h>
-#include "utils.h"
 
-#define PAGESIZE 4096
+/**************************************************
+ * Data structures
+ **************************************************/
 
 typedef struct {
     /* addresses[i] is a pointer to the virtual page 
@@ -23,8 +25,7 @@ typedef struct {
 
 /* A single allocation in the heap. */
 typedef struct Allocation {
-    void *location;
-    size_t size;
+    void *location; size_t size;
     /* We create a window on the part of the virtual address space that is physically 
      * stored on our node. */
     MPI_Win *win;
@@ -40,12 +41,63 @@ typedef struct {
     MPI_Win *win;
 } RDMA;
 
-RDMA findOwner(void *segfault);
+/**************************************************
+ * Error handling
+ **************************************************/
 
-void SegvHandler(int sig, siginfo_t *si, void *unused);
+#define MPI_SAFE(fncall)                                                                \
+    {                                                                                   \
+        if (fncall != MPI_SUCCESS) {                                                    \
+            perror("MPI call unsuccessfull\n");                                         \
+            MPI_Abort(MPI_COMM_WORLD, 1);                                               \
+        }                                                                               \
+    }
 
-void registerHandler(void);
+#define MPROTECT_SAFE(fncall)                                                           \
+    {                                                                                   \
+        if (fncall != 0) {                                                              \
+            perror("mprotect failed");                                                  \
+            MPI_Abort(MPI_COMM_WORLD, 1);                                               \
+        }                                                                               \
+    }
 
-Allocation *createAllocation(void);
+#define MREMAP_SAFE(variable, fncall)                                                   \
+    {                                                                                   \
+        variable = fncall;                                                              \
+        if (variable == MAP_FAILED) {                                                   \
+            perror("mremap failed");                                                    \
+            MPI_Abort(MPI_COMM_WORLD, 1);                                               \
+        }                                                                               \
+    }
 
-Allocation *insertAtHead(Allocation *head, Allocation *newHead);
+#define MMAP_SAFE(variable, fncall)                                                     \
+    {                                                                                   \
+        variable = fncall;                                                              \
+        if (variable == MAP_FAILED) {                                                   \
+            perror("mmap failed");                                                      \
+            MPI_Abort(MPI_COMM_WORLD, 1);                                               \
+        }                                                                               \
+    }
+
+/**************************************************
+ * Debugging
+ **************************************************/
+
+#ifdef DEBUG
+    #define DBUG_PRINT(fmt, ...)                                                        \
+        fprintf(stderr, "\t[node %d]: " fmt "\n", Shray_rank, __VA_ARGS__);
+#else
+    #define DBUG_PRINT(fmt, ...)
+#endif
+
+/**************************************************
+ * Profiling
+ **************************************************/
+
+#ifdef PROFILE
+    #define BARRIERCOUNT barrierCounter++;
+    #define SEGFAULTCOUNT segfaultCounter++;
+#else
+    #define BARRIERCOUNT
+    #define SEGFAULTCOUNT
+#endif
