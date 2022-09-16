@@ -1,7 +1,7 @@
 CC = mpicc.openmpi
 RUN = mpirun.openmpi
 FLAGS = -O3 -ffast-math -march=native -mtune=native -Wall
-LFLAGS = -lm
+LFLAGS = -lm -lcblas
 APPS = $(wildcard apps/*.c)
 RELEASE = $(patsubst apps/%.c, bin/%, $(APPS))
 DEBUG = $(patsubst apps/%.c, bin/%_debug, $(APPS))

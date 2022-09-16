@@ -55,6 +55,7 @@ typedef struct {
     {                                                                                   \
         if (fncall != MPI_SUCCESS) {                                                    \
             perror("MPI call unsuccessfull\n");                                         \
+            fprintf(stderr, "Line %d: ", __LINE__);                                     \
             MPI_Abort(MPI_COMM_WORLD, 1);                                               \
         }                                                                               \
     }
@@ -62,6 +63,7 @@ typedef struct {
 #define MPROTECT_SAFE(fncall)                                                           \
     {                                                                                   \
         if (fncall != 0) {                                                              \
+            fprintf(stderr, "Line %d: ", __LINE__);                                     \
             perror("mprotect failed");                                                  \
             MPI_Abort(MPI_COMM_WORLD, 1);                                               \
         }                                                                               \
@@ -72,6 +74,7 @@ typedef struct {
         variable = fncall;                                                              \
         if (variable == MAP_FAILED) {                                                   \
             perror("mremap failed");                                                    \
+            fprintf(stderr, "Line %d: ", __LINE__);                                     \
             MPI_Abort(MPI_COMM_WORLD, 1);                                               \
         }                                                                               \
     }
@@ -81,6 +84,7 @@ typedef struct {
         variable = fncall;                                                              \
         if (variable == MAP_FAILED) {                                                   \
             perror("mmap failed");                                                      \
+            fprintf(stderr, "Line %d: ", __LINE__);                                     \
             MPI_Abort(MPI_COMM_WORLD, 1);                                               \
         }                                                                               \
     }

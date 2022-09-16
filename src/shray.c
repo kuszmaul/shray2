@@ -80,7 +80,6 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
 
     /* Admit the current cache line. */
     cache.addresses[cache.firstIn] = (void *)((uintptr_t)address / ShrayPagesz * ShrayPagesz);
-    MPROTECT_SAFE(mprotect(cache.addresses[cache.firstIn], ShrayPagesz, PROT_READ | PROT_WRITE));
 
     /* Copy the remote page */
     RDMA rdma = findOwner(cache.addresses[cache.firstIn]);
@@ -310,6 +309,7 @@ void ShraySync(void *array)
     size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
 
     void *start = (void *)((uintptr_t)current->location + firstPage * ShrayPagesz);
+    DBUG_PRINT("We make %zu bytes from %p available for writing", segmentSize, start);
     MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
 
     MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
