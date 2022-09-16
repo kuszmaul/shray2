@@ -70,7 +70,12 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
 
     /* Evict the previous cache line. */
     if (cache.addresses[cache.firstIn] != NULL) {
-        MPROTECT_SAFE(mprotect(cache.addresses[cache.firstIn], ShrayPagesz, PROT_NONE));
+        DBUG_PRINT("Cache eviction: We remap %p to %p\n", 
+                    cache.cacheLines[cache.firstIn], cache.cacheLinesCopy[cache.firstIn]);
+
+        MREMAP_SAFE(cache.cacheLines[cache.firstIn], mremap(cache.cacheLines[cache.firstIn],
+                ShrayPagesz, ShrayPagesz, MREMAP_MAYMOVE | MREMAP_FIXED,
+                cache.cacheLinesCopy[cache.firstIn]));
     }
 
     /* Admit the current cache line. */
@@ -80,12 +85,22 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     /* Copy the remote page */
     RDMA rdma = findOwner(cache.addresses[cache.firstIn]);
 
+    DBUG_PRINT("We fill %p with a page from node %d, offset %zu from the window.", 
+            cache.addresses[cache.firstIn], rdma.owner, rdma.offset);
+
     MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, rdma.owner, 0, *rdma.win));
 
     MPI_SAFE(MPI_Get(cache.addresses[cache.firstIn], ShrayPagesz, MPI_BYTE, rdma.owner, 
             rdma.offset, ShrayPagesz, MPI_BYTE, *rdma.win));
 
     MPI_SAFE(MPI_Win_unlock(rdma.owner, *rdma.win));
+
+    DBUG_PRINT("Cache admittance: We remap %p to %p\n", 
+                cache.cacheLines[cache.firstIn], cache.addresses[cache.firstIn]);
+
+    MREMAP_SAFE(cache.cacheLines[cache.firstIn], mremap(cache.cacheLines[cache.firstIn], 
+            ShrayPagesz, ShrayPagesz, MREMAP_MAYMOVE | MREMAP_FIXED, 
+            cache.addresses[cache.firstIn]));
 
     cache.firstIn = (cache.firstIn + 1) % cache.numberOfLines;
 }
@@ -142,14 +157,30 @@ void ShrayInit(int *argc, char ***argv, size_t cacheSize)
 
     cache.firstIn = 0;
     cache.numberOfLines = cacheSize / ShrayPagesz;
-    if ((cache.addresses = malloc(cache.numberOfLines * sizeof(void *))) == NULL) {
+    cache.addresses = malloc(cache.numberOfLines * sizeof(void *));
+    cache.cacheLines = malloc(cache.numberOfLines * sizeof(void *));
+    cache.cacheLinesCopy = malloc(cache.numberOfLines * sizeof(void *));
+
+    if (cache.addresses == NULL || cache.cacheLines == NULL || cache.cacheLinesCopy == NULL) {
         perror("Allocating cache addresses has failed\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    cache.cacheLines[0] = mmap(NULL, cacheSize, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    cache.cacheLinesCopy[0] = cache.cacheLines[0];
+
+    for (size_t i = 1; i < cache.numberOfLines; i++) {
+        cache.cacheLines[i] = (void *)((uintptr_t)cache.cacheLines[0] + ShrayPagesz * i);
+        cache.cacheLinesCopy[i] = cache.cacheLines[i];
     }
 
     for (size_t i = 0; i < cache.numberOfLines; i++) {
         cache.addresses[i] = NULL;
     }
+
+    DBUG_PRINT("We allocated %zu pages of cache starting at %p.", cache.numberOfLines,
+            cache.cacheLines[0]);
 
     registerHandler();
 }
@@ -185,6 +216,10 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     heap = insertAtHead(heap, alloc);
 
     MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
+
+    DBUG_PRINT("Made a DSM allocation [%p, %p[, of which we own [%p, %p[.", 
+            alloc->location, (void *)((uintptr_t)alloc->location + alloc->size),
+            start, (void *)((uintptr_t)start + segmentSize));
 
     BARRIERCOUNT
 

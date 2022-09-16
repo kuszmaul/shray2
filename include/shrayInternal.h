@@ -14,6 +14,12 @@
  **************************************************/
 
 typedef struct {
+    /* Pointer to our cache lines. Note: can be deduced from the 
+     * first pointer, but we need lValues for remapping. */
+    void **cacheLines;
+    /* We do not remap this, so we do not forget where our 
+     * registered region is. */
+    void **cacheLinesCopy;
     /* addresses[i] is a pointer to the virtual page 
      * stored in the ith cache line. */
     void **addresses;
