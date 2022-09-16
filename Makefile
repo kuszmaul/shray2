@@ -35,8 +35,5 @@ bin/%_debug: apps/%.c bin/shray_debug.o
 bin/%_profile: apps/%.c bin/shray_profile.o
 	$(CC) $(FLAGS) $^ -o $@ $(LFLAGS)
 
-debug%:
-	$(RUN) -n 2 bin/$*_debug 2>&1 | vi -
-
 clean:
 	$(RM) bin/*

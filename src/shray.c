@@ -90,7 +90,7 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
 
     MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, rdma.owner, 0, *rdma.win));
 
-    MPI_SAFE(MPI_Get(cache.addresses[cache.firstIn], ShrayPagesz, MPI_BYTE, rdma.owner, 
+    MPI_SAFE(MPI_Get(cache.cacheLines[cache.firstIn], ShrayPagesz, MPI_BYTE, rdma.owner, 
             rdma.offset, ShrayPagesz, MPI_BYTE, *rdma.win));
 
     MPI_SAFE(MPI_Win_unlock(rdma.owner, *rdma.win));
@@ -146,7 +146,7 @@ void ShrayInit(int *argc, char ***argv, size_t cacheSize)
     segfaultCounter = 0;
     barrierCounter = 0;
 
-    int pagesz = sysconf (_SC_PAGE_SIZE);
+    int pagesz = sysconf(_SC_PAGE_SIZE);
     if (pagesz == -1) {
         perror("Querying system page size failed.");
     }
