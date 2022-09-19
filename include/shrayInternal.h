@@ -14,14 +14,9 @@
  **************************************************/
 
 typedef struct {
-    /* Pointer to our cache lines. Note: can be deduced from the 
-     * first pointer, but we need lValues for remapping. */
-    void **cacheLines;
-    /* We do not remap this, so we do not forget where our 
-     * registered region is. */
-    void **cacheLinesCopy;
     /* addresses[i] is a pointer to the virtual page 
-     * stored in the ith cache line. */
+     * stored in the ith cache line, or a reserved 
+     * piece of memory in case the cache line is empty. */
     void **addresses;
     /* The position of the first cache line admitted. */
     size_t firstIn;
@@ -31,7 +26,8 @@ typedef struct {
 
 /* A single allocation in the heap. */
 typedef struct Allocation {
-    void *location; size_t size;
+    void *location; 
+    size_t size;
     /* We create a window on the part of the virtual address space that is physically 
      * stored on our node. */
     MPI_Win *win;
