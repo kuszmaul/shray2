@@ -11,7 +11,7 @@ all: release debug profile
 
 release: $(RELEASE)
 
-debug: FLAGS += -DDEBUG -g
+debug: FLAGS += -DDEBUG -g -fsanitize=undefined #-fsanitize=address
 debug: $(DEBUG)
 
 profile: FLAGS += -DPROFILE

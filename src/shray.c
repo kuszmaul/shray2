@@ -3,6 +3,7 @@
  * we distribute blockwise along the first dimension. */
 
 #include "../include/shray.h"
+#include <assert.h>
 
 /*****************************************************
  * Global variable declarations. 
@@ -190,7 +191,11 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     void *start = (void *)((uintptr_t)alloc->location + firstPage * ShrayPagesz);
     MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
-    MPI_SAFE(MPI_Win_create(start, segmentSize, 1, MPI_INFO_NULL, MPI_COMM_WORLD, alloc->win));
+//    MPI_SAFE(MPI_Win_create(start, segmentSize, 1, MPI_INFO_NULL, MPI_COMM_WORLD, alloc->win));
+    /* See page 448 of https://www.mpi-forum.org/docs/mpi-3.1/mpi31-report.pdf on why
+     * this is necessary. */
+    MPI_SAFE(MPI_Win_create_dynamic(MPI_INFO_NULL, MPI_COMM_WORLD, alloc->win));
+    MPI_SAFE(MPI_Win_attach(*(alloc->win), start, segmentSize));
 
     /* Insert a new allocation */
     heap = insertAtHead(heap, alloc);
@@ -233,17 +238,15 @@ void ShraySync(void *array)
     }
 
     /* Synchronise in case the first or last page is co-owned with someone else. */
-    size_t firstPage = Shray_rank * current->bytesPerBlock / ShrayPagesz;
-    size_t lastPage = (Shray_rank == Shray_size - 1) ? 
-        current->size / ShrayPagesz :
-        (Shray_rank + 1) * current->bytesPerBlock / ShrayPagesz;
-
     size_t firstByte = Shray_rank * current->bytesPerBlock;
     size_t lastByte = (Shray_rank + 1) * current->bytesPerBlock - 1;
 
     /* Get the last page of the previous rank, and copy its contents to our copy of that 
      * page. */
     if ((firstByte % ShrayPagesz != 0) && (Shray_rank != 0)) {
+
+        size_t firstPage = Shray_rank * current->bytesPerBlock / ShrayPagesz;
+
         size_t theirFirstPage = (Shray_rank - 1) * current->bytesPerBlock / 
             ShrayPagesz;
         size_t theirLastPage = (Shray_rank * current->bytesPerBlock - 1) / 
@@ -284,16 +287,7 @@ void ShraySync(void *array)
         MPI_SAFE(MPI_Win_unlock(Shray_rank + 1, *(current->win)));
     }
 
-    /* Protect only the pages we own. */
-    MPROTECT_SAFE(mprotect(current->location, current->size, PROT_NONE));
-
-    size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
-
-    void *start = (void *)((uintptr_t)current->location + firstPage * ShrayPagesz);
-    DBUG_PRINT("We make %zu bytes from %p available for writing", segmentSize, start);
-    MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
-
-    MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
+    MPI_SAFE(MPI_Win_fence(0, *(current->win)));
     BARRIERCOUNT
 }
 
