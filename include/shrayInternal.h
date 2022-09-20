@@ -5,8 +5,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <unistd.h>
-#include <mpi.h>
-#define __USE_GNU
+#include <gasnet.h>
 #include <sys/mman.h>
 
 /**************************************************
@@ -28,30 +27,21 @@ typedef struct {
 typedef struct Allocation {
     void *location; 
     size_t size;
-    /* We create a window on the part of the virtual address space that is physically 
-     * stored on our node. */
-    MPI_Win *win;
     struct Allocation *next;
     /* The number of bytes owned by each node except the last one. */
     size_t bytesPerBlock;
 } Allocation;
 
-/* For retrieving a remote page. */
-typedef struct {
-    int owner;
-    MPI_Win *win;
-} RDMA;
-
 /**************************************************
  * Error handling
  **************************************************/
 
-#define MPI_SAFE(fncall)                                                                \
+#define GASNET_SAFE(fncall)                                                             \
     {                                                                                   \
-        if (fncall != MPI_SUCCESS) {                                                    \
-            perror("MPI call unsuccessfull\n");                                         \
-            fprintf(stderr, "Line %d: ", __LINE__);                                     \
-            MPI_Abort(MPI_COMM_WORLD, 1);                                               \
+        int retval;                                                                     \
+        if ((retval = fncall) != GASNET_OK) {                                           \
+            printf("Error during GASNet call\n");                                       \
+            gasnet_exit(1);                                                             \
         }                                                                               \
     }
 
@@ -60,7 +50,7 @@ typedef struct {
         if (fncall != 0) {                                                              \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
             perror("mprotect failed");                                                  \
-            MPI_Abort(MPI_COMM_WORLD, 1);                                               \
+            gasnet_exit(1);                                                             \
         }                                                                               \
     }
 
@@ -70,7 +60,7 @@ typedef struct {
         if (variable == MAP_FAILED) {                                                   \
             perror("mremap failed");                                                    \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
-            MPI_Abort(MPI_COMM_WORLD, 1);                                               \
+            gasnet_exit(1);                                                             \
         }                                                                               \
     }
 
@@ -80,7 +70,7 @@ typedef struct {
         if (variable == MAP_FAILED) {                                                   \
             perror("mmap failed");                                                      \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
-            MPI_Abort(MPI_COMM_WORLD, 1);                                               \
+            gasnet_exit(1);                                                             \
         }                                                                               \
     }
 

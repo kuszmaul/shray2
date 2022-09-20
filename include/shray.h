@@ -33,11 +33,13 @@ void ShrayFinalize(void);
 
 #define SHRAY_TIME(fncall)                                      \
     do {                                                        \
-        MPI_Barrier(MPI_COMM_WORLD);                            \
+/*        gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS); \
+        gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);   \
         double start = MPI_Wtime();                             \
         fncall;                                                 \
-        MPI_Barrier(MPI_COMM_WORLD);                            \
+        gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS); \
+        gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);   \
         double end = MPI_Wtime();                               \
-        fprintf(stderr, #fncall " took %lfs.\n", end - start);  \
+        fprintf(stderr, #fncall " took %lfs.\n", end - start);*/  \
     } while (0)
 #endif

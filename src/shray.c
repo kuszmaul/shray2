@@ -22,6 +22,12 @@ static size_t ShrayPagesz;
  * Helper functions
  *****************************************************/
 
+static void gasnetBarrier(void)
+{
+    gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS);
+    gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);
+}
+
 /* Returns ceil(a / b) */
 inline size_t roundUp(size_t a, size_t b)
 {
@@ -35,10 +41,8 @@ int inRange(void *address, Allocation* alloc)
 }
 
 /* segfault is rounded to page boundary */
-RDMA findOwner(void *segfault)
+int findOwner(void *segfault)
 {
-    RDMA rdma;
-
     /* We advance through the allocations, until we find the one containing our 
      * segfault. */
     Allocation *current = heap;
@@ -49,15 +53,12 @@ RDMA findOwner(void *segfault)
 
     if (current == NULL) {
             printf("Segfault (%p) outside of DSM area\n", segfault);
-            MPI_Abort(MPI_COMM_WORLD, 5);
+            gasnet_exit(1);
     }
 
     uintptr_t difference = (uintptr_t)segfault - (uintptr_t)(current->location);
 
-    rdma.owner = difference / current->bytesPerBlock;
-    rdma.win = current->win;
-
-    return rdma;
+    return difference / current->bytesPerBlock;
 }
 
 void SegvHandler(int sig, siginfo_t *si, void *unused)
@@ -68,17 +69,12 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     DBUG_PRINT("Segfault at %p.", address)
 
     /* Copy the remote page to the cache line we are going to evict. */
-    RDMA rdma = findOwner(roundedAddress);
+    int owner = findOwner(roundedAddress);
 
     DBUG_PRINT("We fill %p with a page from node %d",
             cache.addresses[cache.firstIn], rdma.owner);
 
-    MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, rdma.owner, 0, *rdma.win));
-
-    MPI_SAFE(MPI_Get(cache.addresses[cache.firstIn], ShrayPagesz, MPI_BYTE, rdma.owner, 
-            (uintptr_t)roundedAddress, ShrayPagesz, MPI_BYTE, *rdma.win));
-
-    MPI_SAFE(MPI_Win_unlock(rdma.owner, *rdma.win));
+    gasnet_get_bulk(cache.addresses[cache.firstIn], owner, roundedAddress, ShrayPagesz);
 
     /* Remap the evicted cache line to the proper position. */
     DBUG_PRINT("Cache admittance: We remap %p to %p\n", 
@@ -100,14 +96,13 @@ void registerHandler(void)
 
     if (sigaction (SIGSEGV, &sa, NULL) == -1) {
         perror("Registering SIGSEGV handler failed.\n");
-        MPI_Abort(MPI_COMM_WORLD, 6);
+        gasnet_exit(1);
     }
 }
 
 Allocation *createAllocation(void)
 {
     Allocation *result = malloc(sizeof(Allocation));
-    result->win = malloc(sizeof(MPI_Win));
 
     return result;
 }
@@ -124,10 +119,12 @@ Allocation *insertAtHead(Allocation *head, Allocation *newHead)
 
 void ShrayInit(int *argc, char ***argv, size_t cacheSize)
 {
-    MPI_Init(NULL, NULL);
+    GASNET_SAFE(gasnet_init(argc, argv));
+    /* Must be built with GASNET_SEGMENT_EVERYTHING, so these arguments are ignored. */
+    GASNET_SAFE(gasnet_attach(NULL, 0, 4096, 0));
 
-    MPI_Comm_size(MPI_COMM_WORLD, &Shray_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &Shray_rank);
+    Shray_size = gasnet_nodes();
+    Shray_rank = gasnet_mynode();
 
     segfaultCounter = 0;
     barrierCounter = 0;
@@ -147,7 +144,7 @@ void ShrayInit(int *argc, char ***argv, size_t cacheSize)
 
     if (cache.addresses == NULL) {
         perror("Allocating cache addresses has failed\n");
-        MPI_Abort(MPI_COMM_WORLD, 1);
+        gasnet_exit(1);
     }
 
     MMAP_SAFE(cache.addresses[0], mmap(NULL, cache.numberOfLines * ShrayPagesz, 
@@ -169,16 +166,12 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     alloc->size = totalSize;
 
-    /* This is really ugly, but the MPI-standard does not safely allow us to create 
-     * a window on whatever memory we want. For that reason we need a dynamic window,
-     * which works with absolute offsets, instead of relative ones. So we need the 
-     * allocation to have the same address on every node. */
     if (Shray_rank == 0) {
         MMAP_SAFE(alloc->location, mmap(NULL, alloc->size, PROT_NONE, MAP_ANONYMOUS |
                 MAP_PRIVATE, -1, 0));
     }
 
-    MPI_SAFE(MPI_Bcast(&(alloc->location), 1, MPI_AINT, 0, MPI_COMM_WORLD));
+    // Broadcast alloc->location to the other nodes. 
 
     if (Shray_rank != 0) {
         MMAP_SAFE(alloc->location, mmap(alloc->location, alloc->size, PROT_NONE, 
@@ -196,19 +189,16 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
     if (segmentSize == 0) {
         fprintf(stderr, "A processor has no data\n");
-        MPI_Abort(MPI_COMM_WORLD, 5);
+        gasnet_exit(1);
     }
 
     void *start = (void *)((uintptr_t)alloc->location + firstPage * ShrayPagesz);
     MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
 
-    MPI_SAFE(MPI_Win_create_dynamic(MPI_INFO_NULL, MPI_COMM_WORLD, alloc->win));
-    MPI_SAFE(MPI_Win_attach(*(alloc->win), start, segmentSize));
-
     /* Insert a new allocation */
     heap = insertAtHead(heap, alloc);
 
-    MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
+    gasnetBarrier();
 
     DBUG_PRINT("Made a DSM allocation [%p, %p[, of which we own [%p, %p[.", 
             alloc->location, (void *)((uintptr_t)alloc->location + alloc->size),
@@ -232,7 +222,7 @@ size_t ShrayEnd(size_t firstDimension)
 
 void ShraySync(void *array)
 {    
-    MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
+    gasnetBarrier();
     BARRIERCOUNT
 
     Allocation *current = heap;
@@ -261,12 +251,7 @@ void ShraySync(void *array)
         DBUG_PRINT("We get [%p, %p[ from node %d\n", pageBoundary, 
                 (void *)((uintptr_t)pageBoundary + count), Shray_rank - 1);
 
-        MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, Shray_rank - 1, 0, *(current->win)));
-    
-        MPI_SAFE(MPI_Get(pageBoundary, count, MPI_BYTE, Shray_rank - 1, 
-                    (uintptr_t)pageBoundary, count, MPI_BYTE, *(current->win)));
-
-        MPI_SAFE(MPI_Win_unlock(Shray_rank - 1, *(current->win)));
+        gasnet_get_bulk(pageBoundary, Shray_rank - 1, pageBoundary, count);
     }
 
     /* Get the first page of the next rank, and copy its contents to our copy of that 
@@ -282,22 +267,15 @@ void ShraySync(void *array)
         DBUG_PRINT("We get [%p, %p[ from node %d\n", dest, 
                 (void *)((uintptr_t)dest + count), Shray_rank + 1);
 
-        MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, Shray_rank + 1, 0, *(current->win)));
-    
-        MPI_SAFE(MPI_Get(dest, count, MPI_BYTE, 
-                    Shray_rank + 1, (uintptr_t)lastByte + 1, count,
-                    MPI_BYTE, *(current->win)));
-    
-        MPI_SAFE(MPI_Win_unlock(Shray_rank + 1, *(current->win)));
+        gasnet_get_bulk(dest, Shray_rank + 1, dest, count);
     }
 
-    MPI_SAFE(MPI_Win_fence(0, *(current->win)));
     BARRIERCOUNT
 }
 
 void ShrayFree(void *address)
 {
-    MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
+    gasnetBarrier();
     BARRIERCOUNT
 
     /* indirect iterates through the links of the nodes, e.g. the pointers
@@ -311,16 +289,15 @@ void ShrayFree(void *address)
 
     if (*indirect == NULL) {
         fprintf(stderr, "Illegal dsm free\n");
-        MPI_Abort(MPI_COMM_WORLD, 2);
+        gasnet_exit(1);
     } else {
-        MPI_SAFE(MPI_Win_free((*indirect)->win));
         munmap(address, (*indirect)->size);
         Allocation *deleteThis = *indirect;
         *indirect = (*indirect)->next;
         free(deleteThis);
     }
 
-    MPI_SAFE(MPI_Barrier(MPI_COMM_WORLD));
+    gasnetBarrier();
     BARRIERCOUNT
 }
 
@@ -333,5 +310,5 @@ void ShrayReport(void)
 
 void ShrayFinalize(void)
 {
-    MPI_SAFE(MPI_Finalize());
+    gasnet_exit(0);
 }
