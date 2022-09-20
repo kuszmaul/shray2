@@ -39,7 +39,6 @@ typedef struct Allocation {
 /* For retrieving a remote page. */
 typedef struct {
     int owner;
-    size_t offset;
     MPI_Win *win;
 } RDMA;
 

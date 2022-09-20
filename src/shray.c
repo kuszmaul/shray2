@@ -55,9 +55,6 @@ RDMA findOwner(void *segfault)
     uintptr_t difference = (uintptr_t)segfault - (uintptr_t)(current->location);
 
     rdma.owner = difference / current->bytesPerBlock;
-    rdma.offset = difference % current->bytesPerBlock + 
-        (rdma.owner * current->bytesPerBlock) % ShrayPagesz;
-
     rdma.win = current->win;
 
     return rdma;
@@ -73,13 +70,13 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     /* Copy the remote page to the cache line we are going to evict. */
     RDMA rdma = findOwner(roundedAddress);
 
-    DBUG_PRINT("We fill %p with a page from node %d, offset %zu from the window.", 
-            cache.addresses[cache.firstIn], rdma.owner, rdma.offset);
+    DBUG_PRINT("We fill %p with a page from node %d",
+            cache.addresses[cache.firstIn], rdma.owner);
 
     MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, rdma.owner, 0, *rdma.win));
 
     MPI_SAFE(MPI_Get(cache.addresses[cache.firstIn], ShrayPagesz, MPI_BYTE, rdma.owner, 
-            rdma.offset, ShrayPagesz, MPI_BYTE, *rdma.win));
+            (uintptr_t)roundedAddress, ShrayPagesz, MPI_BYTE, *rdma.win));
 
     MPI_SAFE(MPI_Win_unlock(rdma.owner, *rdma.win));
 
@@ -172,8 +169,21 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     alloc->size = totalSize;
 
-    MMAP_SAFE(alloc->location, mmap(NULL, alloc->size, PROT_NONE, MAP_ANONYMOUS |
+    /* This is really ugly, but the MPI-standard does not safely allow us to create 
+     * a window on whatever memory we want. For that reason we need a dynamic window,
+     * which works with absolute offsets, instead of relative ones. So we need the 
+     * allocation to have the same address on every node. */
+    if (Shray_rank == 0) {
+        MMAP_SAFE(alloc->location, mmap(NULL, alloc->size, PROT_NONE, MAP_ANONYMOUS |
                 MAP_PRIVATE, -1, 0));
+    }
+
+    MPI_SAFE(MPI_Bcast(&(alloc->location), 1, MPI_AINT, 0, MPI_COMM_WORLD));
+
+    if (Shray_rank != 0) {
+        MMAP_SAFE(alloc->location, mmap(alloc->location, alloc->size, PROT_NONE, 
+                MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+    }
 
     /* We distribute blockwise over the first dimension. */
     size_t bytesPerLatterDimensions = alloc->size / firstDimension;
@@ -191,9 +201,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     void *start = (void *)((uintptr_t)alloc->location + firstPage * ShrayPagesz);
     MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
-//    MPI_SAFE(MPI_Win_create(start, segmentSize, 1, MPI_INFO_NULL, MPI_COMM_WORLD, alloc->win));
-    /* See page 448 of https://www.mpi-forum.org/docs/mpi-3.1/mpi31-report.pdf on why
-     * this is necessary. */
+
     MPI_SAFE(MPI_Win_create_dynamic(MPI_INFO_NULL, MPI_COMM_WORLD, alloc->win));
     MPI_SAFE(MPI_Win_attach(*(alloc->win), start, segmentSize));
 
@@ -245,25 +253,19 @@ void ShraySync(void *array)
      * page. */
     if ((firstByte % ShrayPagesz != 0) && (Shray_rank != 0)) {
 
-        size_t firstPage = Shray_rank * current->bytesPerBlock / ShrayPagesz;
+        void *pageBoundary = (void *)((uintptr_t)current->location +
+                (uintptr_t)firstByte / ShrayPagesz * ShrayPagesz);
 
-        size_t theirFirstPage = (Shray_rank - 1) * current->bytesPerBlock / 
-            ShrayPagesz;
-        size_t theirLastPage = (Shray_rank * current->bytesPerBlock - 1) / 
-            ShrayPagesz;
+        size_t count = (uintptr_t)current->location + firstByte - (uintptr_t)pageBoundary;
 
-        void *destination = (void *)((uintptr_t)(current->location) + 
-                firstPage * ShrayPagesz);
-
-        /* From this byte on, we own it, before this byte the previous rank does. */
-        size_t pageBoundary = Shray_rank * current->bytesPerBlock % ShrayPagesz;
+        DBUG_PRINT("We get [%p, %p[ from node %d\n", pageBoundary, 
+                (void *)((uintptr_t)pageBoundary + count), Shray_rank - 1);
 
         MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, Shray_rank - 1, 0, *(current->win)));
     
-        MPI_SAFE(MPI_Get(destination, pageBoundary, MPI_BYTE, Shray_rank - 1, 
-                    (theirLastPage - theirFirstPage) * ShrayPagesz, 
-                    pageBoundary, MPI_BYTE, *(current->win)));
-    
+        MPI_SAFE(MPI_Get(pageBoundary, count, MPI_BYTE, Shray_rank - 1, 
+                    (uintptr_t)pageBoundary, count, MPI_BYTE, *(current->win)));
+
         MPI_SAFE(MPI_Win_unlock(Shray_rank - 1, *(current->win)));
     }
 
@@ -272,17 +274,19 @@ void ShraySync(void *array)
     if ((lastByte % ShrayPagesz != ShrayPagesz - 1) && 
             (Shray_rank != Shray_size - 1)) {
 
-        void *destination = (void *)((uintptr_t)current->location + 
-                (Shray_rank + 1) * current->bytesPerBlock);
+        void *dest = (void *)((uintptr_t)current->location + lastByte + 1);
 
-        /* Before this byte, we own it, after this byte the next rank does. */
-        size_t pageBoundary = lastByte % ShrayPagesz;
+        size_t count = roundUp((uintptr_t)lastByte, ShrayPagesz) * ShrayPagesz - 
+            (uintptr_t)lastByte - 1;
+
+        DBUG_PRINT("We get [%p, %p[ from node %d\n", dest, 
+                (void *)((uintptr_t)dest + count), Shray_rank + 1);
 
         MPI_SAFE(MPI_Win_lock(MPI_LOCK_SHARED, Shray_rank + 1, 0, *(current->win)));
     
-        MPI_SAFE(MPI_Get(destination, ShrayPagesz - pageBoundary - 1, MPI_BYTE, 
-                    Shray_rank + 1, pageBoundary + 1, ShrayPagesz - 
-                    pageBoundary - 1, MPI_BYTE, *(current->win)));
+        MPI_SAFE(MPI_Get(dest, count, MPI_BYTE, 
+                    Shray_rank + 1, (uintptr_t)lastByte + 1, count,
+                    MPI_BYTE, *(current->win)));
     
         MPI_SAFE(MPI_Win_unlock(Shray_rank + 1, *(current->win)));
     }
