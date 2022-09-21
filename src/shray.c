@@ -250,10 +250,13 @@ void ShraySync(void *array)
 
         size_t count = (uintptr_t)current->location + firstByte - (uintptr_t)pageBoundary;
 
-        DBUG_PRINT("We get [%p, %p[ from node %d\n", pageBoundary, 
+        DBUG_PRINT("We are going to get [%p, %p[ from node %d\n", pageBoundary, 
                 (void *)((uintptr_t)pageBoundary + count), Shray_rank - 1);
 
         gasnet_get_bulk(pageBoundary, Shray_rank - 1, pageBoundary, count);
+
+        DBUG_PRINT("We got [%p, %p[ from node %d\n", pageBoundary, 
+                (void *)((uintptr_t)pageBoundary + count), Shray_rank - 1);
     }
 
     /* Get the first page of the next rank, and copy its contents to our copy of that 
@@ -266,10 +269,13 @@ void ShraySync(void *array)
         size_t count = roundUp((uintptr_t)lastByte, ShrayPagesz) * ShrayPagesz - 
             (uintptr_t)lastByte - 1;
 
-        DBUG_PRINT("We get [%p, %p[ from node %d\n", dest, 
+        DBUG_PRINT("We are going to get [%p, %p[ from node %d\n", dest, 
                 (void *)((uintptr_t)dest + count), Shray_rank + 1);
 
         gasnet_get_bulk(dest, Shray_rank + 1, dest, count);
+
+        DBUG_PRINT("We got [%p, %p[ from node %d\n", dest, 
+                (void *)((uintptr_t)dest + count), Shray_rank + 1);
     }
 
     BARRIERCOUNT

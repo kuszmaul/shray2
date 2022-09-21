@@ -1,7 +1,7 @@
 include /usr/local/gasnet/include/smp-conduit/smp-seq.mak 
 
 FLAGS = -O3 -ffast-math -march=native -mtune=native -Wall
-LFLAGS = -lm -lcblas
+LFLAGS = -lm -lcblas -fsanitize=undefined
 APPS = $(wildcard apps/*.c)
 RELEASE = $(patsubst apps/%.c, bin/%, $(APPS))
 DEBUG = $(patsubst apps/%.c, bin/%_debug, $(APPS))
@@ -11,7 +11,7 @@ all: release debug profile
 
 release: $(RELEASE)
 
-debug: FLAGS += -DDEBUG -g -fsanitize=undefined #-fsanitize=address
+debug: FLAGS += -DDEBUG -g -fsanitize=undefined
 debug: $(DEBUG)
 
 profile: FLAGS += -DPROFILE
