@@ -1,6 +1,7 @@
-include /usr/local/gasnet/include/smp-conduit/smp-seq.mak 
+#include /usr/local/gasnet/include/smp-conduit/smp-seq.mak 
+include /usr/local/gasnet/include/mpi-conduit/mpi-seq.mak 
 
-FLAGS = -O3 -ffast-math -march=native -mtune=native -Wall
+FLAGS = #-O3 -ffast-math -march=native -mtune=native -Wall
 LFLAGS = -lm -lcblas -fsanitize=undefined
 APPS = $(wildcard apps/*.c)
 RELEASE = $(patsubst apps/%.c, bin/%, $(APPS))
