@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     ShraySync(A);
     ShraySync(B);
 
-    SHRAY_TIME(matmul(A, B, C, n));
+    matmul(A, B, C, n);
     ShraySync(C);
 
     ShrayFree(A);
