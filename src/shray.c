@@ -72,7 +72,7 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     int owner = findOwner(roundedAddress);
 
     DBUG_PRINT("We fill %p with a page from node %d",
-            cache.addresses[cache.firstIn], rdma.owner);
+            cache.addresses[cache.firstIn], owner);
 
     gasnet_get_bulk(cache.addresses[cache.firstIn], owner, roundedAddress, ShrayPagesz);
 
@@ -171,7 +171,9 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
                 MAP_PRIVATE, -1, 0));
     }
 
-    // Broadcast alloc->location to the other nodes. 
+    /* Broadcast alloc->location to the other nodes. */
+    gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
+            0, &(alloc->location), sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
     if (Shray_rank != 0) {
         MMAP_SAFE(alloc->location, mmap(alloc->location, alloc->size, PROT_NONE, 

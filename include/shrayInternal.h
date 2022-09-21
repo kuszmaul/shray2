@@ -6,6 +6,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <gasnet.h>
+#include <gasnet_coll.h>
 #include <sys/mman.h>
 
 /**************************************************
