@@ -47,7 +47,7 @@ int findOwner(void *segfault)
      * segfault. */
     Allocation *current = heap;
 
-    while (!inRange(segfault, current) && current != NULL) {
+    while (current != NULL && !inRange(segfault, current)) {
         current = current->next;
     }
 
@@ -74,7 +74,7 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     DBUG_PRINT("We fill %p with a page from node %d",
             cache.addresses[cache.firstIn], owner);
 
-    gasnet_get_bulk(cache.addresses[cache.firstIn], owner, roundedAddress, ShrayPagesz);
+    gasnet_get(cache.addresses[cache.firstIn], owner, roundedAddress, ShrayPagesz);
 
     /* Remap the evicted cache line to the proper position. */
     DBUG_PRINT("Cache admittance: We remap %p to %p\n", 
