@@ -40,9 +40,18 @@ int inRange(void *address, Allocation* alloc)
         ((uintptr_t)address < (uintptr_t)alloc->location + alloc->size);
 }
 
+typedef struct {
+    /* Owner of this page */
+    int thisOwner;
+    /* Owner of the next page, or -1 if it is not sensible to prefetch. */
+    int nextOwner;
+} Owner;
+
 /* segfault is rounded to page boundary */
-int findOwner(void *segfault)
+Owner findOwner(void *segfault)
 {
+    Owner owner;
+
     /* We advance through the allocations, until we find the one containing our 
      * segfault. */
     Allocation *current = heap;
@@ -58,7 +67,15 @@ int findOwner(void *segfault)
 
     uintptr_t difference = (uintptr_t)segfault - (uintptr_t)(current->location);
 
-    return difference / current->bytesPerBlock;
+    owner.thisOwner = difference / current->bytesPerBlock;
+    void *nextPage = (void *)((uintptr_t)segfault + ShrayPagesz);
+    if (inRange(nextPage, current)) {
+        owner.nextOwner = (difference + ShrayPagesz) / current->bytesPerBlock;
+    } else {
+        owner.nextOwner = -1;
+    }
+
+    return owner;
 }
 
 void SegvHandler(int sig, siginfo_t *si, void *unused)
@@ -68,18 +85,41 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     void *roundedAddress = (void *)((uintptr_t)address / ShrayPagesz * ShrayPagesz);
     DBUG_PRINT("Segfault at %p.", address)
 
-    /* Copy the remote page to the cache line we are going to evict. */
-    int owner = findOwner(roundedAddress);
+    gasnet_wait_syncnbi_gets();
 
-    DBUG_PRINT("We fill %p with a page from node %d",
-            cache.addresses[cache.firstIn], owner);
+    Owner owner = findOwner(roundedAddress);
+    DBUG_PRINT("Segfault is owned by node %d. Next page is owned by node %d.",
+            owner.thisOwner, owner.nextOwner);
 
-    gasnet_get(cache.addresses[cache.firstIn], owner, roundedAddress, ShrayPagesz);
+    /* The prefetch of the previous segfault. */
+    void *prefetchOld = cache.prefetch;
 
-    /* Remap the evicted cache line to the proper position. */
-    DBUG_PRINT("Cache admittance: We remap %p to %p\n", 
-                cache.addresses[cache.firstIn], roundedAddress);
+    /* Prefetch to the second cache line admitted. Protect the line afterwards as its 
+     * contents is undefined until the asynchronous fetch is completed. */
+    cache.prefetch = (void *)((uintptr_t)roundedAddress + ShrayPagesz);
+    if (owner.nextOwner != -1) {
+        DBUG_PRINT("We prefetch %p, storing it in %p.", cache.prefetch, 
+                cache.addresses[cache.firstIn + 1]);
+        gasnet_get_nbi(cache.addresses[cache.firstIn + 1], owner.nextOwner, 
+                cache.prefetch, ShrayPagesz);
+    } else {
+        DBUG_PRINT("We do not prefetch %p as it falls outside of a DSM allocation.", 
+                cache.prefetch);
+    }
+    MPROTECT_SAFE(mprotect(cache.addresses[cache.firstIn + 1], ShrayPagesz, PROT_NONE));
 
+    if (prefetchOld != roundedAddress) {
+        /* We prefetched the wrong page. Do a blocking fetch on the page we need, storing
+         * the result in the line we evict. */
+        DBUG_PRINT("We prefetched %p which we do not need, so now we fetch %p, "
+                "storing it in %p.", prefetchOld, roundedAddress, 
+                cache.addresses[cache.firstIn]);
+        gasnet_get(cache.addresses[cache.firstIn], owner.thisOwner, roundedAddress, ShrayPagesz);
+    }
+
+    /* Remap the evicted cache line to the proper position. This also protects the 
+     * previous position of the evicted cache line. FIXME right?*/
+    DBUG_PRINT("We remap %p to %p", cache.addresses[cache.firstIn], roundedAddress);
     MREMAP_SAFE(cache.addresses[cache.firstIn], mremap(cache.addresses[cache.firstIn], 
             ShrayPagesz, ShrayPagesz, MREMAP_MAYMOVE | MREMAP_FIXED, 
             roundedAddress));
@@ -141,6 +181,7 @@ void ShrayInit(int *argc, char ***argv, size_t cacheSize)
     cache.firstIn = 0;
     cache.numberOfLines = cacheSize / ShrayPagesz;
     cache.addresses = malloc(cache.numberOfLines * sizeof(void *));
+    cache.prefetch = NULL;
 
     if (cache.addresses == NULL) {
         perror("Allocating cache addresses has failed\n");
@@ -171,7 +212,8 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
                 MAP_PRIVATE, -1, 0));
     }
 
-    /* Broadcast alloc->location to the other nodes. */
+    /* Broadcast alloc->location to the other nodes. I don't know whether this is 
+     * correct. Especially the 0 was a pure guess. Appears to work for now though. */
     gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
             0, &(alloc->location), sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
@@ -195,6 +237,8 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     }
 
     void *start = (void *)((uintptr_t)alloc->location + firstPage * ShrayPagesz);
+    DBUG_PRINT("ShrayMalloc makes %zu bytes from %p available for read/write.", 
+            segmentSize, start);
     MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
 
     /* Insert a new allocation */

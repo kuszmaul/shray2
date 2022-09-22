@@ -22,6 +22,8 @@ typedef struct {
     size_t firstIn;
     /* This determines the size of our cache. */
     size_t numberOfLines;
+    /* The address we are currently prefetching. */
+    void *prefetch;
 } Cache;
 
 /* A single allocation in the heap. */
