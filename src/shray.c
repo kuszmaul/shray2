@@ -106,8 +106,10 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
         DBUG_PRINT("We do not prefetch %p as it falls outside of a DSM allocation.", 
                 cache.prefetch);
     }
+    /* The asynchronous get needs to write to it, but the results are undefined, so 
+     * we cannot read it. */
     MPROTECT_SAFE(mprotect(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines], 
-                ShrayPagesz, PROT_NONE));
+                ShrayPagesz, PROT_WRITE));
 
     if (prefetchOld != roundedAddress) {
         /* We prefetched the wrong page. Do a blocking fetch on the page we need, storing
