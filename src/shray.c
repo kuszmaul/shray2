@@ -99,14 +99,15 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     cache.prefetch = (void *)((uintptr_t)roundedAddress + ShrayPagesz);
     if (owner.nextOwner != -1) {
         DBUG_PRINT("We prefetch %p, storing it in %p.", cache.prefetch, 
-                cache.addresses[cache.firstIn + 1]);
-        gasnet_get_nbi(cache.addresses[cache.firstIn + 1], owner.nextOwner, 
-                cache.prefetch, ShrayPagesz);
+                cache.addresses[(cache.firstIn + 1) % cache.numberOfLines]);
+        gasnet_get_nbi(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines], 
+                owner.nextOwner, cache.prefetch, ShrayPagesz);
     } else {
         DBUG_PRINT("We do not prefetch %p as it falls outside of a DSM allocation.", 
                 cache.prefetch);
     }
-    MPROTECT_SAFE(mprotect(cache.addresses[cache.firstIn + 1], ShrayPagesz, PROT_NONE));
+    MPROTECT_SAFE(mprotect(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines], 
+                ShrayPagesz, PROT_NONE));
 
     if (prefetchOld != roundedAddress) {
         /* We prefetched the wrong page. Do a blocking fetch on the page we need, storing
