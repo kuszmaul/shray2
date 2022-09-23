@@ -215,7 +215,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
                 MAP_PRIVATE, -1, 0));
     }
 
-    /* Broadcast alloc->location to the other nodes. I don't know whether this is 
+    /* Broadcast alloc->location to the other nodes. FIXME I don't know whether this is 
      * correct. Especially the 0 was a pure guess. Appears to work for now though. */
     gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
             0, &(alloc->location), sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);

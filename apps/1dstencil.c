@@ -86,7 +86,7 @@ int testEquality(double *arr1, double *arr2, size_t startIndex, size_t endIndex,
     for (size_t i = startIndex; i < endIndex; i++) {
         if ((arr1[i] - arr2[i]) * (arr1[i] - arr2[i]) > epsilon) {
             printf("Position %ld: %lf != %lf\n", i, arr1[i], arr2[i]);
-        //    return 0;
+            return 0;
         }
     }
 
