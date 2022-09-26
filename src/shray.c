@@ -236,10 +236,6 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     size_t lastPage = (Shray_rank == Shray_size - 1) ? alloc->size / ShrayPagesz :
         (Shray_rank + 1) * alloc->bytesPerBlock / ShrayPagesz;
     size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
-    if (segmentSize == 0) {
-        fprintf(stderr, "A processor has no data\n");
-        gasnet_exit(1);
-    }
 
     void *start = (void *)((uintptr_t)alloc->location + firstPage * ShrayPagesz);
     DBUG_PRINT("ShrayMalloc makes %zu bytes from %p available for read/write.", 
