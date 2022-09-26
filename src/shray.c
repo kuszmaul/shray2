@@ -220,9 +220,11 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
             0, &(alloc->location), sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
+    DBUG_PRINT("DSM allocation starts at %p", alloc->location);
+
     if (Shray_rank != 0) {
         MMAP_SAFE(alloc->location, mmap(alloc->location, alloc->size, PROT_NONE, 
-                MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
     }
 
     /* We distribute blockwise over the first dimension. */
