@@ -220,26 +220,33 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
             0, &(alloc->location), sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
-    DBUG_PRINT("DSM allocation starts at %p", alloc->location);
-
     if (Shray_rank != 0) {
         MMAP_SAFE(alloc->location, mmap(alloc->location, alloc->size, PROT_NONE, 
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
     }
 
+    DBUG_PRINT("DSM allocation starts at %p", alloc->location);
+
+    gasnetBarrier();
+
     /* We distribute blockwise over the first dimension. */
     size_t bytesPerLatterDimensions = alloc->size / firstDimension;
     alloc->bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
 
-    /* Protect all pages that we do not own, and register what we do. */
-    size_t firstPage = Shray_rank * alloc->bytesPerBlock / ShrayPagesz;
-    size_t lastPage = (Shray_rank == Shray_size - 1) ? alloc->size / ShrayPagesz :
-        (Shray_rank + 1) * alloc->bytesPerBlock / ShrayPagesz;
+    /* Protect all pages that we do not own, and register what we do. We must subtract
+     * one from alloc->bytesPerBlock as we start counting from one. So for example 
+     * the last byte owned by node 0, has index alloc->bytesPerBlock - 1. */
+    size_t firstPage = Shray_rank * (alloc->bytesPerBlock - 1) / ShrayPagesz;
+    size_t lastPage = (Shray_rank == Shray_size - 1) ? (alloc->size - 1) / ShrayPagesz :
+        (Shray_rank + 1) * (alloc->bytesPerBlock - 1) / ShrayPagesz;
     size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
 
+    DBUG_PRINT("First page: %zu, last page: %zu", firstPage, lastPage);
+
     void *start = (void *)((uintptr_t)alloc->location + firstPage * ShrayPagesz);
-    DBUG_PRINT("ShrayMalloc makes %zu bytes from %p available for read/write.", 
-            segmentSize, start);
+    DBUG_PRINT("ShrayMalloc makes %zu bytes from %p available for read/write, so"
+            "\n\t\t  [%p, %p[.", 
+            segmentSize, start, start, (void *)((uintptr_t)start + segmentSize));
     MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
 
     /* Insert a new allocation */

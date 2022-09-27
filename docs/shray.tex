@@ -34,6 +34,8 @@ Bachelor's thesis. It is (going to be) simplified and optimised for array progra
 good locality of reference. It is the aim that this can be used for code generators dealing
 with arrays. 
 
+\section{Related work}
+
 \section{Distributed shared memory}
 
 A
@@ -42,8 +44,20 @@ A
 
 \section{Consistency}
 
-Each processor writes only to the memory it owns. 
+There are two forms of ownership: write ownership, and read ownership. If we have $p$ processors
+total, and an array $A$ whose first dimension is $n$, processor $s$ may write to 
+$[A[s \cdot \lceil \frac{n}{p} \rceil], A[(s + 1) \cdot \lceil \frac{n}{p} \rceil][$. So 
+$A$ is distributed block-wise along its first dimension. 
 
+\medskip
 
+% Explain this more clearly with a picture. 
+
+There is a problem with this. Suppose $P(0)$ owns four elements, and pages contain three 
+elements. When $P(1)$ reads the fourth element, it fetches the entire page, so also elements
+five and six. We also have to make the entire page available for reading. So we must ensure 
+that $P(0)$ also has those elements. For this reason the read ownership consists of all pages
+containing at least one element owned for writing. After writing, each processor must exchange
+this data with its neighbours. 
 
 \end{document}
