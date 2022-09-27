@@ -236,9 +236,9 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     /* Protect all pages that we do not own, and register what we do. We must subtract
      * one from alloc->bytesPerBlock as we start counting from one. So for example 
      * the last byte owned by node 0, has index alloc->bytesPerBlock - 1. */
-    size_t firstPage = Shray_rank * (alloc->bytesPerBlock - 1) / ShrayPagesz;
+    size_t firstPage = Shray_rank * alloc->bytesPerBlock / ShrayPagesz;
     size_t lastPage = (Shray_rank == Shray_size - 1) ? (alloc->size - 1) / ShrayPagesz :
-        (Shray_rank + 1) * (alloc->bytesPerBlock - 1) / ShrayPagesz;
+        ((Shray_rank + 1) * alloc->bytesPerBlock - 1) / ShrayPagesz;
     size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
 
     DBUG_PRINT("First page: %zu, last page: %zu", firstPage, lastPage);
