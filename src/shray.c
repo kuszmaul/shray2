@@ -274,6 +274,32 @@ size_t ShrayEnd(size_t firstDimension)
         (Shray_rank + 1) * roundUp(firstDimension, Shray_size);
 }
 
+void ShrayRealloc(void *array)
+{
+    gasnetBarrier();
+    BARRIERCOUNT
+
+    Allocation *current = heap;
+
+    while (current != NULL && current->location != array) {
+        current = current->next;
+    }
+
+    if (current == NULL) {
+        perror("address is not the start of a DSM allocation.");
+    }
+
+    MPROTECT_SAFE(mprotect(current->location, current->size, PROT_NONE));
+
+    size_t firstPage = Shray_rank * current->bytesPerBlock / ShrayPagesz;
+    size_t lastPage = (Shray_rank == Shray_size - 1) ? (current->size - 1) / ShrayPagesz :
+        ((Shray_rank + 1) * current->bytesPerBlock - 1) / ShrayPagesz;
+    size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
+
+    void *start = (void *)((uintptr_t)current->location + firstPage * ShrayPagesz);
+    MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
+}
+
 void ShraySync(void *array)
 {    
     gasnetBarrier();

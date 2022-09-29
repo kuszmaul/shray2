@@ -10,6 +10,10 @@ void ShrayInit(int *argc, char ***argv, size_t cacheSize);
  * sizeof(TYPE) where TYPE is the type of the array. */
 void *ShrayMalloc(size_t firstDimension, size_t totalSize);
 
+/* After this call, it is no longer legal to read from array. array can be considered
+ * empty again, as if returned by ShrayMalloc. */
+void ShrayRealloc(void *array);
+
 /* Given the first dimension of an array, returns the inclusive lower bound
  * on the first dimension where we need to start computing. */
 size_t ShrayStart(size_t firstDimension);
