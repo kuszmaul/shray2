@@ -45,6 +45,28 @@ void stencil(size_t n, double *in, double *out, int iterations)
     }
 }
 
+void stencil2(size_t n, double **in, double **out, int iterations)
+{
+    double *temp;
+
+    (*out)[0] = (*in)[0];
+    (*out)[n - 1] = (*in)[n - 1];
+
+    for (int t = 1; t <= iterations; t++) {
+        for (size_t i = 1; i < n - 1; i++) {
+            (*out)[i] = (*in)[i - 1] * a + (*in)[i] * b + (*in)[i + 1] * c;
+        }
+
+        temp = *in;
+        *in = *out;
+        *out = temp;
+    }
+
+    temp = *in;
+    *in = *out;
+    *out = temp;
+}
+
 /* Idea: we calculate the stencil one block at a time. 
  * For that we take a slice of the input around the block with an 
  * extra boundary of thickness t. */
@@ -122,7 +144,8 @@ int main(int argc, char **argv)
     init(n, in);
 
     start = clock();
-    stencilOpt(n, in, out2, iterations);
+    stencil2(n, &in, &out2, iterations);
+//    stencilOpt(n, in, out2, iterations);
     end = clock();
     duration = (double)(end - start) / CLOCKS_PER_SEC;
 

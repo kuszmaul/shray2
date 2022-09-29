@@ -32,6 +32,8 @@ typedef struct Allocation {
     size_t size;
     struct Allocation *next;
     /* The number of bytes owned by each node except the last one. */
+    /* FIXME voor 1d arrays zou je halve elementen kunnen ownen. Of toch niet? Houden 
+     * we daar in ShrayMalloc rekening mee? */
     size_t bytesPerBlock;
 } Allocation;
 
@@ -44,7 +46,7 @@ typedef struct Allocation {
         int retval;                                                                     \
         if ((retval = fncall) != GASNET_OK) {                                           \
             printf("Error during GASNet call\n");                                       \
-            gasnet_exit(1);                                                             \
+            ShrayFinalize();                                                            \
         }                                                                               \
     }
 
@@ -53,7 +55,7 @@ typedef struct Allocation {
         if (fncall != 0) {                                                              \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
             perror("mprotect failed");                                                  \
-            gasnet_exit(1);                                                             \
+            ShrayFinalize();                                                             \
         }                                                                               \
     }
 
@@ -63,7 +65,7 @@ typedef struct Allocation {
         if (variable == MAP_FAILED) {                                                   \
             perror("mremap failed");                                                    \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
-            gasnet_exit(1);                                                             \
+            ShrayFinalize();                                                             \
         }                                                                               \
     }
 
@@ -73,7 +75,7 @@ typedef struct Allocation {
         if (variable == MAP_FAILED) {                                                   \
             perror("mmap failed");                                                      \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
-            gasnet_exit(1);                                                             \
+            ShrayFinalize();                                                             \
         }                                                                               \
     }
 

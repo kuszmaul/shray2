@@ -1,17 +1,27 @@
-#include "../include/shray.h"
 #include <stdio.h>
 #include <pthread.h>
+#include <stdlib.h>
 
 /* Number of threads */
 int P;
 
 #define PTHREAD_CREATE(a, b, c, d)                  \
     {                                               \
-        if (!pthread_create(a, b, c, d)) {          \
+        if (pthread_create(a, b, c, d) != 0) {      \
             perror("Error in pthread_create\n");    \
-            ShrayFinalize();                        \
+            exit(EXIT_FAILURE);                     \
         }                                           \
     }
+
+#define PTHREAD_JOIN(a, b)                          \
+    {                                               \
+        if (pthread_join(a, b) != 0) {            \
+            perror("Error in pthread_join\n");      \
+            exit(EXIT_FAILURE);                     \
+        }                                           \
+    }
+
+
 
 typedef struct {
     double *array1d;
@@ -23,13 +33,14 @@ typedef struct {
 void *parallelReduce(void *arg)
 {
     InitArg *input = (InitArg *)arg;
+    printf("Hello from %d, reduction\n", input->tid);
 
     double *sums = malloc(2 * sizeof(double));
     sums[0] = 0.0;
     sums[1] = 0.0;
 
     size_t totalElements = input->size * input->size;
-    size_t blockSize = roundup(totalElements, P);
+    size_t blockSize = totalElements / P;
     size_t start = input->tid * blockSize;
     size_t end = ((input->tid + 1) * blockSize > totalElements) ? 
         totalElements : (input->tid + 1) * blockSize;
@@ -53,25 +64,26 @@ void *threadHello(void *arg)
 void *parallelInit(void *arg)
 {
     InitArg *input = (InitArg *)arg;
+    printf("Hello from %d\n", input->tid);
 
     /* 1d init */
     size_t n = input->size;
-    size_t blockSize = roundup((ShrayEnd(n * n) - 
-                ShrayStart(n * n)), P);
-    size_t start = ShrayStart(n * n) + input->tid * blockSize;
-    size_t end = (ShrayStart(n * n) + (input->tid + 1) * blockSize > ShrayEnd(n * n)) ? 
-            ShrayEnd(n * n) : ShrayStart(n * n) + (input->tid + 1) * blockSize;
+    size_t blockSize = (n * n + P - 1) / P;
+    size_t start = input->tid * blockSize;
+    size_t end = ((input->tid + 1) * blockSize > n * n) ? 
+            n * n : (input->tid + 1) * blockSize;
+
+    printf("Start %zu, end %zu\n", start, end);
 
     for (size_t i = start; i < end; i++) {
         input->array1d[i] = 1.0;
     }
 
     /* 2d init */
-    blockSize = roundup((ShrayEnd(n) - 
-                ShrayStart(n)), P);
-    start = ShrayStart(n) + input->tid * blockSize;
-    end = (ShrayStart(n) + (input->tid + 1) * blockSize > ShrayEnd(n)) ? 
-            ShrayEnd(n) : ShrayStart(n) + (input->tid + 1) * blockSize;
+    blockSize = (n + P - 1) / P;
+    start = input->tid * blockSize;
+    end = ((input->tid + 1) * blockSize > n) ? 
+            n : (input->tid + 1) * blockSize;
 
     for (size_t i = start; i < end; i++) {
         for (size_t j = 0; j < n; j++) {
@@ -79,16 +91,15 @@ void *parallelInit(void *arg)
         }
     }
 
+    printf("Init succesfull on P(%d)\n", input->tid);
+
     return NULL;
 }
 
 int main(int argc, char **argv)
 {
-    ShrayInit(&argc, &argv, 409600);
-
     if (argc != 3) {
         printf("Usage: square root of array size, number of threads per node.\n");
-        ShrayFinalize();
     }
 
     size_t n = atoll(argv[1]);
@@ -99,8 +110,8 @@ int main(int argc, char **argv)
     InitArg *inits = malloc(P * sizeof(InitArg));
     void **returnValues = malloc(P * sizeof(void*));
 
-    double *arr1d = ShrayMalloc(n * n, n * n * sizeof(double));
-    double *arr2d = ShrayMalloc(n, n * n * sizeof(double));
+    double *arr1d = malloc(n * n * sizeof(double));
+    double *arr2d = malloc(n * n * sizeof(double));
 
     for (int tid = 0; tid < P; tid++) {
         inits[tid].array1d = arr1d;
@@ -111,12 +122,10 @@ int main(int argc, char **argv)
     }
 
     for (size_t tid = 0; tid < P; tid++) {
-        pthread_join(threads[tid], returnValues[tid]);
+        PTHREAD_JOIN(threads[tid], returnValues[tid]);
     }
 
-    ShraySync(arr1d);
-    ShraySync(arr2d);
-
+    printf("Joined succesfully\n");
     /* Computation */
     void **returnSums = malloc(P * sizeof(void *));
     double sum1 = 0.0;
@@ -127,7 +136,7 @@ int main(int argc, char **argv)
     }
 
     for (size_t tid = 0; tid < P; tid++) {
-        pthread_join(threads[tid], returnSums[tid]);
+        PTHREAD_JOIN(threads[tid], returnSums[tid]);
     }
 
     for (size_t tid = 0; tid < P; tid++) {
@@ -135,8 +144,8 @@ int main(int argc, char **argv)
         sum2 += ((double *)returnSums[tid])[1];
     }
 
-    ShrayFree(arr1d);
-    ShrayFree(arr2d);
+    free(arr1d);
+    free(arr2d);
     free(threads);
     free(inits);
     free(returnValues);
@@ -145,7 +154,5 @@ int main(int argc, char **argv)
     printf("Sum of arr 1D is %lf, should be %lf.\n", sum1, (double)n * n);
     printf("Sum of arr 2D is %lf, should be %lf.\n", sum2, (double)n * n);
 
-    ShrayReport();
-
-    ShrayFinalize();
+    return EXIT_SUCCESS;
 }
