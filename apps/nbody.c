@@ -1,14 +1,22 @@
-#include "../include/shray.h"
 #include <math.h>
-#include <assert.h>
+#include "../include/shray.h"
 
-//#define MIN(a, b) ((a) < (b)) ? (a) : (b)
+#define min(a, b) ((a) < (b) ? a : b)
 
 typedef struct {
     double x;
     double y;
     double z;
 } Point;
+
+void init(Point *positions, size_t n)
+{
+    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+        positions[i].x = i;
+        positions[i].y = i;
+        positions[i].z = i;
+    }
+}
 
 /* 16 flops */
 Point accelerate(Point pos1, Point pos2, double mass)
@@ -25,21 +33,19 @@ Point accelerate(Point pos1, Point pos2, double mass)
     return a;
 }
 
-/* Same as accelerate all, but tiled for improved cache performance. */
-void accelerateAllTiled(Point *accel, Point *positions, double *masses, size_t n)
+void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
-    size_t tileSize = 1000;
+    /* For segfaults it would be best to have block = 1000, for overall performance,
+     * something like block = 100. Perhaps we need to block twice. */
+    size_t block = 100;
 
-    size_t start = ShrayStart(n);
-    size_t end = ShrayEnd(n);
-
-    for (size_t I = start; I < end; I += tileSize) {
-        for (size_t J = 0; J < n; J += tileSize) {
-            for (size_t i = I; i < MIN(I + tileSize, end); i++) {
+    for (size_t I = ShrayStart(n); I < ShrayEnd(n); I += block) {
+        for (size_t J = 0; J < n; J += block) {
+            for (size_t i = I; i < min(I + block, n); i++) {
                 accel[i].x = 0.0;
                 accel[i].y = 0.0;
                 accel[i].z = 0.0;
-                for (size_t j = J; j < MIN(J + tileSize, n); j++) {
+                for (size_t j = J; j < min(J + block, n); j++) {
                     accel[i].x += 
                         accelerate(positions[i], positions[j], masses[j]).x;
                     accel[i].y += 
@@ -52,28 +58,12 @@ void accelerateAllTiled(Point *accel, Point *positions, double *masses, size_t n
     }
 }
  
-void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
-{
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
-        accel[i].x = 0.0;
-        accel[i].y = 0.0;
-        accel[i].z = 0.0;
-        for (size_t j = 0; j < n; j++) {
-            accel[i].x += 
-                accelerate(positions[i], positions[j], masses[j]).x;
-            accel[i].y += 
-                accelerate(positions[i], positions[j], masses[j]).y;
-            accel[i].z += 
-                accelerate(positions[i], positions[j], masses[j]).z;
-        }
-    }
-}
- 
 /* Advances the n-bodies in place. accel is a buffer, does not need to be initialized. */
 void advance(Point *positions, Point *velocities, double *masses, 
         Point *accel, double dt, size_t n)
 {
-    accelerateAllTiled(positions, accel, masses, n);
+    accelerateAll(positions, accel, masses, n);
+    ShraySync(accel);
 
     for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
         velocities[i].x += accel[i].x * dt;
@@ -83,31 +73,33 @@ void advance(Point *positions, Point *velocities, double *masses,
         positions[i].y += velocities[i].y * dt;
         positions[i].z += velocities[i].z * dt;
     }
+    ShraySync(positions);
+    ShraySync(velocities);
 }
 
 int main(int argc, char **argv)
 {
-    size_t cacheSize = 40960;
-
-    ShrayInit(&argc, &argv, cacheSize);
+    /* For n = 10000, we use 800000 bytes. */
+    ShrayInit(&argc, &argv, 2 * 4096000 / 4);
 
     if (argc != 3) {
         printf("Usage: n, iterations\n");
-        gasnet_exit(1);
+        ShrayFinalize();
     }
 
     size_t n = atoll(argv[1]);
     int iterations = atoi(argv[2]);
 
-    Point *positions = ShrayMalloc(n, n * sizeof(Point));
-    Point *velocities = ShrayMalloc(n, n * sizeof(Point));
-    Point *accel = ShrayMalloc(n, n * sizeof(Point));
-    double *masses = ShrayMalloc(n, n * sizeof(double));
+    Point *positions = (Point *)ShrayMalloc(n, n * sizeof(Point));
+    Point *velocities = (Point *)ShrayMalloc(n, n * sizeof(Point));
+    double *masses = (double *)ShrayMalloc(n, n * sizeof(double));
+    Point *accel = (Point *)ShrayMalloc(n, n * sizeof(Point));
+
+    init(positions, n);
+    ShraySync(positions);
 
     for (int i = 0; i < iterations; i++) {
         advance(positions, velocities, masses, accel, 0.1, n);
-        ShraySync(positions);
-        ShraySync(velocities);
     }
 
     ShrayFree(positions);
