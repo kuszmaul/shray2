@@ -22,30 +22,7 @@ void init(size_t n, double *arr)
     }
 }
 
-void stencil(size_t n, double *in, double *out, int iterations)
-{
-    double *temp;
-
-    out[0] = in[0];
-    out[n - 1] = in[n - 1];
-
-    for (int t = 1; t <= iterations; t++) {
-        for (size_t i = 1; i < n - 1; i++) {
-            out[i] = in[i - 1] * a + in[i] * b + in[i + 1] * c;
-        }
-
-        temp = in;
-        in = out;
-        out = temp;
-    }
-
-    /* We buffer swapped, so copy in to out in case iterations is even. */
-    if (iterations % 2 == 0) {
-        memcpy(out, in, n * sizeof(double));
-    }
-}
-
-void stencil2(size_t n, double **in, double **out, int iterations)
+void stencil(size_t n, double **in, double **out, int iterations)
 {
     double *temp;
 
@@ -83,7 +60,7 @@ void stencilOpt(size_t n, double *in, double *out, int iterations)
         memcpy(inBuffer, &in[i - iterations], (BLOCK + 2 * iterations) * sizeof(double));
 
         /* Perform the stencil. */
-        stencil(BLOCK + 2 * iterations, inBuffer, outBuffer, iterations);
+        stencil(BLOCK + 2 * iterations, &inBuffer, &outBuffer, iterations);
 
         /* Copy the result back to out. */
         memcpy(&out[i], &outBuffer[iterations], BLOCK * sizeof(double));
@@ -92,11 +69,11 @@ void stencilOpt(size_t n, double *in, double *out, int iterations)
 
     /* Boundary of the grid */
     memcpy(inBuffer, in, (BLOCK + iterations) * sizeof(double));
-    stencil(BLOCK + iterations, inBuffer, outBuffer, iterations);
+    stencil(BLOCK + iterations, &inBuffer, &outBuffer, iterations);
     memcpy(out, outBuffer, BLOCK * sizeof(double));
 
     memcpy(inBuffer, &in[n - BLOCK - iterations], (BLOCK + iterations) * sizeof(double));
-    stencil(BLOCK + iterations, inBuffer, outBuffer, iterations);
+    stencil(BLOCK + iterations, &inBuffer, &outBuffer, iterations);
     memcpy(&out[n - BLOCK], &outBuffer[iterations], BLOCK * sizeof(double));
 
     free(inBuffer);
@@ -134,7 +111,7 @@ int main(int argc, char **argv)
     init(n, in);
 
     time_t start = clock();
-    stencil(n, in, out, iterations);
+    stencil(n, &in, &out, iterations);
     time_t end  = clock();
     double duration = (double)(end - start) / CLOCKS_PER_SEC;
 
@@ -144,8 +121,7 @@ int main(int argc, char **argv)
     init(n, in);
 
     start = clock();
-    stencil2(n, &in, &out2, iterations);
-//    stencilOpt(n, in, out2, iterations);
+    stencilOpt(n, in, out2, iterations);
     end = clock();
     duration = (double)(end - start) / CLOCKS_PER_SEC;
 

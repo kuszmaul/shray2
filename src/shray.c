@@ -227,8 +227,6 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     DBUG_PRINT("DSM allocation starts at %p", alloc->location);
 
-    gasnetBarrier();
-
     /* We distribute blockwise over the first dimension. */
     size_t bytesPerLatterDimensions = alloc->size / firstDimension;
     alloc->bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
@@ -252,13 +250,9 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     /* Insert a new allocation */
     heap = insertAtHead(heap, alloc);
 
-    gasnetBarrier();
-
     DBUG_PRINT("Made a DSM allocation [%p, %p[, of which we own [%p, %p[.", 
             alloc->location, (void *)((uintptr_t)alloc->location + alloc->size),
             start, (void *)((uintptr_t)start + segmentSize));
-
-    BARRIERCOUNT
 
     return alloc->location;
 }
@@ -276,9 +270,6 @@ size_t ShrayEnd(size_t firstDimension)
 
 void ShrayRealloc(void *array)
 {
-    gasnetBarrier();
-    BARRIERCOUNT
-
     Allocation *current = heap;
 
     while (current != NULL && current->location != array) {
@@ -302,6 +293,7 @@ void ShrayRealloc(void *array)
 
 void ShraySync(void *array)
 {    
+    /* So the other processors have finished writing before we get their parts of the pages. */
     gasnetBarrier();
     BARRIERCOUNT
 
@@ -356,11 +348,14 @@ void ShraySync(void *array)
                 (void *)((uintptr_t)dest + count), Shray_rank + 1);
     }
 
+    /* So no one reads from use before the communications are completed. */
+    gasnetBarrier();
     BARRIERCOUNT
 }
 
 void ShrayFree(void *address)
 {
+    /* So everyone has finished reading before we free the array. */
     gasnetBarrier();
     BARRIERCOUNT
 
@@ -382,9 +377,6 @@ void ShrayFree(void *address)
         *indirect = (*indirect)->next;
         free(deleteThis);
     }
-
-    gasnetBarrier();
-    BARRIERCOUNT
 }
 
 void ShrayReport(void)
