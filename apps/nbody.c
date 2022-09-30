@@ -1,4 +1,5 @@
 #include <math.h>
+#include <assert.h>
 #include "../include/shray.h"
 
 #define min(a, b) ((a) < (b) ? a : b)
@@ -35,25 +36,34 @@ Point accelerate(Point pos1, Point pos2, double mass)
 
 void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
-    /* For segfaults it would be best to have block = 1000, for overall performance,
-     * something like block = 100. Perhaps we need to block twice. */
+    /* For segfaults it would be best to have block = 1000. For physical cache performance
+     * something like block = 100. So that is why we block twice. */
+    size_t cacheBlock = 1000;
     size_t block = 100;
+    assert(cacheBlock % block == 0);
 
-    for (size_t I = ShrayStart(n); I < ShrayEnd(n); I += block) {
-        for (size_t J = 0; J < n; J += block) {
-            for (size_t i = I; i < min(I + block, n); i++) {
+    size_t start = ShrayStart(n);
+    size_t end = ShrayEnd(n);
+
+    for (size_t I1 = start; I1 < end; I1 += cacheBlock) {
+        for (size_t J1 = 0; J1 < n; J1 += cacheBlock) {
+    for (size_t I2 = I1; I2 < I1 + cacheBlock; I2 += block) {
+        for (size_t J2 = J1; J2 < J1 + cacheBlock; J2 += block) {
+    for (size_t i = I2; i < min(I2 + block, end); i++) {
                 accel[i].x = 0.0;
                 accel[i].y = 0.0;
                 accel[i].z = 0.0;
-                for (size_t j = J; j < min(J + block, n); j++) {
-                    accel[i].x += 
-                        accelerate(positions[i], positions[j], masses[j]).x;
-                    accel[i].y += 
-                        accelerate(positions[i], positions[j], masses[j]).y;
-                    accel[i].z += 
-                        accelerate(positions[i], positions[j], masses[j]).z;
-                }
-            }
+        for (size_t j = J2; j < min(J2 + block, n); j++) {
+                accel[i].x += 
+                    accelerate(positions[i], positions[j], masses[j]).x;
+                accel[i].y += 
+                    accelerate(positions[i], positions[j], masses[j]).y;
+                accel[i].z += 
+                    accelerate(positions[i], positions[j], masses[j]).z;
+        }
+    }
+        }
+    }
         }
     }
 }
@@ -80,7 +90,7 @@ void advance(Point *positions, Point *velocities, double *masses,
 int main(int argc, char **argv)
 {
     /* For n = 10000, we use 800000 bytes. */
-    ShrayInit(&argc, &argv, 2 * 4096000 / 4);
+    ShrayInit(&argc, &argv, 2 * 409600 / 4);
 
     if (argc != 3) {
         printf("Usage: n, iterations\n");
