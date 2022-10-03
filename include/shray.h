@@ -11,7 +11,9 @@ void ShrayInit(int *argc, char ***argv, size_t cacheSize);
 void *ShrayMalloc(size_t firstDimension, size_t totalSize);
 
 /* After this call, it is no longer legal to read from array. array can be considered
- * empty again, as if returned by ShrayMalloc. */
+ * empty again, as if returned by ShrayMalloc. 
+ * FIXME Is this even necessary? We cannot read from it until after a sync anyway, and
+ * that resets the read protections. */
 void ShrayRealloc(void *array);
 
 /* Given the first dimension of an array, returns the inclusive lower bound

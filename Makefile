@@ -2,7 +2,7 @@
 include /usr/local/gasnet/include/mpi-conduit/mpi-par.mak 
 
 FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math
-LFLAGS = -lm -lcblas -fsanitize=undefined -pthread
+LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread
 APPS = $(wildcard apps/*.c)
 RELEASE = $(patsubst apps/%.c, bin/%, $(APPS))
 DEBUG = $(patsubst apps/%.c, bin/%_debug, $(APPS))

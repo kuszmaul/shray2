@@ -21,6 +21,20 @@ void matmul(double *A, double *B, double *C, size_t n)
             n, B, n, 0.0, C + start * n, n);
 }
 
+/* If A, B are all one's, C should be n at every entry. */
+int check(double *C, size_t n, double epsilon)
+{
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < n; j++) {
+            if ((C[i * n + j] - n) * (C[i * n + j] - n) > epsilon) {
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     ShrayInit(&argc, &argv, 8 * 1 * 4096000 / 4);
@@ -44,11 +58,17 @@ int main(int argc, char **argv)
     matmul(A, B, C, n);
     ShraySync(C);
 
+    ShrayReport();
+
+    if (check(C, n, 0.01)) {
+        printf("Success!\n");
+    } else {
+        printf("Failure!\n");
+    }
+
     ShrayFree(A);
     ShrayFree(B);
     ShrayFree(C);
-
-    ShrayReport();
 
     ShrayFinalize();
 

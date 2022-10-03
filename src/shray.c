@@ -277,7 +277,7 @@ void ShrayRealloc(void *array)
     }
 
     if (current == NULL) {
-        perror("address is not the start of a DSM allocation.");
+        fprintf(stderr, "address %p is not the start of a DSM allocation.\n", array);
     }
 
     MPROTECT_SAFE(mprotect(current->location, current->size, PROT_NONE));
@@ -304,7 +304,7 @@ void ShraySync(void *array)
     }
 
     if (current == NULL) {
-        perror("address is not the start of a DSM allocation.");
+        fprintf(stderr, "address %p is not the start of a DSM allocation.\n", array);
     }
 
     /* Synchronise in case the first or last page is co-owned with someone else. */
