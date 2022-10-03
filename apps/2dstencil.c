@@ -16,7 +16,7 @@ const double e = 0.25;
 
 void init(size_t n, double *arr)
 {
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
         for (size_t j = 0; j < n; j++) {
             arr[i * n + j] = i + j;
         }
@@ -42,7 +42,6 @@ void relax(size_t n, double **in, double **out)
         (*out)[i * n] = (*in)[i * n];
         (*out)[i * n + n - 1] = (*in)[i * n + n - 1];
     }
-    printf("Copied first and last column / rows\n");
 
     /* Inner part */
     for (size_t i = MAX(ShrayStart(n), 1); i < MIN(ShrayEnd(n), n - 1); i++) {
@@ -60,19 +59,17 @@ void stencil(size_t n, double **in, double **out, int iterations)
 {
     for (int t = 1; t < iterations; t++) {
         relax(n, in, out);
-        printf("in: %p, out: %p\n", *in, *out);
-        ShraySync(out);
+        ShraySync(*out);
 
         /* Switch buffers */
         double *temp = *in;
         *in = *out;
         *out = temp;
-        printf("in: %p, out: %p\n", *in, *out);
     }
 
     /* No buffer swap after the last iteration. */
     relax(n, in, out);
-    ShraySync(out);
+    ShraySync(*out);
 }
 
 int main(int argc, char **argv)
@@ -90,12 +87,8 @@ int main(int argc, char **argv)
     double *in = ShrayMalloc(n, n * n * sizeof(double));
     double *out = ShrayMalloc(n, n * n * sizeof(double));
 
-    printf("Allocation succesfull\n");
-
     init(n, in);
     ShraySync(in);
-
-    printf("Init succesfull\n");
 
     time_t start = clock();
     stencil(n, &in, &out, iterations);
@@ -103,7 +96,7 @@ int main(int argc, char **argv)
     double duration = (double)(end - start) / CLOCKS_PER_SEC;
 
     printf("Time %lfs, n %zu, iterations %d, %lf Gflops/s\n", duration, n, iterations, 
-            5.0 * (n - 2) * iterations / 1000000000.0 / duration);
+            9.0 * (n - 2) * (n - 2) * iterations / 1000000000.0 / duration);
 
     ShrayFree(in);
     ShrayFree(out);

@@ -215,6 +215,12 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
                 MAP_PRIVATE, -1, 0));
     }
 
+    if (alloc->size / ShrayPagesz < Shray_size) {
+        fprintf(stderr, "Your allocation is less than a page per node. This makes "
+                "no sense, allocate it redundantly on each node.\n");
+        gasnet_exit(1);
+    }
+
     /* Broadcast alloc->location to the other nodes. FIXME I don't know whether this is 
      * correct. Especially the 0 was a pure guess. Appears to work for now though. */
     gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
