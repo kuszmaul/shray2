@@ -50,7 +50,7 @@ void relax(size_t n, double **in, double **out)
                              b * (*in)[i * n + j - 1] + 
                              c * (*in)[i * n + j] + 
                              d * (*in)[i * n + j + 1] + 
-                             e * (*in)[(i - 1) * n + j];
+                             e * (*in)[(i + 1) * n + j];
         }
     }
 }
@@ -61,7 +61,8 @@ void stencil(size_t n, double **in, double **out, int iterations)
         relax(n, in, out);
         ShraySync(*out);
 
-        /* Switch buffers */
+        /* Switch buffers. This is allowed because every processor is done writing to 
+         * out at this point, hence does not need to read from in anymore. */
         double *temp = *in;
         *in = *out;
         *out = temp;
