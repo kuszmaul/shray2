@@ -1,4 +1,7 @@
-/* A five-point stencil. Not optimised, so heavily memory-bound. */
+/* A five-point stencil. Not optimised, so heavily memory-bound. 
+ * MKL contain an optimised version, but it is not possible to 
+ * specify the number of iterations, it just continues until 
+ * convergence. */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -25,6 +28,20 @@ void init(size_t n, double *arr)
 
 void relax(size_t n, double **in, double **out)
 {
+   /* Inner part */
+    for (size_t i = MAX(ShrayStart(n), 1); i < MIN(ShrayEnd(n), n - 1); i++) {
+        for (size_t j = 1; j < n - 1; j++) {
+            (*out)[i * n + j] = a * (*in)[(i - 1) * n + j] + 
+                             b * (*in)[i * n + j - 1] + 
+                             c * (*in)[i * n + j] + 
+                             d * (*in)[i * n + j + 1] + 
+                             e * (*in)[(i + 1) * n + j];
+        }
+    }
+}
+
+void stencil(size_t n, double **in, double **out, int iterations)
+{
     /* First and last row. */
     if (ShrayStart(n) == 0) {
         for (size_t j = 0; j < n; j++) {
@@ -42,21 +59,8 @@ void relax(size_t n, double **in, double **out)
         (*out)[i * n] = (*in)[i * n];
         (*out)[i * n + n - 1] = (*in)[i * n + n - 1];
     }
-
+ 
     /* Inner part */
-    for (size_t i = MAX(ShrayStart(n), 1); i < MIN(ShrayEnd(n), n - 1); i++) {
-        for (size_t j = 1; j < n - 1; j++) {
-            (*out)[i * n + j] = a * (*in)[(i - 1) * n + j] + 
-                             b * (*in)[i * n + j - 1] + 
-                             c * (*in)[i * n + j] + 
-                             d * (*in)[i * n + j + 1] + 
-                             e * (*in)[(i + 1) * n + j];
-        }
-    }
-}
-
-void stencil(size_t n, double **in, double **out, int iterations)
-{
     for (int t = 1; t < iterations; t++) {
         relax(n, in, out);
         ShraySync(*out);
