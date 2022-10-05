@@ -64,10 +64,12 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
         accel[i].x = 0.0;
         accel[i].y = 0.0;
         accel[i].z = 0.0;
+    }
 
-        for (int s = 0; s < p; s++) {
-            shmem_getmem(pos_local, positions, pos_buffsize, s);
-            shmem_getmem(mass_local, masses, mass_buffsize, s);
+    for (int s = 0; s < p; s++) {
+        shmem_getmem(pos_local, positions, pos_buffsize, s);
+        shmem_getmem(mass_local, masses, mass_buffsize, s);
+        for (size_t i = 0; i < n / p; i++) {
             for (size_t j = 0; j < n / p; j++) {
                 accel[i].x += accelerate(positions[i], pos_local[j], mass_local[j]).x;
                 accel[i].y += accelerate(positions[i], pos_local[j], mass_local[j]).y;
