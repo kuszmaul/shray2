@@ -30,8 +30,7 @@ void init(double *matrix, size_t n, double value)
  *
  * where A[s][t] means the sth block row-wise of A, and the tth block column-wise. 
  *
- * Assumes C is initialised to 0. 
- */
+ * Assumes C is initialised to 0. */
 void matmul(double *A, double *B, double *C, size_t n)
 {
 	int p = shmem_n_pes();
@@ -87,6 +86,7 @@ int main(int argc, char **argv)
 
 	init(A, n, 1);
 	init(B, n, 1);
+	init(C, n, 0);
     shmem_barrier_all();
 
 	matmul(A, B, C, n);
