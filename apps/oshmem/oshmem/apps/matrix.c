@@ -3,91 +3,65 @@
 #include <stdlib.h>
 #include <cblas.h>
 
-static inline size_t roundUp(size_t a, size_t b)
-{
-    return (a + b - 1) / b;
-}
-
-static void printMatrix(double *array, size_t n)
-{
-	if (shmem_my_pe() != 0) {
-		return;
-	}
-
-	printf("matrix: \n");
-	for (size_t i = 0; i < n; ++i) {
-		for (size_t j = 0; j < n; ++j) {
-			printf("%f, ", array[i * n + j]);
-		}
-		printf("\n");
-	}
-	printf("\n");
-}
-
-static inline size_t shmem_index_start(int mype, int npes, size_t n)
-{
-	return mype * roundUp(n, npes);
-}
-
-static inline size_t shmem_index_end(int mype, int npes, size_t n)
-{
-	return (mype == npes - 1)
-		? n
-		: (mype + 1) * roundUp(n, npes);
-}
-
-
-static void sync(long *pSync, double *x, int n)
-{
-	int npes = shmem_n_pes();
-	for (int i = 0; i < npes; ++i) {
-		int pe = i;
-		size_t start = shmem_index_start(pe, npes, n);
-		size_t end = shmem_index_end(pe, npes, n);
-		shmem_broadcast64(
-				x + (n * start),
-				x + (n * start),
-				n * (end - start),
-				pe,
-				0, 0, npes, pSync);
-	}
-}
-
-
 void init(double *matrix, size_t n, double value)
 {
-	int mype = shmem_my_pe();
-	int npes = shmem_n_pes();
-
-	size_t start = shmem_index_start(mype, npes, n);
-	size_t end = shmem_index_end(mype, npes, n);
-
-	for (size_t i = start; i < end; i++) {
+	for (size_t i = 0; i < n / shmem_n_pes(); i++) {
 		for (size_t j = 0; j < n; j++) {
 			matrix[i * n + j] = value;
 		}
 	}
 }
 
+/* Assumes A, B, C are distributed blockwise along the first dimension.
+ *
+ * We use that 
+ * (    A[0]  )      (   A[0]B   )
+ * (    ...   ) B =  (   ...     ) 
+ * ( A[p - 1] )      ( A[p - 1]B )
+ * 
+ * where A[s] is the sth block of A, so the part owned by processor s (P(s)).
+ * So P(s) has to calculate A[s] B. 
+ *
+ * To ensure memory-scalability, we use
+ *
+ *                                     (   B[0]   ) 
+ * A[s]B = ( A[s][0] ... A[s][p - 1] ) (   ...    ) 
+ *                                     ( B[p - 1] )
+ *
+ * where A[s][t] means the sth block row-wise of A, and the tth block column-wise. 
+ *
+ * Assumes C is initialised to 0. 
+ */
 void matmul(double *A, double *B, double *C, size_t n)
 {
-	int mype = shmem_my_pe();
-	int npes = shmem_n_pes();
+	int p = shmem_n_pes();
 
-	size_t start = shmem_index_start(mype, npes, n);
-	size_t end = shmem_index_end(mype, npes, n);
+    double *Bt = malloc(n / p * n * sizeof(double));
 
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-	        end - start, n, n, 1.0, A + start * n,
-	        n, B, n, 0.0, C + start * n, n);
+    /* Add A[s][t] B[t] to C. */
+    for (int t = 0; t < p; t++) {
+        /* This is where the memory scalability comes from. We grab one block of 
+         * B at a time, overwriting the block we are done with every time. */
+        shmem_get(Bt, B, n / p * n, t);
+
+        /* blas can operate on subarrays, so no need to pack A[s][t]. 
+         * A[s][t] is an n / p x n / p matrix, and a submatrix of A which 
+         * has leading dimension n. B[t] is a n / p x n matrix, and C is 
+         * an n / p x n matrix. */
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                n / p, n, n / p, 1.0, &A[t * n / p], n, Bt, n, 1.0, C, n);
+    }
+
+    free(Bt);
 }
 
-///* If A, B are all one's, C should be n at every entry. */
+/* If A, B are all one's, C should be n at every entry. */
 int check(double *C, size_t n, double epsilon)
 {
-	for (size_t i = 0; i < n; i++) {
+	for (size_t i = 0; i < n / shmem_n_pes(); i++) {
 		for (size_t j = 0; j < n; j++) {
 			if ((C[i * n + j] - n) * (C[i * n + j] - n) > epsilon) {
+                printf("C[%zu, %zu] = %lf != %lf\n", i, j, C[i * n + j], (double)n);
 				return 0;
 			}
 		}
@@ -103,32 +77,25 @@ int main(int argc, char **argv)
 	    exit(EXIT_FAILURE);
 	}
 
-	static long pSync[SHMEM_BCAST_SYNC_SIZE];
-	for (int i = 0; i < SHMEM_BCAST_SYNC_SIZE; i++)
-		pSync[i] = SHMEM_SYNC_VALUE;
-
 	shmem_init();
 
 	size_t n = atol(argv[1]);
 
-	double *A = shmem_malloc(n * n * sizeof(double));
-	double *B = shmem_malloc(n * n * sizeof(double));
-	double *C = shmem_malloc(n * n * sizeof(double));
+	double *A = shmem_malloc(n / shmem_n_pes() * n * sizeof(double));
+	double *B = shmem_malloc(n / shmem_n_pes() * n * sizeof(double));
+	double *C = shmem_malloc(n / shmem_n_pes() * n * sizeof(double));
 
 	init(A, n, 1);
 	init(B, n, 1);
-	sync(pSync, A, n);
-	sync(pSync, B, n);
+    shmem_barrier_all();
 
 	matmul(A, B, C, n);
-	sync(pSync, C, n);
+    shmem_barrier_all();
 
-	if (shmem_my_pe() == 0) {
-		if (check(C, n, 0.01)) {
-		    printf("Success!\n");
-		} else {
-		    printf("Failure!\n");
-		}
+	if (check(C, n, 0.01)) {
+	    printf("Success!\n");
+	} else {
+	    printf("Failure!\n");
 	}
 
 	shmem_free(A);
