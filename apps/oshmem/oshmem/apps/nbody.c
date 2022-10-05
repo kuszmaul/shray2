@@ -55,8 +55,8 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 
     int p = shmem_n_pes();
 
-    size_t pos_buffsize = n / p * n * sizeof(Point);
-    size_t mass_buffsize = n / p * n * sizeof(double);
+    size_t pos_buffsize = n / p * sizeof(Point);
+    size_t mass_buffsize = n / p * sizeof(double);
     Point *pos_local = malloc(pos_buffsize);
     double *mass_local = malloc(mass_buffsize);
 
