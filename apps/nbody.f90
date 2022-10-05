@@ -24,18 +24,22 @@ subroutine accelerateAll(accel, positions, masses, n)
     real(KIND=8) :: accel(n / num_images(), 3)[*]
     real(KIND=8) :: masses(n / num_images())[*]
 
-    integer :: blockFactor, i, j, s
+    integer :: blockFactor, i, j, s, I1, J1
 
     blockFactor = 100
 
-    do i = 1, n / num_images()
+    do I1 = 1, n / num_images(), blockFactor
+        do J1 = 1, n / num_images(), blockFactor 
+    do i = I1, MIN(I1 + blockFactor, n / num_images())
         accel(i,:) = 0
         ! Calculate acceleration with respect to processor s
         do s = 1, num_images()
-            do j = 1, n / num_images() 
+        do j = J1, MIN(J1 + blockFactor, n / num_images())
                 accel(i,:) = accel(i,:) + &
                              accelerate(positions(i,:), positions(j,:)[s], masses(j)[s])
-            end do
+        end do
+        end do
+    end do
         end do
     end do
 end subroutine accelerateAll
