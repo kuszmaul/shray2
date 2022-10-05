@@ -28,9 +28,16 @@ Point accelerate(Point pos1, Point pos2, double mass)
 
     Point a;
 
-    a.x = (pos2.x - pos1.x) * mass / n;
-    a.y = (pos2.y - pos1.y) * mass / n;
-    a.z = (pos2.z - pos1.z) * mass / n;
+    if (n == 0) {
+        a.x = 0;
+        a.y = 0;
+        a.z = 0;
+    } else {
+        a.x = (pos2.x - pos1.x) * mass / n;
+        a.y = (pos2.y - pos1.y) * mass / n;
+        a.z = (pos2.z - pos1.z) * mass / n;
+    }
+
     return a;
 }
 
