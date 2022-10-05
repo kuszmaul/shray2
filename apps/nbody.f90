@@ -100,6 +100,8 @@ program main
 
     dt = 0.1
 
+    sync all
+
     do t = 1, iterations
         call advanceIt(positions, velocities, masses, accel, dt, n)
     end do
