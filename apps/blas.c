@@ -16,6 +16,7 @@ void matmul(double *A, double *B, double *C, size_t n)
     size_t start = ShrayStart(n);
     size_t end = ShrayEnd(n);
 
+    /* Calculates C(start:end,:) = A(start:end,:) B. */
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
             end - start, n, n, 1.0, A + start * n, 
             n, B, n, 0.0, C + start * n, n);

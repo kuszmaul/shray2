@@ -3,18 +3,15 @@
 
 #include "shrayInternal.h"
 
+/* True for exactly one node. Useful to output results only once. */
+extern bool ShrayOutput;
+
 /* First statement in application. */
 void ShrayInit(int *argc, char ***argv, size_t cacheSize);
 
 /* Allocates memory for an array described by sizes and dimension. typeWidth is 
  * sizeof(TYPE) where TYPE is the type of the array. */
 void *ShrayMalloc(size_t firstDimension, size_t totalSize);
-
-/* After this call, it is no longer legal to read from array. array can be considered
- * empty again, as if returned by ShrayMalloc. 
- * FIXME Is this even necessary? We cannot read from it until after a sync anyway, and
- * that resets the read protections. */
-void ShrayRealloc(void *array);
 
 /* Given the first dimension of an array, returns the inclusive lower bound
  * on the first dimension where we need to start computing. */

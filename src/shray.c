@@ -160,6 +160,8 @@ Allocation *insertAtHead(Allocation *head, Allocation *newHead)
  * Shray functionality
  *****************************************************/
 
+bool ShrayOutput;
+
 void ShrayInit(int *argc, char ***argv, size_t cacheSize)
 {
     GASNET_SAFE(gasnet_init(argc, argv));
@@ -168,6 +170,8 @@ void ShrayInit(int *argc, char ***argv, size_t cacheSize)
 
     Shray_size = gasnet_nodes();
     Shray_rank = gasnet_mynode();
+
+    ShrayOutput = (Shray_rank == 0);
 
     segfaultCounter = 0;
     barrierCounter = 0;

@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <gasnet.h>
 #include <gasnet_coll.h>
 #include <sys/mman.h>
@@ -32,8 +33,6 @@ typedef struct Allocation {
     size_t size;
     struct Allocation *next;
     /* The number of bytes owned by each node except the last one. */
-    /* FIXME voor 1d arrays zou je halve elementen kunnen ownen. Of toch niet? Houden 
-     * we daar in ShrayMalloc rekening mee? */
     size_t bytesPerBlock;
 } Allocation;
 

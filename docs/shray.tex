@@ -29,35 +29,168 @@
 
 \section*{Introduction}
 
-This software is based on the Shray distributed shared memory layer from Andrius Šilinskas'
-Bachelor's thesis. It is (going to be) simplified and optimised for array programs with 
-good locality of reference. It is the aim that this can be used for code generators dealing
-with arrays. 
+Shray is a distributed shared memory layer tailored for applications operating on arrays.
+The API is kept simple so it can be integrated into code-generators. We use the following 
+terminology to describe arrays: an $n_1 \times \cdots \times n_d$ array has dimension $d$,
+and extent $n_l$ along the $l$th dimension. So 
 
-\section{Related work}
+\[
+\begin{pmatrix}
+    0 & 1 \\
+    2 & 3 \\
+    4 & 5 \\
+\end{pmatrix}
+\]
 
-\section{Distributed shared memory}
+has dimension two, extent three along the first dimension, and extent two along the second 
+dimension. 
 
-A
+\section{Application programmer interface}
 
-\section{Distribution}
+\begin{lstlisting}
+extern bool ShrayOutput;
+\end{lstlisting}
 
-\section{Consistency}
+True for exactly one node. Useful to output results only once. 
 
-There are two forms of ownership: write ownership, and read ownership. If we have $p$ processors
-total, and an array $A$ whose first dimension is $n$, processor $s$ may write to 
-$[A[s \cdot \lceil \frac{n}{p} \rceil], A[(s + 1) \cdot \lceil \frac{n}{p} \rceil][$. So 
-$A$ is distributed block-wise along its first dimension. 
+\begin{lstlisting}
+void ShrayInit(int *argc, char ***argv, size_t cacheSize);
+\end{lstlisting}
+
+The first statement to be called in your application. The arguments 
+\texttt{argc}, \texttt{argv}, are pointers to the commandline arguments passed from 
+\texttt{main}. The argument \texttt{cacheSize} is the amount of memory Shray is allowed to 
+use for communication buffers on each node. 
+
+\begin{lstlisting}
+void *ShrayMalloc(size_t firstDimension, size_t totalSize);
+\end{lstlisting}
+
+This function is used to make a distributed allocation. If you would like to allocate an 
+array \texttt{TYPE *A} of size $n_1 \times \cdots \times n_d$, then \texttt{firstDimension}
+is $n_1$, and \texttt{totalSize} is $n_1 \cdot \cdots \cdot n_d \cdot \texttt{sizeof(TYPE)}$.
+
+\begin{lstlisting}
+size_t ShrayStart(size_t firstDimension);
+size_t ShrayEnd(size_t firstDimension);
+\end{lstlisting}
+
+These two functions are used for ensuring write-consistency to distributed arrays. See 
+Section \ref{consistency}.
+
+\begin{lstlisting}
+void ShraySync(void *array);
+\end{lstlisting}
+
+This function is used to ensure read-consistency to distributed arrays. See Section 
+\ref{consistency}.
+
+\begin{lstlisting}
+void ShrayFree(void *address);
+\end{lstlisting}
+
+Frees memory allocated by \texttt{ShrayMalloc}.
+
+\begin{lstlisting}
+void ShrayReport(void);
+\end{lstlisting}
+
+Gives information on the number of synchronisations and communicated bytes if Shray is compiled
+with macro \texttt{PROFILE} defined.
+
+\begin{lstlisting}
+void ShrayFinalize(void);
+\end{lstlisting}
+
+The last statement to be called in an application.
+
+\section{Performance}
+
+The underlying implementation models a cache. So for good (decent) performance, a cache-friendly 
+algorithm is necessary. That means no strided accesses, and try to tile your loops if possible. 
+
+\section{Consistency model}\label{consistency}
+
+A write to a distributed array $A$ of size $n_1 \times \cdots \times n_d$ at index 
+$(i_1, \cdots, i_d)$ is legal, if and only if 
+$\texttt{ShrayStart(n1)} \leq i_1 < \texttt{ShrayEnd(n1)}$.
 
 \medskip
 
-% Explain this more clearly with a picture. 
+A read to a distributed array $A$ is legal, if the read and write are separated by a 
+\texttt{ShraySync(A)}. A read is guaranteed to have completed after any \texttt{ShraySync}
+(not necessarily on $A$ itself). This can be useful when reusing an allocation. 
+Suppose \texttt{f(in, out)} reads from in, and writes to out,
+and you do not need \texttt{in} afterwards anymore. It is then safe to reuse \texttt{in} after
 
-There is a problem with this. Suppose $P(0)$ owns four elements, and pages contain three 
-elements. When $P(1)$ reads the fourth element, it fetches the entire page, so also elements
-five and six. We also have to make the entire page available for reading. So we must ensure 
-that $P(0)$ also has those elements. For this reason the read ownership consists of all pages
-containing at least one element owned for writing. After writing, each processor must exchange
-this data with its neighbours. 
+\begin{lstlisting}
+    f(in, out);
+    ShraySync(out);
+\end{lstlisting}
+
+\section{Example}
+
+This is what the Hello World of parallel computing, a pointwise matrix addition, looks like.
+
+\begin{lstlisting}
+#include "../include/shray.h"
+
+/* Initializes n x m matrix to its row-major index. */
+void init(double *matrix, size_t n, size_t m)
+{
+    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+        for (size_t j = 0; j < m; j++) {
+            matrix[i * m + j] = i * m + j;
+        }
+    }
+}
+
+/* C = A + B */
+void matmulAdd(double *A, double *B, double *C, size_t m, size_t n)
+{    
+    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+        for (size_t j = 0; j < m; j++) {
+            C[i * m + j] = A[i * m + j] + B[i * m + j];
+        }
+    }
+}
+
+int main(int argc, char **argv)
+{
+    ShrayInit(&argc, &argv, 40960);
+
+    size_t n = 1000;
+    size_t m = 2000;
+
+    double *A = ShrayMalloc(n, n * m * sizeof(double));
+    double *B = ShrayMalloc(n, n * m * sizeof(double));
+    double *C = ShrayMalloc(n, n * m * sizeof(double));
+
+    init(A, n, m);
+    init(B, n, m);
+    ShraySync(A);
+    ShraySync(B);
+
+    matmulAdd(A, B, C, n, m);
+    ShraySync(C);
+
+    for (int i = 0; i < 10; i++) {
+        printf("C[%d] = %lf. Should be %d\n", i, C[i], 2 * i);
+    }
+
+    ShrayFree(A);
+    ShrayFree(B);
+
+    ShrayFinalize();
+}
+\end{lstlisting}
+
+There is no utilisation of \texttt{ShrayOutput} to highlight that every thread reads the
+exact same \texttt{C[i]}, not simply the ith element owned locally. 
+
+\section{Warning!}
+
+The implementation catches the SIGSEGV signal, so you cannot use a signal-handler that 
+catches this yourself!
 
 \end{document}
