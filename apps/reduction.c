@@ -84,7 +84,7 @@ void *parallelInit(void *arg)
 
 int main(int argc, char **argv)
 {
-    ShrayInit(&argc, &argv, 409600);
+    ShrayInit(&argc, &argv);
 
     if (argc != 3) {
         printf("Usage: square root of array size, number of threads per node.\n");

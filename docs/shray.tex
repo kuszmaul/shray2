@@ -15,6 +15,7 @@
 \usepackage{listings}
 \usepackage{multicol}
 \usepackage{pgfplots}
+\usepackage{underline}
 \usepackage{pgfplotstable}
 \usepackage{subcaption}
 
@@ -54,13 +55,12 @@ extern bool ShrayOutput;
 True for exactly one node. Useful to output results only once. 
 
 \begin{lstlisting}
-void ShrayInit(int *argc, char ***argv, size_t cacheSize);
+void ShrayInit(int *argc, char ***argv);
 \end{lstlisting}
 
 The first statement to be called in your application. The arguments 
 \texttt{argc}, \texttt{argv}, are pointers to the commandline arguments passed from 
-\texttt{main}. The argument \texttt{cacheSize} is the amount of memory Shray is allowed to 
-use for communication buffers on each node. 
+\texttt{main}. 
 
 \begin{lstlisting}
 void *ShrayMalloc(size_t firstDimension, size_t totalSize);
@@ -104,9 +104,15 @@ void ShrayFinalize(void);
 
 The last statement to be called in an application.
 
-\section{Performance}
+\section{Environment variables}
 
-The underlying implementation models a cache. So for good (decent) performance, a cache-friendly 
+The underlying implementation models a cache. You need to set two environment variables:
+\texttt{SHRAY_CACHESIZE} which is the extra memory each node is allowed to use for 
+communication, and \texttt{SHRAY_CACHELINE} which is the number of 4KB pages in a cacheline. 
+
+
+
+So for good (decent) performance, a cache-friendly 
 algorithm is necessary. That means no strided accesses, and try to tile your loops if possible. 
 
 \section{Consistency model}\label{consistency}

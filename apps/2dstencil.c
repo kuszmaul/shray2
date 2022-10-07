@@ -79,7 +79,7 @@ void stencil(size_t n, double **in, double **out, int iterations)
 
 int main(int argc, char **argv)
 {
-    ShrayInit(&argc, &argv, 1000000);
+    ShrayInit(&argc, &argv);
 
     if (argc != 3) {
         printf("Please specify 2 arguments (n, iterations).\n");

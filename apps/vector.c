@@ -22,7 +22,7 @@ void matmulAdd(double *A, double *B, double *C, size_t m, size_t n)
 
 int main(int argc, char **argv)
 {
-    ShrayInit(&argc, &argv, 40960);
+    ShrayInit(&argc, &argv);
 
     size_t n = 1000;
     size_t m = 2000;
@@ -39,11 +39,9 @@ int main(int argc, char **argv)
     matmulAdd(A, B, C, n, m);
     ShraySync(C);
 
-    if (ShrayOutput){
     for (int i = 0; i < 10; i++) {
         printf("C[%d] = %lf. Should be %d\n", i, C[i], 2 * i);
     }
-}
 
     ShrayFree(A);
     ShrayFree(B);

@@ -7,7 +7,7 @@
 extern bool ShrayOutput;
 
 /* First statement in application. */
-void ShrayInit(int *argc, char ***argv, size_t cacheSize);
+void ShrayInit(int *argc, char ***argv);
 
 /* Allocates memory for an array described by sizes and dimension. typeWidth is 
  * sizeof(TYPE) where TYPE is the type of the array. */

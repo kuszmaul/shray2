@@ -96,8 +96,7 @@ void advance(Point *positions, Point *velocities, double *masses,
 
 int main(int argc, char **argv)
 {
-    /* For n = 10000, we use 800000 bytes. */
-    ShrayInit(&argc, &argv, 2 * 409600 / 4);
+    ShrayInit(&argc, &argv);
 
     if (argc != 3) {
         printf("Usage: n, iterations\n");

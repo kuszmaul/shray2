@@ -17,6 +17,7 @@ static int Shray_size;
 static size_t segfaultCounter;
 static size_t barrierCounter;
 static size_t ShrayPagesz;
+static size_t cacheLineSize;
 
 /*****************************************************
  * Helper functions
@@ -162,7 +163,7 @@ Allocation *insertAtHead(Allocation *head, Allocation *newHead)
 
 bool ShrayOutput;
 
-void ShrayInit(int *argc, char ***argv, size_t cacheSize)
+void ShrayInit(int *argc, char ***argv)
 {
     GASNET_SAFE(gasnet_init(argc, argv));
     /* Must be built with GASNET_SEGMENT_EVERYTHING, so these arguments are ignored. */
@@ -185,8 +186,29 @@ void ShrayInit(int *argc, char ***argv, size_t cacheSize)
 
     heap = createAllocation();
 
+    char *cacheLineEnv = getenv("SHRAY_CACHELINE");
+    if (cacheLineEnv == NULL) {
+        fprintf(stderr, "Please set the cacheline environment variable SHRAY_CACHELINE\n");
+        gasnet_exit(1);
+    } else {
+        cacheLineSize = atol(cacheLineEnv);
+    }
+
+    char *cacheSizeEnv = getenv("SHRAY_CACHESIZE");
+    if (cacheSizeEnv == NULL) {
+        fprintf(stderr, "Please set the cache size environment variable SHRAY_CACHESIZE\n");
+        gasnet_exit(1);
+    } else {
+        cache.numberOfLines = atol(cacheSizeEnv) / ShrayPagesz;
+    }
+
+    if (cache.numberOfLines < cacheLineSize) {
+        fprintf(stderr, "You set the cacheline size (SHRAY_CACHELINE) larger than the "
+                        "cache size (SHRAY_CACHESIZE)\n");
+        gasnet_exit(1);
+    }
+
     cache.firstIn = 0;
-    cache.numberOfLines = cacheSize / ShrayPagesz;
     cache.addresses = malloc(cache.numberOfLines * sizeof(void *));
     cache.prefetch = NULL;
 

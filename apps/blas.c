@@ -38,7 +38,7 @@ int check(double *C, size_t n, double epsilon)
 
 int main(int argc, char **argv)
 {
-    ShrayInit(&argc, &argv, 8 * 1 * 4096000 / 4);
+    ShrayInit(&argc, &argv);
 
     if (argc != 2) {
         printf("Takes one command-line argument, size of matrix.\n");

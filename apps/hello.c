@@ -2,7 +2,7 @@
 
 int main(int argc, char **argv)
 {
-    ShrayInit(&argc, &argv, 4096000);
+    ShrayInit(&argc, &argv);
 
     printf("Hello world!\n");
 

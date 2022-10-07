@@ -47,5 +47,9 @@ bin/%_profile: %.o bin/shray_profile.o
 bin/%_fortran: apps/%.f90
 	$(FORTRAN_C) $(FORTRAN_FLAGS) $< -o $@ $(FORTRAN_LFLAGS)
 
+runMulti:
+	export BLIS_NUM_THREADS=2
+	mpirun -n 2 bin/blas_debug 4000
+
 clean:
 	$(RM) bin/* *.mod
