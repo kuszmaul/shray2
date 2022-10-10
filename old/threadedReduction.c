@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 /* Number of threads */
-int P;
+unsigned int P;
 
 #define PTHREAD_CREATE(a, b, c, d)                  \
     {                                               \
@@ -26,7 +26,7 @@ int P;
 typedef struct {
     double *array1d;
     double *array2d;
-    int tid;
+    unsigned int tid;
     size_t size;
 } InitArg;
 
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
     double *arr1d = malloc(n * n * sizeof(double));
     double *arr2d = malloc(n * n * sizeof(double));
 
-    for (int tid = 0; tid < P; tid++) {
+    for (unsigned int tid = 0; tid < P; tid++) {
         inits[tid].array1d = arr1d;
         inits[tid].array2d = arr2d;
         inits[tid].tid = tid;
@@ -131,15 +131,15 @@ int main(int argc, char **argv)
     double sum1 = 0.0;
     double sum2 = 0.0;
 
-    for (int tid = 0; tid < P; tid++) {
+    for (unsigned int tid = 0; tid < P; tid++) {
         PTHREAD_CREATE(&threads[tid], NULL, parallelReduce, &inits[tid]);
     }
 
-    for (size_t tid = 0; tid < P; tid++) {
+    for (unsigned tid = 0; tid < P; tid++) {
         PTHREAD_JOIN(threads[tid], returnSums[tid]);
     }
 
-    for (size_t tid = 0; tid < P; tid++) {
+    for (unsigned  tid = 0; tid < P; tid++) {
         sum1 += ((double *)returnSums[tid])[0];
         sum2 += ((double *)returnSums[tid])[1];
     }

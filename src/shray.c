@@ -12,8 +12,8 @@
 static Cache cache;
 static Allocation *heap;
 
-static int Shray_rank;
-static int Shray_size;
+static unsigned int Shray_rank;
+static unsigned int Shray_size;
 static size_t segfaultCounter;
 static size_t barrierCounter;
 static size_t ShrayPagesz;
@@ -109,8 +109,8 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     }
     /* The asynchronous get needs to write to it, but the results are undefined, so 
      * we cannot read it. */
-    MPROTECT_SAFE(mprotect(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines], 
-                ShrayPagesz, PROT_WRITE));
+    MPROTECT_SAFE(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines], 
+                ShrayPagesz, PROT_WRITE);
 
     if (prefetchOld != roundedAddress) {
         /* We prefetched the wrong page. Do a blocking fetch on the page we need, storing
@@ -146,7 +146,8 @@ void registerHandler(void)
 
 Allocation *createAllocation(void)
 {
-    Allocation *result = malloc(sizeof(Allocation));
+    Allocation *result; 
+    MALLOC_SAFE(result, sizeof(Allocation));
 
     return result;
 }
@@ -209,13 +210,8 @@ void ShrayInit(int *argc, char ***argv)
     }
 
     cache.firstIn = 0;
-    cache.addresses = malloc(cache.numberOfLines * sizeof(void *));
+    MALLOC_SAFE(cache.addresses, cache.numberOfLines * sizeof(void *));
     cache.prefetch = NULL;
-
-    if (cache.addresses == NULL) {
-        perror("Allocating cache addresses has failed\n");
-        gasnet_exit(1);
-    }
 
     MMAP_SAFE(cache.addresses[0], mmap(NULL, cache.numberOfLines * ShrayPagesz, 
                 PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
@@ -277,7 +273,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     DBUG_PRINT("ShrayMalloc makes %zu bytes from %p available for read/write, so"
             "\n\t\t  [%p, %p[.", 
             segmentSize, start, start, (void *)((uintptr_t)start + segmentSize));
-    MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
+    MPROTECT_SAFE(start, segmentSize, PROT_READ | PROT_WRITE);
 
     /* Insert a new allocation */
     heap = insertAtHead(heap, alloc);
@@ -312,7 +308,7 @@ void ShrayRealloc(void *array)
         fprintf(stderr, "address %p is not the start of a DSM allocation.\n", array);
     }
 
-    MPROTECT_SAFE(mprotect(current->location, current->size, PROT_NONE));
+    MPROTECT_SAFE(current->location, current->size, PROT_NONE);
 
     size_t firstPage = Shray_rank * current->bytesPerBlock / ShrayPagesz;
     size_t lastPage = (Shray_rank == Shray_size - 1) ? (current->size - 1) / ShrayPagesz :
@@ -320,7 +316,7 @@ void ShrayRealloc(void *array)
     size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
 
     void *start = (void *)((uintptr_t)current->location + firstPage * ShrayPagesz);
-    MPROTECT_SAFE(mprotect(start, segmentSize, PROT_READ | PROT_WRITE));
+    MPROTECT_SAFE(start, segmentSize, PROT_READ | PROT_WRITE);
 }
 
 void ShraySync(void *array)

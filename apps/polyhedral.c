@@ -24,14 +24,14 @@ void init(size_t n, double *arr)
     }
 }
 
-void stencil(size_t n, double **in, double **out, int iterations)
+void stencil(size_t n, double **in, double **out, unsigned int iterations)
 {
     double *temp;
 
     (*out)[0] = (*in)[0];
     (*out)[n - 1] = (*in)[n - 1];
 
-    for (int t = 1; t <= iterations; t++) {
+    for (unsigned int t = 1; t <= iterations; t++) {
         for (size_t i = 1; i < n - 1; i++) {
             (*out)[i] = (*in)[i - 1] * a + (*in)[i] * b + (*in)[i + 1] * c;
             fprintf(stderr, "Real out[%d][%zu] = %lf\n", t, i, (*out)[i]);
@@ -49,14 +49,14 @@ void stencil(size_t n, double **in, double **out, int iterations)
 
 /* Afterwards out contains partial stencils at the sides, and the full stencil 
  * in the middle. */
-void kernelTrapezoid(size_t n, double **in, double **out, int iterations)
+void kernelTrapezoid(size_t n, double **in, double **out, unsigned int iterations)
 {
     double *temp;
 
     (*out)[0] = (*in)[0];
     (*out)[n - 1] = (*in)[n - 1];
 
-    for (int t = 1; t <= iterations; t++) {
+    for (unsigned int t = 1; t <= iterations; t++) {
         for (size_t i = t; i < n - t; i++) {
             (*out)[i] = (*in)[i - 1] * a + (*in)[i] * b + (*in)[i + 1] * c;
 //            fprintf(stderr, "Fake out[%d][%zu] = %lf\n", t, i, (*out)[i]);
@@ -80,11 +80,11 @@ void kernelTrapezoid(size_t n, double **in, double **out, int iterations)
 
 /* We have overwritten part of the boundary in the trapezoid part, that 
  * we need here. Need to rethink algorithm. */
-void kernelTriangle(double **in, double **out, int iterations)
+void kernelTriangle(double **in, double **out, unsigned int iterations)
 {
     double *temp;
 
-    for (int t = 1; t <= iterations; t++) {
+    for (unsigned int t = 1; t <= iterations; t++) {
         for (size_t i = t; i < 2 * iterations + 2 - t; i++) {
             (*out)[i] = (*in)[i - 1] * a + (*in)[i] * b + (*in)[i + 1] * c;
             printf("Triangle out[%d][%zu] = %lf\n", t, i, (*out)[i]);
@@ -110,7 +110,7 @@ void kernelTriangle(double **in, double **out, int iterations)
  *
  * where we first calculate the upwards facing trapezoids, and then 
  * the downwards facing triangles. */
-void stencilOpt(size_t n, double *in, double *out, int iterations)
+void stencilOpt(size_t n, double *in, double *out, unsigned int iterations)
 {
     double *inBuffer = malloc(BLOCK * sizeof(double));
     double *outBuffer = malloc(BLOCK * sizeof(double));
@@ -168,7 +168,7 @@ int main(int argc, char **argv)
     }
 
     size_t n = atoll(argv[1]);
-    int iterations = atoi(argv[2]);
+    unsigned int iterations = atoi(argv[2]);
 
     /* Pointers of type double[n], so a dereference [i] adds i * n * sizeof(double)
      * bytes to this pointer and then dereferences, aka i rows further. */

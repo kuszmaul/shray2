@@ -47,7 +47,6 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
      * something like block = 100. So that is why we block twice. */
     size_t cacheBlock = 1000;
     size_t block = 100;
-    assert(cacheBlock % block == 0);
 
     size_t start = ShrayStart(n);
     size_t end = ShrayEnd(n);
