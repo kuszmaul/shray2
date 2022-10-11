@@ -81,6 +81,32 @@ void ShraySync(void *array);
 
 /** <!--********************************************************************-->
  *
+ * @fn void ShrayStartOffset(size_t firstDimension, size_t offset)
+ *
+ *   @brief         Return the start index for an array with a minimum of the
+ *                  given offset for the first process.
+ *
+ *   @param array   Array we have finished writing to.
+ *
+ ******************************************************************************/
+
+size_t ShrayStartOffset(size_t firstDimension, size_t offset);
+
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayEndOffset(size_t firstDimension, size_t offset)
+ *
+ *   @brief         Return the end index for an array with a maximum of the
+ *                  given offset for the first process.
+ *
+ *   @param array   Array we have finished writing to.
+ *
+ ******************************************************************************/
+
+size_t ShrayEndOffset(size_t firstDimension, size_t offset);
+
+/** <!--********************************************************************-->
+ *
  * @fn void ShrayFree(void *array)
  *
  *   @brief         Frees distributed array.

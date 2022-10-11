@@ -23,6 +23,16 @@ static size_t cacheLineSize;
  * Helper functions
  *****************************************************/
 
+static inline size_t max(size_t x, size_t y)
+{
+    return x > y ? x : y;
+}
+
+static inline size_t min(size_t x, size_t y)
+{
+    return x < y ? x : y;
+}
+
 static void gasnetBarrier(void)
 {
     gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS);
@@ -290,10 +300,20 @@ size_t ShrayStart(size_t firstDimension)
     return Shray_rank * roundUp(firstDimension, Shray_size);
 }
 
+size_t ShrayStartOffset(size_t firstDimension, size_t offset)
+{
+    return max(ShrayStart(firstDimension), offset);
+}
+
 size_t ShrayEnd(size_t firstDimension)
 {
     return (Shray_rank == Shray_size - 1) ? firstDimension :
         (Shray_rank + 1) * roundUp(firstDimension, Shray_size);
+}
+
+size_t ShrayEndOffset(size_t firstDimension, size_t offset)
+{
+    return min(ShrayEnd(firstDimension), offset);
 }
 
 void ShrayRealloc(void *array)
