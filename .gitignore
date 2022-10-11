@@ -5,3 +5,4 @@ bin/*
 *.mod
 build/
 CMakeCache.txt
+*.asm
