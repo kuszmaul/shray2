@@ -414,7 +414,7 @@ void ShrayReport(void)
             Shray_rank, segfaultCounter, barrierCounter, segfaultCounter * ShrayPagesz);
 }
 
-void ShrayFinalize(void)
+void ShrayFinalize(int exit_code)
 {
-    gasnet_exit(0);
+    gasnet_exit(exit_code);
 }

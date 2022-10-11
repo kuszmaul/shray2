@@ -107,5 +107,5 @@ int main(int argc, char **argv)
     ShrayFree(out);
 
     ShrayReport();
-    ShrayFinalize();
+    ShrayFinalize(0);
 }

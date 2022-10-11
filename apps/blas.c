@@ -71,7 +71,7 @@ int main(int argc, char **argv)
     ShrayFree(B);
     ShrayFree(C);
 
-    ShrayFinalize();
+    ShrayFinalize(0);
 
     exit(EXIT_SUCCESS);
 }

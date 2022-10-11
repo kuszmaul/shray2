@@ -46,5 +46,5 @@ int main(int argc, char **argv)
     ShrayFree(A);
     ShrayFree(B);
 
-    ShrayFinalize();
+    ShrayFinalize(0);
 }

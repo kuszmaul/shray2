@@ -45,7 +45,7 @@ typedef struct Allocation {
         int retval;                                                                     \
         if ((retval = fncall) != GASNET_OK) {                                           \
             printf("Error during GASNet call\n");                                       \
-            ShrayFinalize();                                                            \
+            ShrayFinalize(1);                                                           \
         }                                                                               \
     }
 
@@ -54,7 +54,7 @@ typedef struct Allocation {
         if (mprotect(addr, len, prot) != 0) {                                           \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
             perror("mprotect failed");                                                  \
-            ShrayFinalize();                                                            \
+            ShrayFinalize(1);                                                           \
         }                                                                               \
     }
 
@@ -64,7 +64,7 @@ typedef struct Allocation {
         if (variable == MAP_FAILED) {                                                   \
             perror("mremap failed");                                                    \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
-            ShrayFinalize();                                                            \
+            ShrayFinalize(1);                                                           \
         }                                                                               \
     }
 
@@ -74,7 +74,7 @@ typedef struct Allocation {
         if (variable == MAP_FAILED) {                                                   \
             perror("mmap failed");                                                      \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
-            ShrayFinalize();                                                            \
+            ShrayFinalize(1);                                                           \
         }                                                                               \
     }
 
@@ -84,7 +84,7 @@ typedef struct Allocation {
         if (variable == MAP_FAILED) {                                                   \
             perror("malloc failed");                                                    \
             fprintf(stderr, "Line %d: ", __LINE__);                                     \
-            ShrayFinalize();                                                            \
+            ShrayFinalize(1);                                                           \
         }                                                                               \
     }
 

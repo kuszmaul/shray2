@@ -99,7 +99,7 @@ int main(int argc, char **argv)
 
     if (argc != 3) {
         printf("Usage: n, iterations\n");
-        ShrayFinalize();
+        ShrayFinalize(0);
     }
 
     size_t n = atoll(argv[1]);
@@ -124,7 +124,7 @@ int main(int argc, char **argv)
 
     ShrayReport();
 
-    ShrayFinalize();
+    ShrayFinalize(0);
 
     return EXIT_SUCCESS;
 }
