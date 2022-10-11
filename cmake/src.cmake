@@ -34,7 +34,6 @@ if(${SANITISE})
 	include(sanitise)
 endif()
 
-include(version_header)
 include(gasnet)
 
 # create the common C target

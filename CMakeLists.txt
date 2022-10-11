@@ -45,9 +45,6 @@ endif()
 # base options for installation directories
 include(GNUInstallDirs)
 
-# update the project version based upon git metadata if possible
-include(version)
-
 if(${SRC})
 	include(src)
 elseif(${EXAMPLES} OR ${SANITISE})
