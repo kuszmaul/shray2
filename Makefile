@@ -2,18 +2,21 @@
 include /usr/local/gasnet/include/mpi-conduit/mpi-par.mak 
 
 FORTRAN_C = gfortran
+OSHMEM_C = /home/thomas/repos/shmemBuild/bin/oshcc
 FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic
 LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread
 FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib
 FORTRAN_LFLAGS = -lcaf_openmpi
 APPS = $(wildcard apps/*.c)
 FORTRANAPPS = $(wildcard apps/*.f90)
+SHMEMAPPS = $(wildcard apps/oshmem/*.c)
 RELEASE = $(patsubst apps/%.c, bin/%, $(APPS))
 DEBUG = $(patsubst apps/%.c, bin/%_debug, $(APPS))
 PROFILE = $(patsubst apps/%.c, bin/%_profile, $(APPS))
 FORTRAN = $(patsubst apps/%.f90, bin/%_fortran, $(FORTRANAPPS))
+SHMEM = $(patsubst apps/oshmem/%.c, bin/%_shmem, $(SHMEMAPPS))
 
-all: release debug profile $(FORTRAN)
+all: release debug profile $(FORTRAN) $(SHMEM)
 
 release: $(RELEASE)
 
@@ -46,6 +49,9 @@ bin/%_profile: %.o bin/shray_profile.o
 
 bin/%_fortran: apps/%.f90
 	$(FORTRAN_C) $(FORTRAN_FLAGS) $< -o $@ $(FORTRAN_LFLAGS)
+
+bin/%_shmem: apps/oshmem/%.c
+	$(OSHMEM_C) $(FLAGS) $< -o $@ $(LFLAGS)
 
 runMulti:
 	export BLIS_NUM_THREADS=2

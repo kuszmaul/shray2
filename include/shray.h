@@ -89,6 +89,17 @@ void ShraySync(void *array);
  *
  ******************************************************************************/
 
+void ShrayBarrier(void);
+
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayBarrier(void);
+ *
+ *   @brief Guarantees all reads issued before this function have completed on 
+ *          all processors.
+ *
+ ******************************************************************************/
+
 void ShrayFree(void *address);
 
 /** <!--********************************************************************-->

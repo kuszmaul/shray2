@@ -381,6 +381,12 @@ void ShraySync(void *array)
     BARRIERCOUNT
 }
 
+void ShrayBarrier(void)
+{
+    gasnetBarrier();
+    BARRIERCOUNT
+}
+
 void ShrayFree(void *address)
 {
     /* So everyone has finished reading before we free the array. */
