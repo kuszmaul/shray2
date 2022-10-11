@@ -115,14 +115,16 @@ size_t ShrayEndOffset(size_t firstDimension, size_t offset);
  *
  ******************************************************************************/
 
-void ShrayBarrier(void);
+void ShrayRealloc(void *array);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayBarrier(void);
+ * @fn void ShrayRealloc(void *array);
  *
- *   @brief Guarantees all reads issued before this function have completed on 
- *          all processors.
+ *   @brief Allows a distributed buffer to be reused for a different distributed 
+ *          array of the same size.
+ *
+ *   @param array   buffer we want to reallocate
  *
  ******************************************************************************/
 
@@ -149,15 +151,21 @@ void ShrayReport(void);
 
 void ShrayFinalize(int exit_code);
 
-#define SHRAY_TIME(fncall)                                      \
-    do {                                                        \
-/*        gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS); \
-        gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);   \
-        double start = MPI_Wtime();                             \
-        fncall;                                                 \
-        gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS); \
-        gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);   \
-        double end = MPI_Wtime();                               \
-        fprintf(stderr, #fncall " took %lfs.\n", end - start);*/  \
-    } while (0)
+/* The elipses are a function call block. Example usage:
+ *
+ * double duration;
+ * TIME(duration, f(in, out); ShraySync(out);); 
+ * printf("Executing f took %lf seconds.\n", duration);
+ *
+ * */
+#define TIME(duration, fncalls)                                        \
+    {                                                                  \
+        struct timeval tv1, tv2;                                       \
+        gettimeofday(&tv1, NULL);                                      \
+        fncalls                                                        \
+        gettimeofday(&tv2, NULL);                                      \
+        duration = (double) (tv2.tv_usec - tv1.tv_usec) / 1000000 +    \
+         (double) (tv2.tv_sec - tv1.tv_sec);                           \
+    }
+
 #endif

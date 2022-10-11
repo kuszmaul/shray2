@@ -70,6 +70,7 @@ void stencil(size_t n, double **in, double **out, int iterations)
         double *temp = *in;
         *in = *out;
         *out = temp;
+        ShrayRealloc(*out);
     }
 
     /* No buffer swap after the last iteration. */
@@ -95,13 +96,13 @@ int main(int argc, char **argv)
     init(n, in);
     ShraySync(in);
 
-    time_t start = clock();
-    stencil(n, &in, &out, iterations);
-    time_t end  = clock();
-    double duration = (double)(end - start) / CLOCKS_PER_SEC;
+    double duration;
+    TIME(duration, stencil(n, &in, &out, iterations););
 
-    printf("Time %lfs, n %zu, iterations %d, %lf Gflops/s\n", duration, n, iterations,
-            9.0 * (n - 2) * (n - 2) * iterations / 1000000000.0 / duration);
+    if (ShrayOutput) {
+        printf("Time %lfs, %lf Gflops/s\n", duration, 
+                9.0 * (n - 2) * (n - 2) * iterations / 1000000000.0 / duration);
+    }
 
     ShrayFree(in);
     ShrayFree(out);

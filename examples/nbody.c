@@ -114,8 +114,15 @@ int main(int argc, char **argv)
     init(positions, n);
     ShraySync(positions);
 
-    for (int i = 0; i < iterations; i++) {
+    double duration;
+
+    TIME(duration, for (int i = 0; i < iterations; i++) {
         advance(positions, velocities, masses, accel, 0.1, n);
+    });
+
+    if (ShrayOutput) {
+        printf("Time: %lfs, %lf Gflops/s\n", duration, 
+                16 * n * n * iterations / 1000000000 / duration);
     }
 
     ShrayFree(positions);

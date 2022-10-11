@@ -318,6 +318,10 @@ size_t ShrayEndOffset(size_t firstDimension, size_t offset)
 
 void ShrayRealloc(void *array)
 {
+    /* Make sure every node has finished reading. */
+    gasnetBarrier();
+    BARRIERCOUNT;
+
     Allocation *current = heap;
 
     while (current != NULL && current->location != array) {
@@ -397,12 +401,6 @@ void ShraySync(void *array)
     }
 
     /* So no one reads from use before the communications are completed. */
-    gasnetBarrier();
-    BARRIERCOUNT
-}
-
-void ShrayBarrier(void)
-{
     gasnetBarrier();
     BARRIERCOUNT
 }

@@ -56,8 +56,13 @@ int main(int argc, char **argv)
     ShraySync(A);
     ShraySync(B);
 
-    matmul(A, B, C, n);
-    ShraySync(C);
+    double duration;
+
+    TIME(duration, matmul(A, B, C, n); ShraySync(C););
+
+    if (ShrayOutput) {
+        printf("Time %lf, %lf Gflops/s\n", duration, 2.0 * n * n * n / 1000000000 / duration);
+    }
 
     ShrayReport();
 

@@ -9,6 +9,7 @@
 #include <gasnet.h>
 #include <gasnet_coll.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 
 /**************************************************
  * Data structures
