@@ -43,14 +43,14 @@ Point accelerate(Point pos1, Point pos2, double mass)
 
 void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
-    /* For segfaults it would be best to have block = 1000. For physical cache performance
-     * something like block = 100. So that is why we block twice. */
-    //size_t cacheBlock = end - start;
-    size_t cacheBlock = 1000;
-    size_t block = 100;
-
     size_t start = ShrayStart(n);
     size_t end = ShrayEnd(n);
+
+    /* For segfaults it would be best to have block = 1000. For physical cache performance
+     * something like block = 100. So that is why we block twice. */
+    size_t cacheBlock = end - start;
+//    size_t cacheBlock = 1000;
+    size_t block = 200;
 
     for (size_t I1 = start; I1 < end; I1 += cacheBlock) {
         for (size_t J1 = 0; J1 < n; J1 += cacheBlock) {
