@@ -2,7 +2,7 @@
  * phi_s(k) = k + s * roundUp(n, p), in the higher dimensional case,
  * we distribute blockwise along the first dimension. */
 
-#include <shray2/shray.h>
+#include "../include/shray2/shray.h"
 #include <assert.h>
 
 /*****************************************************

@@ -1,7 +1,7 @@
 #ifndef SHRAY__GUARD
 #define SHRAY__GUARD
 
-#include <shray2/shrayInternal.h>
+#include "shrayInternal.h"
 
 /* True for exactly one node. Useful to output results only once. */
 extern bool ShrayOutput;
