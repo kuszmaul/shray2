@@ -45,15 +45,38 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
     /* For segfaults it would be best to have block = 1000. For physical cache performance
      * something like block = 100. So that is why we block twice. */
-    //size_t cacheBlock = end - start;
     size_t cacheBlock = 1000;
     size_t block = 100;
 
     size_t start = ShrayStart(n);
     size_t end = ShrayEnd(n);
 
+    /* We split up the inner (blocked) loop into two parts, namely [start, n[
+     * and [0, start[. This way the j loop starts at a different point on every
+     * node. As the j loop is the one containing all the information, we have 
+     * better communication load-balance this way. */
     for (size_t I1 = start; I1 < end; I1 += cacheBlock) {
-        for (size_t J1 = 0; J1 < n; J1 += cacheBlock) {
+        for (size_t J1 = start; J1 < n; J1 += cacheBlock) {
+    for (size_t I2 = I1; I2 < I1 + cacheBlock; I2 += block) {
+        for (size_t J2 = J1; J2 < J1 + cacheBlock; J2 += block) {
+    for (size_t i = I2; i < min(I2 + block, end); i++) {
+                accel[i].x = 0.0;
+                accel[i].y = 0.0;
+                accel[i].z = 0.0;
+        for (size_t j = J2; j < min(J2 + block, n); j++) {
+                accel[i].x += 
+                    accelerate(positions[i], positions[j], masses[j]).x;
+                accel[i].y += 
+                    accelerate(positions[i], positions[j], masses[j]).y;
+                accel[i].z += 
+                    accelerate(positions[i], positions[j], masses[j]).z;
+        }
+    }
+        }
+    }
+        }
+
+        for (size_t J1 = 0; J1 < start; J1 += cacheBlock) {
     for (size_t I2 = I1; I2 < I1 + cacheBlock; I2 += block) {
         for (size_t J2 = J1; J2 < J1 + cacheBlock; J2 += block) {
     for (size_t i = I2; i < min(I2 + block, end); i++) {
