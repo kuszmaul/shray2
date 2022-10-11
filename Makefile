@@ -3,7 +3,7 @@ include /usr/local/gasnet/include/mpi-conduit/mpi-par.mak
 
 FORTRAN_C = gfortran
 OSHMEM_C = /home/thomas/repos/shmemBuild/bin/oshcc
-FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic
+FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno
 LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread
 FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib
 FORTRAN_LFLAGS = -lcaf_openmpi
