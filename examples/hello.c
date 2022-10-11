@@ -1,4 +1,4 @@
-#include "../include/shray.h"
+#include <shray2/shray.h>
 
 int main(int argc, char **argv)
 {

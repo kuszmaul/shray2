@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+get_filename_component(CMAKE_LIBDIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+
+# add generated target exports
+if(NOT TARGET @PROJECT_NAME@::@PROJECT_NAME@)
+	include("${CMAKE_LIBDIR}/@PROJECT_NAME@Targets.cmake")
+endif()
+
+set(@PROJECT_NAME@_LIBRARIES @PROJECT_NAME@::@PROJECT_NAME@)
+
+check_required_components("@PROJECT_NAME@")

@@ -6,29 +6,12 @@
 #include <string.h>
 #include <assert.h>
 
-#include "../include/shray.h"
+#include <shray2/shray.h>
 
 /* The coefficients of the three-point stencil. */
 const double a = 0.50;
 const double b = 0.33;
 const double c = 0.25;
-
-/* 80 kB per array, so should fit in a 256 kB L2 cache. */
-#define BLOCK 10000
-
-static void printArray(double *array, size_t n)
-{
-    if (ShrayStart(n) != 0) {
-        return;
-    }
-
-    printf("array: ");
-    for (size_t i = 0; i < n; ++i)
-    {
-        printf("%f, ", array[i]);
-    }
-    printf("\n");
-}
 
 void init(size_t n, double *arr)
 {
@@ -36,7 +19,6 @@ void init(size_t n, double *arr)
         arr[i] = i;
     }
 }
-
 
 void stencil_alloc(size_t n, double **in, double **out, int iterations)
 {
