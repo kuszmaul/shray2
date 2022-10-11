@@ -3,7 +3,7 @@ include /usr/local/gasnet/include/mpi-conduit/mpi-seq.mak
 
 FORTRAN_C = gfortran
 SHMEM_C = /home/thomas/repos/shmemBuild/bin/oshcc
-FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -I/home/thomas/work/dsm/shray2.0/include/shray2/
+FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -I/home/thomas/work/dsm/shray2.0/include
 LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread 
 #LFLAGS = -lm -lopenblas -fsanitize=undefined -pthread
 FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib
