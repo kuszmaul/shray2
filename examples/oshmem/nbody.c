@@ -51,7 +51,7 @@ Point accelerate(Point pos1, Point pos2, double mass)
 
 void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
-    size_t block = 100;
+    size_t block = 200;
 
     int p = shmem_n_pes();
 
@@ -66,14 +66,30 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
         accel[i].z = 0.0;
     }
 
+//    for (int s = 0; s < p; s++) {
+//        shmem_getmem(pos_local, positions, pos_buffsize, s);
+//        shmem_getmem(mass_local, masses, mass_buffsize, s);
+//        for (size_t i = 0; i < n / p; i++) {
+//            for (size_t j = 0; j < n / p; j++) {
+//                accel[i].x += accelerate(positions[i], pos_local[j], mass_local[j]).x;
+//                accel[i].y += accelerate(positions[i], pos_local[j], mass_local[j]).y;
+//                accel[i].z += accelerate(positions[i], pos_local[j], mass_local[j]).z;
+//            }
+//        }
+//    }
+    
     for (int s = 0; s < p; s++) {
         shmem_getmem(pos_local, positions, pos_buffsize, s);
         shmem_getmem(mass_local, masses, mass_buffsize, s);
-        for (size_t i = 0; i < n / p; i++) {
-            for (size_t j = 0; j < n / p; j++) {
+        for (size_t I = 0; I < n / p; I += block) {
+            for (size_t J = 0; J < n / p; J += block) {
+        for (size_t i = I; i < min(I + block, n / p); i++) {
+            for (size_t j = J; j < min(J + block, n / p); j++) {
                 accel[i].x += accelerate(positions[i], pos_local[j], mass_local[j]).x;
                 accel[i].y += accelerate(positions[i], pos_local[j], mass_local[j]).y;
                 accel[i].z += accelerate(positions[i], pos_local[j], mass_local[j]).z;
+            }
+        }
             }
         }
     }

@@ -15,7 +15,7 @@ RELEASE = $(patsubst examples/%.c, bin/%, $(APPS))
 DEBUG = $(patsubst examples/%.c, bin/%_debug, $(APPS))
 PROFILE = $(patsubst examples/%.c, bin/%_profile, $(APPS))
 FORTRAN = $(patsubst examples/fortran/%.f90, bin/%_fortran, $(FORTRANAPPS))
-SHMEM = $(patsubst examples/oshemem/%.c, bin/%_shmem, $(SHMEMAPPS))
+SHMEM = $(patsubst examples/oshmem/%.c, bin/%_shmem, $(SHMEMAPPS))
 
 all: release debug profile $(FORTRAN) $(SHMEM)
 
