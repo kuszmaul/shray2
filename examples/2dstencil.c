@@ -1,6 +1,6 @@
-/* A five-point stencil. Not optimised, so heavily memory-bound. 
- * MKL contain an optimised version, but it is not possible to 
- * specify the number of iterations, it just continues until 
+/* A five-point stencil. Not optimised, so heavily memory-bound.
+ * MKL contain an optimised version, but it is not possible to
+ * specify the number of iterations, it just continues until
  * convergence. */
 
 #include <stdlib.h>
@@ -8,7 +8,7 @@
 #include <time.h>
 #include <string.h>
 #include <assert.h>
-#include "../include/shray.h"
+#include <shray2/shray.h>
 
 /* The coefficients of the five-point stencil. */
 const double a = 0.50;
@@ -31,10 +31,10 @@ void relax(size_t n, double **in, double **out)
    /* Inner part */
     for (size_t i = MAX(ShrayStart(n), 1); i < MIN(ShrayEnd(n), n - 1); i++) {
         for (size_t j = 1; j < n - 1; j++) {
-            (*out)[i * n + j] = a * (*in)[(i - 1) * n + j] + 
-                             b * (*in)[i * n + j - 1] + 
-                             c * (*in)[i * n + j] + 
-                             d * (*in)[i * n + j + 1] + 
+            (*out)[i * n + j] = a * (*in)[(i - 1) * n + j] +
+                             b * (*in)[i * n + j - 1] +
+                             c * (*in)[i * n + j] +
+                             d * (*in)[i * n + j + 1] +
                              e * (*in)[(i + 1) * n + j];
         }
     }
@@ -59,13 +59,13 @@ void stencil(size_t n, double **in, double **out, int iterations)
         (*out)[i * n] = (*in)[i * n];
         (*out)[i * n + n - 1] = (*in)[i * n + n - 1];
     }
- 
+
     /* Inner part */
     for (int t = 1; t < iterations; t++) {
         relax(n, in, out);
         ShraySync(*out);
 
-        /* Switch buffers. This is allowed because every processor is done writing to 
+        /* Switch buffers. This is allowed because every processor is done writing to
          * out at this point, hence does not need to read from in anymore. */
         double *temp = *in;
         *in = *out;
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
     time_t end  = clock();
     double duration = (double)(end - start) / CLOCKS_PER_SEC;
 
-    printf("Time %lfs, n %zu, iterations %d, %lf Gflops/s\n", duration, n, iterations, 
+    printf("Time %lfs, n %zu, iterations %d, %lf Gflops/s\n", duration, n, iterations,
             9.0 * (n - 2) * (n - 2) * iterations / 1000000000.0 / duration);
 
     ShrayFree(in);

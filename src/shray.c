@@ -1,12 +1,12 @@
-/* Distribution: 1d it is a block distribution on the bytes, so 
- * phi_s(k) = k + s * roundUp(n, p), in the higher dimensional case, 
+/* Distribution: 1d it is a block distribution on the bytes, so
+ * phi_s(k) = k + s * roundUp(n, p), in the higher dimensional case,
  * we distribute blockwise along the first dimension. */
 
-#include "../include/shray.h"
+#include <shray2/shray.h>
 #include <assert.h>
 
 /*****************************************************
- * Global variable declarations. 
+ * Global variable declarations.
  *****************************************************/
 
 static Cache cache;
@@ -23,6 +23,16 @@ static size_t cacheLineSize;
  * Helper functions
  *****************************************************/
 
+static inline size_t max(size_t x, size_t y)
+{
+    return x > y ? x : y;
+}
+
+static inline size_t min(size_t x, size_t y)
+{
+    return x < y ? x : y;
+}
+
 static void gasnetBarrier(void)
 {
     gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS);
@@ -30,14 +40,14 @@ static void gasnetBarrier(void)
 }
 
 /* Returns ceil(a / b) */
-inline size_t roundUp(size_t a, size_t b)
+static inline size_t roundUp(size_t a, size_t b)
 {
     return (a + b - 1) / b;
 }
 
 int inRange(void *address, Allocation* alloc)
 {
-    return ((uintptr_t)alloc->location <= (uintptr_t)address) && 
+    return ((uintptr_t)alloc->location <= (uintptr_t)address) &&
         ((uintptr_t)address < (uintptr_t)alloc->location + alloc->size);
 }
 
@@ -53,7 +63,7 @@ Owner findOwner(void *segfault)
 {
     Owner owner;
 
-    /* We advance through the allocations, until we find the one containing our 
+    /* We advance through the allocations, until we find the one containing our
      * segfault. */
     Allocation *current = heap;
 
@@ -95,37 +105,37 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     /* The prefetch of the previous segfault. */
     void *prefetchOld = cache.prefetch;
 
-    /* Prefetch to the second cache line admitted. Protect the line afterwards as its 
+    /* Prefetch to the second cache line admitted. Protect the line afterwards as its
      * contents is undefined until the asynchronous fetch is completed. */
     cache.prefetch = (void *)((uintptr_t)roundedAddress + ShrayPagesz);
     if (owner.nextOwner != -1) {
-        DBUG_PRINT("We prefetch %p, storing it in %p.", cache.prefetch, 
+        DBUG_PRINT("We prefetch %p, storing it in %p.", cache.prefetch,
                 cache.addresses[(cache.firstIn + 1) % cache.numberOfLines]);
-        gasnet_get_nbi(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines], 
+        gasnet_get_nbi(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines],
                 owner.nextOwner, cache.prefetch, ShrayPagesz);
     } else {
-        DBUG_PRINT("We do not prefetch %p as it falls outside of a DSM allocation.", 
+        DBUG_PRINT("We do not prefetch %p as it falls outside of a DSM allocation.",
                 cache.prefetch);
     }
-    /* The asynchronous get needs to write to it, but the results are undefined, so 
+    /* The asynchronous get needs to write to it, but the results are undefined, so
      * we cannot read it. */
-    MPROTECT_SAFE(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines], 
+    MPROTECT_SAFE(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines],
                 ShrayPagesz, PROT_WRITE);
 
     if (prefetchOld != roundedAddress) {
         /* We prefetched the wrong page. Do a blocking fetch on the page we need, storing
          * the result in the line we evict. */
         DBUG_PRINT("We prefetched %p which we do not need, so now we fetch %p, "
-                "storing it in %p.", prefetchOld, roundedAddress, 
+                "storing it in %p.", prefetchOld, roundedAddress,
                 cache.addresses[cache.firstIn]);
         gasnet_get(cache.addresses[cache.firstIn], owner.thisOwner, roundedAddress, ShrayPagesz);
     }
 
-    /* Remap the evicted cache line to the proper position. This also protects the 
+    /* Remap the evicted cache line to the proper position. This also protects the
      * previous position of the evicted cache line. FIXME right?*/
     DBUG_PRINT("We remap %p to %p", cache.addresses[cache.firstIn], roundedAddress);
-    MREMAP_SAFE(cache.addresses[cache.firstIn], mremap(cache.addresses[cache.firstIn], 
-            ShrayPagesz, ShrayPagesz, MREMAP_MAYMOVE | MREMAP_FIXED, 
+    MREMAP_SAFE(cache.addresses[cache.firstIn], mremap(cache.addresses[cache.firstIn],
+            ShrayPagesz, ShrayPagesz, MREMAP_MAYMOVE | MREMAP_FIXED,
             roundedAddress));
 
     cache.firstIn = (cache.firstIn + 1) % cache.numberOfLines;
@@ -146,7 +156,7 @@ void registerHandler(void)
 
 Allocation *createAllocation(void)
 {
-    Allocation *result; 
+    Allocation *result;
     MALLOC_SAFE(result, sizeof(Allocation));
 
     return result;
@@ -182,7 +192,7 @@ void ShrayInit(int *argc, char ***argv)
     if (pagesz == -1) {
         perror("Querying system page size failed.");
     }
- 
+
     ShrayPagesz = (size_t)pagesz;
 
     heap = createAllocation();
@@ -213,7 +223,7 @@ void ShrayInit(int *argc, char ***argv)
     MALLOC_SAFE(cache.addresses, cache.numberOfLines * sizeof(void *));
     cache.prefetch = NULL;
 
-    MMAP_SAFE(cache.addresses[0], mmap(NULL, cache.numberOfLines * ShrayPagesz, 
+    MMAP_SAFE(cache.addresses[0], mmap(NULL, cache.numberOfLines * ShrayPagesz,
                 PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
 
     for (size_t i = 1; i < cache.numberOfLines; i++) {
@@ -243,13 +253,13 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
         gasnet_exit(1);
     }
 
-    /* Broadcast alloc->location to the other nodes. FIXME I don't know whether this is 
+    /* Broadcast alloc->location to the other nodes. FIXME I don't know whether this is
      * correct. Especially the 0 was a pure guess. Appears to work for now though. */
     gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
             0, &(alloc->location), sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
     if (Shray_rank != 0) {
-        MMAP_SAFE(alloc->location, mmap(alloc->location, alloc->size, PROT_NONE, 
+        MMAP_SAFE(alloc->location, mmap(alloc->location, alloc->size, PROT_NONE,
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
     }
 
@@ -260,7 +270,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     alloc->bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
 
     /* Protect all pages that we do not own, and register what we do. We must subtract
-     * one from alloc->bytesPerBlock as we start counting from one. So for example 
+     * one from alloc->bytesPerBlock as we start counting from one. So for example
      * the last byte owned by node 0, has index alloc->bytesPerBlock - 1. */
     size_t firstPage = Shray_rank * alloc->bytesPerBlock / ShrayPagesz;
     size_t lastPage = (Shray_rank == Shray_size - 1) ? (alloc->size - 1) / ShrayPagesz :
@@ -271,14 +281,14 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     void *start = (void *)((uintptr_t)alloc->location + firstPage * ShrayPagesz);
     DBUG_PRINT("ShrayMalloc makes %zu bytes from %p available for read/write, so"
-            "\n\t\t  [%p, %p[.", 
+            "\n\t\t  [%p, %p[.",
             segmentSize, start, start, (void *)((uintptr_t)start + segmentSize));
     MPROTECT_SAFE(start, segmentSize, PROT_READ | PROT_WRITE);
 
     /* Insert a new allocation */
     heap = insertAtHead(heap, alloc);
 
-    DBUG_PRINT("Made a DSM allocation [%p, %p[, of which we own [%p, %p[.", 
+    DBUG_PRINT("Made a DSM allocation [%p, %p[, of which we own [%p, %p[.",
             alloc->location, (void *)((uintptr_t)alloc->location + alloc->size),
             start, (void *)((uintptr_t)start + segmentSize));
 
@@ -290,10 +300,20 @@ size_t ShrayStart(size_t firstDimension)
     return Shray_rank * roundUp(firstDimension, Shray_size);
 }
 
+size_t ShrayStartOffset(size_t firstDimension, size_t offset)
+{
+    return max(ShrayStart(firstDimension), offset);
+}
+
 size_t ShrayEnd(size_t firstDimension)
 {
     return (Shray_rank == Shray_size - 1) ? firstDimension :
         (Shray_rank + 1) * roundUp(firstDimension, Shray_size);
+}
+
+size_t ShrayEndOffset(size_t firstDimension, size_t offset)
+{
+    return min(ShrayEnd(firstDimension), offset);
 }
 
 void ShrayRealloc(void *array)
@@ -320,7 +340,7 @@ void ShrayRealloc(void *array)
 }
 
 void ShraySync(void *array)
-{    
+{
     /* So the other processors have finished writing before we get their parts of the pages. */
     gasnetBarrier();
     BARRIERCOUNT
@@ -339,7 +359,7 @@ void ShraySync(void *array)
     size_t firstByte = Shray_rank * current->bytesPerBlock;
     size_t lastByte = (Shray_rank + 1) * current->bytesPerBlock - 1;
 
-    /* Get the last page of the previous rank, and copy its contents to our copy of that 
+    /* Get the last page of the previous rank, and copy its contents to our copy of that
      * page. */
     if ((firstByte % ShrayPagesz != 0) && (Shray_rank != 0)) {
 
@@ -348,31 +368,31 @@ void ShraySync(void *array)
 
         size_t count = (uintptr_t)current->location + firstByte - (uintptr_t)pageBoundary;
 
-        DBUG_PRINT("We are going to get [%p, %p[ from node %d\n", pageBoundary, 
+        DBUG_PRINT("We are going to get [%p, %p[ from node %d\n", pageBoundary,
                 (void *)((uintptr_t)pageBoundary + count), Shray_rank - 1);
 
         gasnet_get_bulk(pageBoundary, Shray_rank - 1, pageBoundary, count);
 
-        DBUG_PRINT("We got [%p, %p[ from node %d\n", pageBoundary, 
+        DBUG_PRINT("We got [%p, %p[ from node %d\n", pageBoundary,
                 (void *)((uintptr_t)pageBoundary + count), Shray_rank - 1);
     }
 
-    /* Get the first page of the next rank, and copy its contents to our copy of that 
+    /* Get the first page of the next rank, and copy its contents to our copy of that
      * page. */
-    if ((lastByte % ShrayPagesz != ShrayPagesz - 1) && 
+    if ((lastByte % ShrayPagesz != ShrayPagesz - 1) &&
             (Shray_rank != Shray_size - 1)) {
 
         void *dest = (void *)((uintptr_t)current->location + lastByte + 1);
 
-        size_t count = roundUp((uintptr_t)lastByte, ShrayPagesz) * ShrayPagesz - 
+        size_t count = roundUp((uintptr_t)lastByte, ShrayPagesz) * ShrayPagesz -
             (uintptr_t)lastByte - 1;
 
-        DBUG_PRINT("We are going to get [%p, %p[ from node %d\n", dest, 
+        DBUG_PRINT("We are going to get [%p, %p[ from node %d\n", dest,
                 (void *)((uintptr_t)dest + count), Shray_rank + 1);
 
         gasnet_get_bulk(dest, Shray_rank + 1, dest, count);
 
-        DBUG_PRINT("We got [%p, %p[ from node %d\n", dest, 
+        DBUG_PRINT("We got [%p, %p[ from node %d\n", dest,
                 (void *)((uintptr_t)dest + count), Shray_rank + 1);
     }
 
@@ -394,9 +414,9 @@ void ShrayFree(void *address)
     BARRIERCOUNT
 
     /* indirect iterates through the links of the nodes, e.g. the pointers
-     * to the next allocation. Double pointer is necessary because there is no 
+     * to the next allocation. Double pointer is necessary because there is no
      * link to heap (the head of the list). */
-    Allocation **indirect = &heap; 
+    Allocation **indirect = &heap;
 
     while ((*indirect)->location != address) {
         indirect = &(*indirect)->next;
@@ -415,7 +435,7 @@ void ShrayFree(void *address)
 
 void ShrayReport(void)
 {
-    fprintf(stderr, 
+    fprintf(stderr,
             "Shray report P(%d): %zu segfaults, %zu barriers, %zu bytes communicated.\n",
             Shray_rank, segfaultCounter, barrierCounter, segfaultCounter * ShrayPagesz);
 }

@@ -1,7 +1,7 @@
 #ifndef SHRAY__GUARD
 #define SHRAY__GUARD
 
-#include "shrayInternal.h"
+#include <shray2/shrayInternal.h>
 
 /* True for exactly one node. Useful to output results only once. */
 extern bool ShrayOutput;
@@ -38,12 +38,12 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize);
  *
  * @fn size_t ShrayStart(size_t firstDimension)
  *
- *   @brief       Determines the start of the first dimension of a distributed 
+ *   @brief       Determines the start of the first dimension of a distributed
  *                array we write to.
  *
  *   @param firstDimension Extent of the first dimension of the array.
  *
- *   @return start such that we are allowed to write to (i1, ..., id) for 
+ *   @return start such that we are allowed to write to (i1, ..., id) for
  *           start <= i1 < end.
  *
  ******************************************************************************/
@@ -54,12 +54,12 @@ size_t ShrayStart(size_t firstDimension);
  *
  * @fn size_t ShrayEnd(size_t firstDimension)
  *
- *   @brief       Determines the end of the first dimension of a distributed 
+ *   @brief       Determines the end of the first dimension of a distributed
  *                array we write to.
  *
  *   @param firstDimension Extent of the first dimension of the array.
  *
- *   @return end such that we are allowed to write to (i1, ..., id) for 
+ *   @return end such that we are allowed to write to (i1, ..., id) for
  *           start <= i1 < end.
  *
  ******************************************************************************/
@@ -78,6 +78,32 @@ size_t ShrayEnd(size_t firstDimension);
  ******************************************************************************/
 
 void ShraySync(void *array);
+
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayStartOffset(size_t firstDimension, size_t offset)
+ *
+ *   @brief         Return the start index for an array with a minimum of the
+ *                  given offset for the first process.
+ *
+ *   @param array   Array we have finished writing to.
+ *
+ ******************************************************************************/
+
+size_t ShrayStartOffset(size_t firstDimension, size_t offset);
+
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayEndOffset(size_t firstDimension, size_t offset)
+ *
+ *   @brief         Return the end index for an array with a maximum of the
+ *                  given offset for the first process.
+ *
+ *   @param array   Array we have finished writing to.
+ *
+ ******************************************************************************/
+
+size_t ShrayEndOffset(size_t firstDimension, size_t offset);
 
 /** <!--********************************************************************-->
  *

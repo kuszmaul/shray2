@@ -3,3 +3,4 @@ results/*
 bin/*
 *.out
 *.mod
+build/

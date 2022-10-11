@@ -1,6 +1,6 @@
 #include <math.h>
 #include <assert.h>
-#include "../include/shray.h"
+#include <shray2/shray.h>
 
 #define min(a, b) ((a) < (b) ? a : b)
 
@@ -23,7 +23,7 @@ void init(Point *positions, size_t n)
 Point accelerate(Point pos1, Point pos2, double mass)
 {
     /* ||pos2 - pos1||^3 */
-    double n = pow(pow(pos2.x - pos1.x, 2) + pow(pos2.y - pos1.y, 2) + 
+    double n = pow(pow(pos2.x - pos1.x, 2) + pow(pos2.y - pos1.y, 2) +
                 pow(pos2.z - pos1.z, 2), 1.5);
 
     Point a;
@@ -61,11 +61,11 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
                 accel[i].y = 0.0;
                 accel[i].z = 0.0;
         for (size_t j = J2; j < min(J2 + block, n); j++) {
-                accel[i].x += 
+                accel[i].x +=
                     accelerate(positions[i], positions[j], masses[j]).x;
-                accel[i].y += 
+                accel[i].y +=
                     accelerate(positions[i], positions[j], masses[j]).y;
-                accel[i].z += 
+                accel[i].z +=
                     accelerate(positions[i], positions[j], masses[j]).z;
         }
     }
@@ -74,9 +74,9 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
         }
     }
 }
- 
+
 /* Advances the n-bodies in place. accel is a buffer, does not need to be initialized. */
-void advance(Point *positions, Point *velocities, double *masses, 
+void advance(Point *positions, Point *velocities, double *masses,
         Point *accel, double dt, size_t n)
 {
     accelerateAll(positions, accel, masses, n);

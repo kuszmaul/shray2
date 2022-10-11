@@ -1,4 +1,4 @@
-#include "../include/shray.h"
+#include <shray2/shray.h>
 
 /* Initializes n x m matrix to its row-major index. */
 void init(double *matrix, size_t n, size_t m)
@@ -12,7 +12,7 @@ void init(double *matrix, size_t n, size_t m)
 
 /* C = A + B */
 void matmulAdd(double *A, double *B, double *C, size_t m, size_t n)
-{    
+{
     for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
         for (size_t j = 0; j < m; j++) {
             C[i * m + j] = A[i * m + j] + B[i * m + j];

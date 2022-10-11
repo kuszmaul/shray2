@@ -1,6 +1,6 @@
 #include <math.h>
 #include <assert.h>
-#include "../include/shray.h"
+#include <shray2/shray.h>
 
 #define min(a, b) ((a) < (b) ? a : b)
 
@@ -23,7 +23,7 @@ void init(Point *positions, size_t n)
 Point accelerate(Point pos1, Point pos2, double mass)
 {
     /* ||pos2 - pos1||^3 */
-    double n = pow(pow(pos2.x - pos1.x, 2) + pow(pos2.y - pos1.y, 2) + 
+    double n = pow(pow(pos2.x - pos1.x, 2) + pow(pos2.y - pos1.y, 2) +
                 pow(pos2.z - pos1.z, 2), 1.5);
 
     Point a;
@@ -53,7 +53,7 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 
     /* We split up the inner (blocked) loop into two parts, namely [start, n[
      * and [0, start[. This way the j loop starts at a different point on every
-     * node. As the j loop is the one containing all the information, we have 
+     * node. As the j loop is the one containing all the information, we have
      * better communication load-balance this way. */
     for (size_t I1 = start; I1 < end; I1 += cacheBlock) {
         for (size_t J1 = start; J1 < n; J1 += cacheBlock) {
@@ -64,11 +64,11 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
                 accel[i].y = 0.0;
                 accel[i].z = 0.0;
         for (size_t j = J2; j < min(J2 + block, n); j++) {
-                accel[i].x += 
+                accel[i].x +=
                     accelerate(positions[i], positions[j], masses[j]).x;
-                accel[i].y += 
+                accel[i].y +=
                     accelerate(positions[i], positions[j], masses[j]).y;
-                accel[i].z += 
+                accel[i].z +=
                     accelerate(positions[i], positions[j], masses[j]).z;
         }
     }
@@ -84,11 +84,11 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
                 accel[i].y = 0.0;
                 accel[i].z = 0.0;
         for (size_t j = J2; j < min(J2 + block, n); j++) {
-                accel[i].x += 
+                accel[i].x +=
                     accelerate(positions[i], positions[j], masses[j]).x;
-                accel[i].y += 
+                accel[i].y +=
                     accelerate(positions[i], positions[j], masses[j]).y;
-                accel[i].z += 
+                accel[i].z +=
                     accelerate(positions[i], positions[j], masses[j]).z;
         }
     }
@@ -97,9 +97,9 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
         }
     }
 }
- 
+
 /* Advances the n-bodies in place. accel is a buffer, does not need to be initialized. */
-void advance(Point *positions, Point *velocities, double *masses, 
+void advance(Point *positions, Point *velocities, double *masses,
         Point *accel, double dt, size_t n)
 {
     accelerateAll(positions, accel, masses, n);

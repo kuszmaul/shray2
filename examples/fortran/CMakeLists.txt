@@ -1,0 +1,20 @@
+# example fortran binaries
+foreach(file
+		matrix
+		nbody
+		stencil)
+	set(EXAMPLE_TARGET "${file}_fortran")
+
+	add_executable("${EXAMPLE_TARGET}"
+		"${file}.f90")
+
+	# TODO: use a proper find() for coarray stuff
+	target_compile_options("${EXAMPLE_TARGET}"
+		PRIVATE
+			${PROJECT_FLAGS}
+			-fcoarray=lib)
+	target_link_options("${EXAMPLE_TARGET}"
+		PRIVATE
+			${PROJECT_FLAGS}
+			-lcaf_openmpi)
+endforeach(file)
