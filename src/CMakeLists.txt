@@ -22,7 +22,7 @@ foreach(suffix
 			$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 	target_link_libraries("${LIB_TARGET}"
 		PUBLIC
-			"GASNet::${GASNet_CONDUIT}-${GASNet_THREADING}"
+			GASNet::GASNet
 		PRIVATE
 			cinterface)
 	target_compile_definitions("${LIB_TARGET}"
