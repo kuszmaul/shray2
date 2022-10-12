@@ -107,7 +107,9 @@ typedef struct Allocation {
 #ifdef PROFILE
     #define BARRIERCOUNT barrierCounter++;
     #define SEGFAULTCOUNT segfaultCounter++;
+    #define PREFETCHMISS prefetchMissCounter++;
 #else
     #define BARRIERCOUNT
     #define SEGFAULTCOUNT
+    #define PREFETCHMISS
 #endif

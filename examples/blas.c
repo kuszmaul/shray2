@@ -66,11 +66,11 @@ int main(int argc, char **argv)
 
     ShrayReport();
 
-    if (check(C, n, 0.01)) {
-        printf("Success!\n");
-    } else {
-        printf("Failure!\n");
-    }
+//    if (check(C, n, 0.01)) {
+//        printf("Success!\n");
+//    } else {
+//        printf("Failure!\n");
+//    }
 
     ShrayFree(A);
     ShrayFree(B);

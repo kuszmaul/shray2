@@ -15,6 +15,7 @@ static Allocation *heap;
 static unsigned int Shray_rank;
 static unsigned int Shray_size;
 static size_t segfaultCounter;
+static size_t prefetchMissCounter;
 static size_t barrierCounter;
 static size_t ShrayPagesz;
 static size_t cacheLineSize;
@@ -129,6 +130,7 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
                 "storing it in %p.", prefetchOld, roundedAddress,
                 cache.addresses[cache.firstIn]);
         gasnet_get(cache.addresses[cache.firstIn], owner.thisOwner, roundedAddress, ShrayPagesz);
+        PREFETCHMISS
     }
 
     /* Remap the evicted cache line to the proper position. This also protects the
@@ -187,6 +189,7 @@ void ShrayInit(int *argc, char ***argv)
 
     segfaultCounter = 0;
     barrierCounter = 0;
+    prefetchMissCounter = 0;
 
     int pagesz = sysconf(_SC_PAGE_SIZE);
     if (pagesz == -1) {
@@ -434,8 +437,10 @@ void ShrayFree(void *address)
 void ShrayReport(void)
 {
     fprintf(stderr,
-            "Shray report P(%d): %zu segfaults, %zu barriers, %zu bytes communicated.\n",
-            Shray_rank, segfaultCounter, barrierCounter, segfaultCounter * ShrayPagesz);
+            "Shray report P(%d): %zu segfaults (%zu prefetch misses), %zu barriers, "
+            "%zu bytes communicated.\n",
+            Shray_rank, segfaultCounter, prefetchMissCounter, barrierCounter, 
+            segfaultCounter * ShrayPagesz);
 }
 
 void ShrayFinalize(int exit_code)
