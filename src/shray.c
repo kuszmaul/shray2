@@ -52,18 +52,9 @@ int inRange(void *address, Allocation* alloc)
         ((uintptr_t)address < (uintptr_t)alloc->location + alloc->size);
 }
 
-typedef struct {
-    /* Owner of this page */
-    int thisOwner;
-    /* Owner of the next page, or -1 if it is not sensible to prefetch. */
-    int nextOwner;
-} Owner;
-
 /* segfault is rounded to page boundary */
-Owner findOwner(void *segfault)
+unsigned int findOwner(void *segfault)
 {
-    Owner owner;
-
     /* We advance through the allocations, until we find the one containing our
      * segfault. */
     Allocation *current = heap;
@@ -79,15 +70,7 @@ Owner findOwner(void *segfault)
 
     uintptr_t difference = (uintptr_t)segfault - (uintptr_t)(current->location);
 
-    owner.thisOwner = difference / current->bytesPerBlock;
-    void *nextPage = (void *)((uintptr_t)segfault + ShrayPagesz);
-    if (inRange(nextPage, current)) {
-        owner.nextOwner = (difference + ShrayPagesz) / current->bytesPerBlock;
-    } else {
-        owner.nextOwner = -1;
-    }
-
-    return owner;
+    return difference / current->bytesPerBlock;
 }
 
 void SegvHandler(int sig, siginfo_t *si, void *unused)
@@ -97,44 +80,13 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     void *roundedAddress = (void *)((uintptr_t)address / ShrayPagesz * ShrayPagesz);
     DBUG_PRINT("Segfault at %p.", address)
 
-    gasnet_wait_syncnbi_gets();
+    unsigned int owner = findOwner(roundedAddress);
+    DBUG_PRINT("Segfault is owned by node %d.", owner);
 
-    Owner owner = findOwner(roundedAddress);
-    DBUG_PRINT("Segfault is owned by node %d. Next page is owned by node %d.",
-            owner.thisOwner, owner.nextOwner);
+    /* Fetch the remote page and store it in the cache line we are going to evict. */
+    gasnet_get(cache.addresses[cache.firstIn], owner, roundedAddress, ShrayPagesz);
 
-    /* The prefetch of the previous segfault. */
-    void *prefetchOld = cache.prefetch;
-
-    /* Prefetch to the second cache line admitted. Protect the line afterwards as its
-     * contents is undefined until the asynchronous fetch is completed. */
-    cache.prefetch = (void *)((uintptr_t)roundedAddress + ShrayPagesz);
-    if (owner.nextOwner != -1) {
-        DBUG_PRINT("We prefetch %p, storing it in %p.", cache.prefetch,
-                cache.addresses[(cache.firstIn + 1) % cache.numberOfLines]);
-        gasnet_get_nbi(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines],
-                owner.nextOwner, cache.prefetch, ShrayPagesz);
-    } else {
-        DBUG_PRINT("We do not prefetch %p as it falls outside of a DSM allocation.",
-                cache.prefetch);
-    }
-    /* The asynchronous get needs to write to it, but the results are undefined, so
-     * we cannot read it. */
-    MPROTECT_SAFE(cache.addresses[(cache.firstIn + 1) % cache.numberOfLines],
-                ShrayPagesz, PROT_WRITE);
-
-    if (prefetchOld != roundedAddress) {
-        /* We prefetched the wrong page. Do a blocking fetch on the page we need, storing
-         * the result in the line we evict. */
-        DBUG_PRINT("We prefetched %p which we do not need, so now we fetch %p, "
-                "storing it in %p.", prefetchOld, roundedAddress,
-                cache.addresses[cache.firstIn]);
-        gasnet_get(cache.addresses[cache.firstIn], owner.thisOwner, roundedAddress, ShrayPagesz);
-        PREFETCHMISS
-    }
-
-    /* Remap the evicted cache line to the proper position. This also protects the
-     * previous position of the evicted cache line. FIXME right?*/
+    /* Remap the line to the proper position. */
     DBUG_PRINT("We remap %p to %p", cache.addresses[cache.firstIn], roundedAddress);
     MREMAP_SAFE(cache.addresses[cache.firstIn], mremap(cache.addresses[cache.firstIn],
             ShrayPagesz, ShrayPagesz, MREMAP_MAYMOVE | MREMAP_FIXED,
