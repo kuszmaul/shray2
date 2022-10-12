@@ -79,7 +79,7 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 void advance(Point *positions, Point *velocities, double *masses,
         Point *accel, double dt, size_t n)
 {
-    accelerateAll(positions, accel, masses, n);
+    accelerateAll(accel, positions, masses, n);
     ShraySync(accel);
 
     for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
