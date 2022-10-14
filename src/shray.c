@@ -203,16 +203,10 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
      * pointer up.*/
     if (Shray_rank == 0) {
         void *mmapAddress;
-        MMAP_SAFE(mmapAddress, mmap(NULL, alloc->size + ShrayPagesz, 
+        MMAP_SAFE(mmapAddress, mmap(NULL, alloc->size + 10 * ShrayPagesz, 
                     PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
         alloc->location = (void *)(roundUp((uintptr_t)mmapAddress, ShrayPagesz) * ShrayPagesz);
         DBUG_PRINT("mmapAddress = %p, allocation start = %p", mmapAddress, alloc->location);
-    }
-
-
-    if (Shray_rank == 0) {
-        MMAP_SAFE(alloc->location, mmap(NULL, alloc->size, PROT_NONE, MAP_ANONYMOUS |
-                MAP_PRIVATE, -1, 0));
     }
 
     if (alloc->size / ShrayPagesz < Shray_size) {
@@ -221,8 +215,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
         gasnet_exit(1);
     }
 
-    /* Broadcast alloc->location to the other nodes. FIXME I don't know whether this is
-     * correct. Especially the 0 was a pure guess. Appears to work for now though. */
+    /* Broadcast alloc->location to the other nodes. */
     gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
             0, &(alloc->location), sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
@@ -237,28 +230,31 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     size_t bytesPerLatterDimensions = alloc->size / firstDimension;
     alloc->bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
 
-    /* Protect all pages that we do not own, and register what we do. We must subtract
-     * one from alloc->bytesPerBlock as we start counting from one. So for example
-     * the last byte owned by node 0, has index alloc->bytesPerBlock - 1. */
-    size_t firstPage = Shray_rank * alloc->bytesPerBlock / ShrayPagesz;
-    size_t lastPage = (Shray_rank == Shray_size - 1) ? (alloc->size - 1) / ShrayPagesz :
-        ((Shray_rank + 1) * alloc->bytesPerBlock - 1) / ShrayPagesz;
-    size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
+    uintptr_t firstByte = ((uintptr_t)alloc->location + Shray_rank * alloc->bytesPerBlock);
+    uintptr_t lastByte = (Shray_rank == Shray_size - 1) ? 
+        (uintptr_t)alloc->location + alloc->size - 1 : 
+        (uintptr_t)alloc->location + (Shray_rank + 1) * alloc->bytesPerBlock - 1;
 
-    DBUG_PRINT("First page: %zu, last page: %zu", firstPage, lastPage);
+    /* First byte, last byte rounded down to page number. */
+    uintptr_t firstPage = (uintptr_t)firstByte / ShrayPagesz * ShrayPagesz;
+    uintptr_t lastPage = (uintptr_t)lastByte / ShrayPagesz * ShrayPagesz;
 
-    void *start = (void *)((uintptr_t)alloc->location + firstPage * ShrayPagesz);
+    size_t segmentSize = lastPage - firstPage + ShrayPagesz;
+
+    DBUG_PRINT("First byte: %p, first page: %p, last byte: %p, last page: %p", 
+            (void *)firstByte, (void *)firstPage, (void *)lastByte, (void *)lastPage);
+
     DBUG_PRINT("ShrayMalloc makes %zu bytes from %p available for read/write, so"
             "\n\t\t  [%p, %p[.",
-            segmentSize, start, start, (void *)((uintptr_t)start + segmentSize));
-    MPROTECT_SAFE(start, segmentSize, PROT_READ | PROT_WRITE);
+            segmentSize, (void *)firstPage, (void *)firstPage, (void *)(lastPage + ShrayPagesz));
+    MPROTECT_SAFE((void *)firstPage, segmentSize, PROT_READ | PROT_WRITE);
 
     /* Insert a new allocation */
     heap = insertAtHead(heap, alloc);
 
     DBUG_PRINT("Made a DSM allocation [%p, %p[, of which we own [%p, %p[.",
             alloc->location, (void *)((uintptr_t)alloc->location + alloc->size),
-            start, (void *)((uintptr_t)start + segmentSize));
+            (void *)firstPage, (void *)(lastPage + ShrayPagesz));
 
     return alloc->location;
 }

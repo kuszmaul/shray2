@@ -53,7 +53,7 @@ typedef struct Allocation {
 #define MPROTECT_SAFE(addr, len, prot)                                                  \
     {                                                                                   \
         if (mprotect(addr, len, prot) != 0) {                                           \
-            fprintf(stderr, "Line %d: ", __LINE__);                                     \
+            fprintf(stderr, "Line %d, node [%d]: ", __LINE__, Shray_rank);              \
             perror("mprotect failed");                                                  \
             ShrayFinalize(1);                                                           \
         }                                                                               \
@@ -63,8 +63,8 @@ typedef struct Allocation {
     {                                                                                   \
         variable = fncall;                                                              \
         if (variable == MAP_FAILED) {                                                   \
+            fprintf(stderr, "Line %d, node [%d]: ", __LINE__, Shray_rank);              \
             perror("mremap failed");                                                    \
-            fprintf(stderr, "Line %d: ", __LINE__);                                     \
             ShrayFinalize(1);                                                           \
         }                                                                               \
     }
@@ -73,8 +73,8 @@ typedef struct Allocation {
     {                                                                                   \
         variable = fncall;                                                              \
         if (variable == MAP_FAILED) {                                                   \
+            fprintf(stderr, "Line %d, node [%d]: ", __LINE__, Shray_rank);              \
             perror("mmap failed");                                                      \
-            fprintf(stderr, "Line %d: ", __LINE__);                                     \
             ShrayFinalize(1);                                                           \
         }                                                                               \
     }
@@ -83,8 +83,8 @@ typedef struct Allocation {
     {                                                                                   \
         variable = malloc(size);                                                        \
         if (variable == MAP_FAILED) {                                                   \
+            fprintf(stderr, "Line %d, node [%d]: ", __LINE__, Shray_rank);              \
             perror("malloc failed");                                                    \
-            fprintf(stderr, "Line %d: ", __LINE__);                                     \
             ShrayFinalize(1);                                                           \
         }                                                                               \
     }
