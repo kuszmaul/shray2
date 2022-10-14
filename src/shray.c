@@ -143,15 +143,6 @@ void ShrayInit(int *argc, char ***argv)
     barrierCounter = 0;
     prefetchMissCounter = 0;
 
-    int pagesz = sysconf(_SC_PAGE_SIZE);
-    if (pagesz == -1) {
-        perror("Querying system page size failed.");
-    }
-
-    ShrayPagesz = (size_t)pagesz;
-
-    heap = createAllocation();
-
     char *cacheLineEnv = getenv("SHRAY_CACHELINE");
     if (cacheLineEnv == NULL) {
         fprintf(stderr, "Please set the cacheline environment variable SHRAY_CACHELINE\n");
@@ -159,6 +150,15 @@ void ShrayInit(int *argc, char ***argv)
     } else {
         cacheLineSize = atol(cacheLineEnv);
     }
+
+    int pagesz = sysconf(_SC_PAGE_SIZE);
+    if (pagesz == -1) {
+        perror("Querying system page size failed.");
+    }
+
+    ShrayPagesz = (size_t)pagesz * cacheLineSize;
+
+    heap = createAllocation();
 
     char *cacheSizeEnv = getenv("SHRAY_CACHESIZE");
     if (cacheSizeEnv == NULL) {
@@ -196,6 +196,19 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     Allocation *alloc = createAllocation();
 
     alloc->size = totalSize;
+
+    /* For the segfault handler, we need the start of each allocation to be 
+     * ShrayPagesz-aligned. We cheat a little by making it possible for this to be multiple 
+     * system-pages. So we mmap a bit more, and then move the 
+     * pointer up.*/
+    if (Shray_rank == 0) {
+        void *mmapAddress;
+        MMAP_SAFE(mmapAddress, mmap(NULL, alloc->size + ShrayPagesz, 
+                    PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+        alloc->location = (void *)(roundUp((uintptr_t)mmapAddress, ShrayPagesz) * ShrayPagesz);
+        DBUG_PRINT("mmapAddress = %p, allocation start = %p", mmapAddress, alloc->location);
+    }
+
 
     if (Shray_rank == 0) {
         MMAP_SAFE(alloc->location, mmap(NULL, alloc->size, PROT_NONE, MAP_ANONYMOUS |
