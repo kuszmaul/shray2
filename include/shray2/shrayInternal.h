@@ -101,6 +101,22 @@ typedef struct Allocation {
 #endif
 
 /**************************************************
+ * Graphing segfaults
+ **************************************************/
+
+#ifdef GRAPH 
+    #define PROFILE
+    #define GRAPH_SEGV(segfault, segvNo)                                          \
+        {                                                                         \
+            if (Shray_rank == 0) {                                                \
+                fprintf(stderr, "%zu, %zu\n", segvNo, segfault / ShrayPagesz);    \
+            }                                                                     \
+        }
+#else
+    #define GRAPH_SEGV(segfault, segvNo)
+#endif
+
+/**************************************************
  * Profiling
  **************************************************/
 
@@ -112,20 +128,4 @@ typedef struct Allocation {
     #define BARRIERCOUNT
     #define SEGFAULTCOUNT
     #define PREFETCHMISS
-#endif
-
-/**************************************************
- * Graphing segfaults
- **************************************************/
-
-#ifdef GRAPH 
-    #define GRAPH_SEGV(segfault, segvNo)                                          \
-        {                                                                         \
-            if (Shray_rank == 0) {                                                \
-                fprintf(stderr, "%zu, %zu\n", segvNo, segfault / ShrayPagesz);    \
-            }                                                                     \
-        }
-    #define SEGFAULTCOUNT segfaultCounter++;
-#else
-    #define GRAPH_SEGV(segfault, segvNo)
 #endif
