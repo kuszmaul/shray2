@@ -78,6 +78,8 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     SEGFAULTCOUNT
     void *address = si->si_addr;
     void *roundedAddress = (void *)((uintptr_t)address / ShrayPagesz * ShrayPagesz);
+    GRAPH_SEGV((uintptr_t)address, segfaultCounter)
+
     DBUG_PRINT("Segfault at %p.", address)
 
     unsigned int owner = findOwner(roundedAddress);

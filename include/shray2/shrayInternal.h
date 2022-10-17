@@ -113,3 +113,19 @@ typedef struct Allocation {
     #define SEGFAULTCOUNT
     #define PREFETCHMISS
 #endif
+
+/**************************************************
+ * Graphing segfaults
+ **************************************************/
+
+#ifdef GRAPH 
+    #define GRAPH_SEGV(segfault, segvNo)                                          \
+        {                                                                         \
+            if (Shray_rank == 0) {                                                \
+                fprintf(stderr, "%zu, %zu\n", segvNo, segfault / ShrayPagesz);    \
+            }                                                                     \
+        }
+    #define SEGFAULTCOUNT segfaultCounter++;
+#else
+    #define GRAPH_SEGV(segfault, segvNo)
+#endif

@@ -1,0 +1,6 @@
+//    #define GRAPH_SEGV(segfault, segvNo)                            \
+//        {                                                           \
+//            if (Shray_rank == 0 || 1) {                                  \
+//                fprintf(stderr, "%zu, %zu\n", segvNo, segfault);    \
+//            }                                                       \
+//        }                                                           
