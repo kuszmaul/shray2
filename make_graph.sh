@@ -1,13 +1,35 @@
-# Usage: name of executable, number of processors, commandline arguments (maximum of 3).
+#!/bin/sh
+
+# Usage: name of executable, number of processors, commandline arguments.
 # Makes a graph of the segfault page numbers on the y-axis, and time on the x-axis
 
-#!/bin/bash
+set -eu
 
-make graph
-echo "time,pageNumber" > $1_segfaults.out
-mpirun -n $2 bin/$1_graph $3 $4 $5 2>> $1_segfaults.out
+if [ "$#" -lt 3 ]; then
+	printf "Usage: EXECUTABLE NUMBER_PROCESSORS [EXECUTABLE ARGS]\n" >&2
+	exit 1
+fi
 
-sed -i '/WARNING/d' $1_segfaults.out
-sed -i '/Shray/d' $1_segfaults.out
+example="$1"
+nproc="$2"
 
-# TODO generate plot
+shift
+shift
+
+printf 'Running %s (%s proc) with arguments: %s\n' "$example" "$nproc" "$@"
+
+datadir=experiments/results
+mkdir -p "$datadir"
+
+base=$(basename "$example")
+datafile="$datadir/${base}_segfaults.data"
+
+printf 'time,pageNumber\n' >"$datafile"
+mpirun -n "$nproc" "$example" "$@" 2>>"$datafile"
+
+sed -i '/WARNING/d' "$datafile"
+sed -i '/Shray/d' "$datafile"
+sed -i '/time,/d' "$datafile"
+
+# make graph using gnu plot
+gnuplot -c experiments/segfault_time.gpi "$base" "$datafile" "$datadir"
