@@ -5,7 +5,7 @@
 
 set -eu
 
-if [ "$#" -lt 3 ]; then
+if [ "$#" -lt 2 ]; then
 	printf "Usage: EXECUTABLE NUMBER_PROCESSORS [EXECUTABLE ARGS]\n" >&2
 	exit 1
 fi
