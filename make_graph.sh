@@ -28,7 +28,7 @@ mkdir -p "$datadir"
 base=$(basename "$example")
 datafile="$datadir/${base}_segfaults.data"
 
-mpirun -n "$nproc" "$example" "$@" 2>>"$datafile"
+mpirun -n "$nproc" "$example" "$@" 2>"$datafile"
 
 sed -i '/WARNING/d' "$datafile"
 sed -i '/Shray/d' "$datafile"
