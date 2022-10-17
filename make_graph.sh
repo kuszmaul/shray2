@@ -16,7 +16,11 @@ nproc="$2"
 shift
 shift
 
-printf 'Running %s (%s proc) with arguments: %s\n' "$example" "$nproc" "$@"
+printf 'Running %s (%s proc) with arguments: ' "$example" "$nproc"
+for i in "$@"; do
+	printf '%s ' "$i"
+done
+printf '\n'
 
 datadir=experiments/results
 mkdir -p "$datadir"
