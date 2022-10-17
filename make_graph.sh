@@ -28,12 +28,9 @@ mkdir -p "$datadir"
 base=$(basename "$example")
 datafile="$datadir/${base}_segfaults.data"
 
-printf 'time,pageNumber\n' >"$datafile"
 mpirun -n "$nproc" "$example" "$@" 2>>"$datafile"
 
 sed -i '/WARNING/d' "$datafile"
 sed -i '/Shray/d' "$datafile"
-sed -i '/time,/d' "$datafile"
 
-# make graph using gnu plot
 gnuplot -c experiments/segfault_time.gpi "$base" "$datafile" "$datadir"
