@@ -70,7 +70,6 @@ void stencil(size_t n, double **in, double **out, int iterations)
         double *temp = *in;
         *in = *out;
         *out = temp;
-        ShrayRealloc(*out);
     }
 
     /* No buffer swap after the last iteration. */
@@ -84,7 +83,7 @@ int main(int argc, char **argv)
 
     if (argc != 3) {
         printf("Please specify 2 arguments (n, iterations).\n");
-        exit(1);
+        ShrayFinalize(1);
     }
 
     size_t n = atoll(argv[1]);

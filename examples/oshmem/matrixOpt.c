@@ -47,12 +47,27 @@ void matmul(double *A, double *B, double *C, size_t n)
 	int p = shmem_n_pes();
 
     double *Bt = malloc(n / p * n * sizeof(double));
+    double *BtAsync = malloc(n / p * n * sizeof(double));
 
-    /* Add A[s][t] B[t] to C. */
-    for (int t = 0; t < p; t++) {
-        /* This is where the memory scalability comes from. We grab one block of 
-         * B at a time, overwriting the block we are done with every time. */
-        shmem_get(Bt, B, n / p * n, t);
+    /* Add A[s][t] B[t] to C. We start with t = 0 (B[0] = B), and repeat the 
+     * asynchronous get B[t + 1] - compute A[s][t] B[t] cycle. */
+
+    shmem_get_nbi(BtAsync, B, n / p * n, (shmem_my_pe() + 1) % p);
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            n / p, n, n / p, 1.0, &A[0 * n / p], n, B, n, 1.0, C, n);
+
+    for (int i = 1; i < p; i++) {
+        /* Transfer the async get into Bt. */
+        shmem_quiet();
+        double *temp = Bt;
+        Bt = BtAsync;
+        BtAsync = temp;
+
+        /* Get the next block */
+        int t = (i + shmem_my_pe()) % p;
+        if (t != (shmem_my_pe() - 1) % p) {
+            shmem_get_nbi(BtAsync, B, n / p * n, (t + 1) % p);
+        }
 
         /* blas can operate on subarrays, so no need to pack A[s][t]. 
          * A[s][t] is an n / p x n / p matrix, and a submatrix of A which 
@@ -62,6 +77,7 @@ void matmul(double *A, double *B, double *C, size_t n)
                 n / p, n, n / p, 1.0, &A[t * n / p], n, Bt, n, 1.0, C, n);
     }
 
+    free(BtAsync);
     free(Bt);
 }
 
