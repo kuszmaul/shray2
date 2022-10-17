@@ -6,11 +6,14 @@ include(language_standard)
 foreach(suffix
 		""
 		_debug
-		_profile)
+		_profile
+		_graph)
 	if(suffix STREQUAL "_debug")
 		set(EXTRA_DEFINES DEBUG)
 	elseif(suffix STREQUAL "_profile")
 		set(EXTRA_DEFINES PROFILE)
+	elseif(suffix STREQUAL "_graph")
+		set(EXTRA_DEFINES GRAPH)
 	endif()
 
 	set(LIB_TARGET "${PROJECT_NAME}${suffix}")

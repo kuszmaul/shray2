@@ -6,11 +6,14 @@ find_package(BLAS REQUIRED)
 foreach(suffix
 		""
 		_debug
-		_profile)
+		_profile
+		_graph)
 	if(suffix STREQUAL "_debug")
 		set(EXTRA_DEFINES DEBUG)
 	elseif(suffix STREQUAL "_profile")
 		set(EXTRA_DEFINES PROFILE)
+	elseif(suffix STREQUAL "_graph")
+		set(EXTRA_DEFINES GRAPH)
 	endif()
 
 	foreach(file
