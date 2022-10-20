@@ -15,7 +15,6 @@ static Allocation *heap;
 static unsigned int Shray_rank;
 static unsigned int Shray_size;
 static size_t segfaultCounter;
-static size_t prefetchMissCounter;
 static size_t barrierCounter;
 static size_t ShrayPagesz;
 static size_t cacheLineSize;
@@ -52,25 +51,22 @@ int inRange(void *address, Allocation* alloc)
         ((uintptr_t)address < (uintptr_t)alloc->location + alloc->size);
 }
 
-/* segfault is rounded to page boundary */
-unsigned int findOwner(void *segfault)
+Allocation *findOwner(void *segfault)
 {
     /* We advance through the allocations, until we find the one containing our
      * segfault. */
-    Allocation *current = heap;
+    Allocation *alloc = heap;
 
-    while (current != NULL && !inRange(segfault, current)) {
-        current = current->next;
+    while (alloc != NULL && !inRange(segfault, alloc)) {
+        alloc = alloc->next;
     }
 
-    if (current == NULL) {
-            printf("Segfault (%p) outside of DSM area\n", segfault);
+    if (alloc == NULL) {
+            printf("[node %d]: Segfault (%p) outside of DSM area\n", Shray_rank, segfault);
             gasnet_exit(1);
     }
 
-    uintptr_t difference = (uintptr_t)segfault - (uintptr_t)(current->location);
-
-    return difference / current->bytesPerBlock;
+    return alloc;
 }
 
 void SegvHandler(int sig, siginfo_t *si, void *unused)
@@ -82,7 +78,10 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
 
     DBUG_PRINT("Segfault at %p.", address)
 
-    unsigned int owner = findOwner(roundedAddress);
+    Allocation *alloc = findOwner(roundedAddress);
+    uintptr_t difference = (uintptr_t)roundedAddress - (uintptr_t)(alloc->location);
+    unsigned int owner = difference / alloc->bytesPerBlock;
+
     DBUG_PRINT("Segfault is owned by node %d.", owner);
 
     /* Fetch the remote page and store it in the cache line we are going to evict. */
@@ -107,6 +106,18 @@ void registerHandler(void)
     if (sigaction (SIGSEGV, &sa, NULL) == -1) {
         perror("Registering SIGSEGV handler failed.\n");
         gasnet_exit(1);
+    }
+}
+
+void resetCache()
+{
+    for (size_t i = 0; i < cache.numberOfLines; i++) {
+        void *location = (void *)((uintptr_t)cache.original + i * ShrayPagesz);
+        if (cache.addresses[i] != location) {
+            DBUG_PRINT("We remap %p to %p", cache.addresses[i], location);
+            MREMAP_SAFE(cache.addresses[i], mremap(cache.addresses[i], 
+                        ShrayPagesz, ShrayPagesz, MREMAP_MAYMOVE | MREMAP_FIXED, location));
+        }
     }
 }
 
@@ -178,10 +189,10 @@ void ShrayInit(int *argc, char ***argv)
 
     cache.firstIn = 0;
     MALLOC_SAFE(cache.addresses, cache.numberOfLines * sizeof(void *));
-    cache.prefetch = NULL;
 
     MMAP_SAFE(cache.addresses[0], mmap(NULL, cache.numberOfLines * ShrayPagesz,
                 PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    cache.original = cache.addresses[0];
 
     for (size_t i = 1; i < cache.numberOfLines; i++) {
         cache.addresses[i] = (void *)((uintptr_t)cache.addresses[i - 1] + ShrayPagesz);
@@ -280,25 +291,7 @@ void ShrayRealloc(void *array)
     gasnetBarrier();
     BARRIERCOUNT;
 
-    Allocation *current = heap;
-
-    while (current != NULL && current->location != array) {
-        current = current->next;
-    }
-
-    if (current == NULL) {
-        fprintf(stderr, "address %p is not the start of a DSM allocation.\n", array);
-    }
-
-    MPROTECT_SAFE(current->location, current->size, PROT_NONE);
-
-    size_t firstPage = Shray_rank * current->bytesPerBlock / ShrayPagesz;
-    size_t lastPage = (Shray_rank == Shray_size - 1) ? (current->size - 1) / ShrayPagesz :
-        ((Shray_rank + 1) * current->bytesPerBlock - 1) / ShrayPagesz;
-    size_t segmentSize = (lastPage - firstPage + 1) * ShrayPagesz;
-
-    void *start = (void *)((uintptr_t)current->location + firstPage * ShrayPagesz);
-    MPROTECT_SAFE(start, segmentSize, PROT_READ | PROT_WRITE);
+    resetCache();
 }
 
 void ShraySync(void *array)
@@ -307,28 +300,20 @@ void ShraySync(void *array)
     gasnetBarrier();
     BARRIERCOUNT
 
-    Allocation *current = heap;
-
-    while (current != NULL && current->location != array) {
-        current = current->next;
-    }
-
-    if (current == NULL) {
-        fprintf(stderr, "address %p is not the start of a DSM allocation.\n", array);
-    }
+    Allocation *alloc = findOwner(array);
 
     /* Synchronise in case the first or last page is co-owned with someone else. */
-    size_t firstByte = Shray_rank * current->bytesPerBlock;
-    size_t lastByte = (Shray_rank + 1) * current->bytesPerBlock - 1;
+    size_t firstByte = Shray_rank * alloc->bytesPerBlock;
+    size_t lastByte = (Shray_rank + 1) * alloc->bytesPerBlock - 1;
 
     /* Get the last page of the previous rank, and copy its contents to our copy of that
      * page. */
     if ((firstByte % ShrayPagesz != 0) && (Shray_rank != 0)) {
 
-        void *pageBoundary = (void *)((uintptr_t)current->location +
+        void *pageBoundary = (void *)((uintptr_t)alloc->location +
                 (uintptr_t)firstByte / ShrayPagesz * ShrayPagesz);
 
-        size_t count = (uintptr_t)current->location + firstByte - (uintptr_t)pageBoundary;
+        size_t count = (uintptr_t)alloc->location + firstByte - (uintptr_t)pageBoundary;
 
         DBUG_PRINT("We are going to get [%p, %p[ from node %d\n", pageBoundary,
                 (void *)((uintptr_t)pageBoundary + count), Shray_rank - 1);
@@ -344,7 +329,7 @@ void ShraySync(void *array)
     if ((lastByte % ShrayPagesz != ShrayPagesz - 1) &&
             (Shray_rank != Shray_size - 1)) {
 
-        void *dest = (void *)((uintptr_t)current->location + lastByte + 1);
+        void *dest = (void *)((uintptr_t)alloc->location + lastByte + 1);
 
         size_t count = roundUp((uintptr_t)lastByte, ShrayPagesz) * ShrayPagesz -
             (uintptr_t)lastByte - 1;
@@ -357,6 +342,8 @@ void ShraySync(void *array)
         DBUG_PRINT("We got [%p, %p[ from node %d\n", dest,
                 (void *)((uintptr_t)dest + count), Shray_rank + 1);
     }
+
+    resetCache(alloc);
 
     /* So no one reads from use before the communications are completed. */
     gasnetBarrier();
@@ -392,9 +379,8 @@ void ShrayFree(void *address)
 void ShrayReport(void)
 {
     fprintf(stderr,
-            "Shray report P(%d): %zu segfaults (%zu prefetch misses), %zu barriers, "
-            "%zu bytes communicated.\n",
-            Shray_rank, segfaultCounter, prefetchMissCounter, barrierCounter, 
+            "Shray report P(%d): %zu segfaults, %zu barriers, "
+            "%zu bytes communicated.\n", Shray_rank, segfaultCounter, barrierCounter, 
             segfaultCounter * ShrayPagesz);
 }
 

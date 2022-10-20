@@ -24,8 +24,8 @@ typedef struct {
     size_t firstIn;
     /* This determines the size of our cache. */
     size_t numberOfLines;
-    /* The address we are currently prefetching. */
-    void *prefetch;
+    /* The cachelines return here after a ShraySync */
+    void *original;
 } Cache;
 
 /* A single allocation in the heap. */
@@ -82,9 +82,9 @@ typedef struct Allocation {
 #define MALLOC_SAFE(variable, size)                                                     \
     {                                                                                   \
         variable = malloc(size);                                                        \
-        if (variable == MAP_FAILED) {                                                   \
-            fprintf(stderr, "Line %d, node [%d]: ", __LINE__, Shray_rank);              \
-            perror("malloc failed");                                                    \
+        if (variable == NULL) {                                                         \
+            fprintf(stderr, "Line %d, node [%d]: malloc failed with size %zu\n",        \
+                    __LINE__, Shray_rank, size);                                        \
             ShrayFinalize(1);                                                           \
         }                                                                               \
     }
