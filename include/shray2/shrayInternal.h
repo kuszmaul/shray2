@@ -24,6 +24,9 @@ typedef struct {
     size_t firstIn;
     /* This determines the size of our cache. */
     size_t numberOfLines;
+    /* True when we have used the last cache line for the first time. Optimisation
+     * for resetCache in low-communication applications. */ 
+    bool allUsed;
 } Cache;
 
 /* A single allocation in the heap. */

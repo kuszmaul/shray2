@@ -1,4 +1,3 @@
-
 /* Distribution: 1d it is a block distribution on the bytes, so
  * phi_s(k) = k + s * roundUp(n, p), in the higher dimensional case,
  * we distribute blockwise along the first dimension. */
@@ -96,7 +95,11 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
             ShrayPagesz, ShrayPagesz, MREMAP_MAYMOVE | MREMAP_FIXED,
             roundedAddress));
 
-    cache.firstIn = (cache.firstIn + 1) % cache.numberOfLines;
+    cache.firstIn++;
+    if (cache.firstIn == cache.numberOfLines) {
+        cache.allUsed = true;
+        cache.firstIn = 0;
+    }
 }
 
 void registerHandler(void)
@@ -114,7 +117,8 @@ void registerHandler(void)
 
 void resetCache()
 {
-    for (size_t i = 0; i < cache.numberOfLines; i++) {
+    size_t end = (cache.allUsed) ? cache.numberOfLines : cache.firstIn;
+    for (size_t i = 0; i < end; i++) {
         MPROTECT_SAFE(cache.addresses[i], ShrayPagesz, PROT_WRITE);
     }
 }
@@ -185,6 +189,7 @@ void ShrayInit(int *argc, char ***argv)
     }
 
     cache.firstIn = 0;
+    cache.allUsed = false;
     MALLOC_SAFE(cache.addresses, cache.numberOfLines * sizeof(void *));
 
     MMAP_SAFE(cache.addresses[0], mmap(NULL, cache.numberOfLines * ShrayPagesz,
