@@ -1,3 +1,4 @@
+
 /* Distribution: 1d it is a block distribution on the bytes, so
  * phi_s(k) = k + s * roundUp(n, p), in the higher dimensional case,
  * we distribute blockwise along the first dimension. */
@@ -154,7 +155,6 @@ void ShrayInit(int *argc, char ***argv)
 
     segfaultCounter = 0;
     barrierCounter = 0;
-    prefetchMissCounter = 0;
 
     char *cacheLineEnv = getenv("SHRAY_CACHELINE");
     if (cacheLineEnv == NULL) {
