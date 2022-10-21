@@ -24,8 +24,6 @@ typedef struct {
     size_t firstIn;
     /* This determines the size of our cache. */
     size_t numberOfLines;
-    /* The cachelines return here after a ShraySync */
-    void *original;
 } Cache;
 
 /* A single allocation in the heap. */

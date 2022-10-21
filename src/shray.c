@@ -87,6 +87,8 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
 
     /* Fetch the remote page and store it in the cache line we are going to evict. */
     gasnet_get(cache.addresses[cache.firstIn], owner, roundedAddress, ShrayPagesz);
+    /* Set protections to read in case that was undone by cacheReset. */
+    MPROTECT_SAFE(cache.addresses[cache.firstIn], ShrayPagesz, PROT_READ | PROT_WRITE);
 
     /* Remap the line to the proper position. */
     DBUG_PRINT("We remap %p to %p", cache.addresses[cache.firstIn], roundedAddress);
@@ -113,12 +115,7 @@ void registerHandler(void)
 void resetCache()
 {
     for (size_t i = 0; i < cache.numberOfLines; i++) {
-        void *location = (void *)((uintptr_t)cache.original + i * ShrayPagesz);
-        if (cache.addresses[i] != location) {
-            DBUG_PRINT("We remap %p to %p", cache.addresses[i], location);
-            MREMAP_SAFE(cache.addresses[i], mremap(cache.addresses[i], 
-                        ShrayPagesz, ShrayPagesz, MREMAP_MAYMOVE | MREMAP_FIXED, location));
-        }
+        MPROTECT_SAFE(cache.addresses[i], ShrayPagesz, PROT_WRITE);
     }
 }
 
@@ -192,7 +189,6 @@ void ShrayInit(int *argc, char ***argv)
 
     MMAP_SAFE(cache.addresses[0], mmap(NULL, cache.numberOfLines * ShrayPagesz,
                 PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-    cache.original = cache.addresses[0];
 
     for (size_t i = 1; i < cache.numberOfLines; i++) {
         cache.addresses[i] = (void *)((uintptr_t)cache.addresses[i - 1] + ShrayPagesz);
