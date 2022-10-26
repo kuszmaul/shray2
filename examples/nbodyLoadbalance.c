@@ -47,8 +47,9 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
     size_t end = ShrayEnd(n);
 
     /* For segfaults it would be best to have block = 1000. For physical cache performance
-     * something like block = 100. So that is why we block twice. */
-    size_t cacheBlock = end - start;
+     * something like block = 100. So that is why we block twice. FIXME this segfaults too 
+     * often, is the blocking wrong? */
+    size_t cacheBlock = (end - start) / 2;
     size_t block = 100;
 
     /* We split up the inner (blocked) loop into two parts, namely [start, n[

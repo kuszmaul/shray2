@@ -3,7 +3,14 @@
 
 #include "shrayInternal.h"
 
-/* True for exactly one node. Useful to output results only once. */
+/** <!--********************************************************************-->
+ *
+ * @var bool ShrayOutput
+ *
+ *   @brief       True for exactly one node, useful to output only once.
+ *
+ ******************************************************************************/
+
 extern bool ShrayOutput;
 
 /** <!--********************************************************************-->
@@ -81,29 +88,16 @@ void ShraySync(void *array);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayStartOffset(size_t firstDimension, size_t offset)
+ * @fn void ShrayRealloc(void *array);
  *
- *   @brief         Return the start index for an array with a minimum of the
- *                  given offset for the first process.
+ *   @brief Allows a distributed buffer to be reused for a different distributed 
+ *          array of the same size.
  *
- *   @param array   Array we have finished writing to.
- *
- ******************************************************************************/
-
-size_t ShrayStartOffset(size_t firstDimension, size_t offset);
-
-/** <!--********************************************************************-->
- *
- * @fn void ShrayEndOffset(size_t firstDimension, size_t offset)
- *
- *   @brief         Return the end index for an array with a maximum of the
- *                  given offset for the first process.
- *
- *   @param array   Array we have finished writing to.
+ *   @param array   buffer we want to reallocate
  *
  ******************************************************************************/
 
-size_t ShrayEndOffset(size_t firstDimension, size_t offset);
+void ShrayRealloc(void *array);
 
 /** <!--********************************************************************-->
  *
@@ -112,19 +106,6 @@ size_t ShrayEndOffset(size_t firstDimension, size_t offset);
  *   @brief         Frees distributed array.
  *
  *   @param array   Array to be freed.
- *
- ******************************************************************************/
-
-void ShrayRealloc(void *array);
-
-/** <!--********************************************************************-->
- *
- * @fn void ShrayRealloc(void *array);
- *
- *   @brief Allows a distributed buffer to be reused for a different distributed 
- *          array of the same size.
- *
- *   @param array   buffer we want to reallocate
  *
  ******************************************************************************/
 
@@ -143,7 +124,7 @@ void ShrayReport(void);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayReport(void)
+ * @fn void ShrayFinalize(int exit_code)
  *
  *   @brief         Last statement to be called in an application.
  *

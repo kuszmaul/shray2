@@ -109,7 +109,7 @@ void registerHandler(void)
     sigemptyset (&sa.sa_mask);
     sa.sa_sigaction = SegvHandler;
 
-    if (sigaction (SIGSEGV, &sa, NULL) == -1) {
+    if (sigaction(SIGSEGV, &sa, NULL) == -1) {
         perror("Registering SIGSEGV handler failed.\n");
         gasnet_exit(1);
     }
@@ -136,7 +136,6 @@ void UpdatePage(uintptr_t page, Allocation *alloc)
         
         uintptr_t start = (allocStart < page) ? page : allocStart;
         uintptr_t end = (allocEnd > page + ShrayPagesz) ? page + ShrayPagesz : allocEnd;
-        if (start >= end) continue; // FIXME prove this is always false
 
         DBUG_PRINT("UpdatePage: we get [%p, %p[ from %d", (void *)start, (void *)end, rank);
         gasnet_get_nbi_bulk((void *)start, rank, (void *)start, end - start);
@@ -155,6 +154,7 @@ Allocation *createAllocation(void)
 {
     Allocation *result;
     MALLOC_SAFE(result, sizeof(Allocation));
+    result->next = NULL;
 
     return result;
 }
