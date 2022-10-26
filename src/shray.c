@@ -115,6 +115,34 @@ void registerHandler(void)
     }
 }
 
+/* Helper function for ShraySync, updates page with the calculated contents from 
+ * other pages asynchronously. */
+void UpdatePage(uintptr_t page, Allocation *alloc)
+{
+    for (unsigned int rank = 0; rank < Shray_size; rank++) {
+
+        if (rank == Shray_rank) continue;
+
+        /* Inclusive */
+        uintptr_t allocStart = (uintptr_t)alloc->location + rank * alloc->bytesPerBlock;
+        /* allocStart is increasing in rank, so this will fail for subsequent 
+         * iterations as well. */
+        if (allocStart >= page + ShrayPagesz) break;
+
+        /* Exclusive */
+        uintptr_t allocEnd = (uintptr_t)alloc->location + 
+                             (rank + 1) * alloc->bytesPerBlock;
+        if (allocEnd <= page) continue;
+        
+        uintptr_t start = (allocStart < page) ? page : allocStart;
+        uintptr_t end = (allocEnd > page + ShrayPagesz) ? page + ShrayPagesz : allocEnd;
+        if (start >= end) continue; // FIXME prove this is always false
+
+        DBUG_PRINT("UpdatePage: we get [%p, %p[ from %d", (void *)start, (void *)end, rank);
+        gasnet_get_nbi_bulk((void *)start, rank, (void *)start, end - start);
+    }
+}
+
 void resetCache()
 {
     size_t end = (cache.allUsed) ? cache.numberOfLines : cache.firstIn;
@@ -223,12 +251,6 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
         DBUG_PRINT("mmapAddress = %p, allocation start = %p", mmapAddress, alloc->location);
     }
 
-    if (alloc->size / ShrayPagesz < Shray_size) {
-        fprintf(stderr, "Your allocation is less than a page per node. This makes "
-                "no sense, allocate it redundantly on each node.\n");
-        gasnet_exit(1);
-    }
-
     /* Broadcast alloc->location to the other nodes. */
     gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
             0, &(alloc->location), sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
@@ -255,7 +277,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     DBUG_PRINT("Made a DSM allocation [%p, %p[, of which we own [%p, %p[.",
             alloc->location, (void *)((uintptr_t)alloc->location + alloc->size),
-            (void *)firstPage, (void *)(firstPage + segmentSize));
+            (void *)firstByte, (void *)(lastByte + 1));
 
     MPROTECT_SAFE((void *)firstPage, segmentSize, PROT_READ | PROT_WRITE);
 
@@ -306,43 +328,14 @@ void ShraySync(void *array)
     /* Synchronise in case the first or last page is co-owned with someone else. */
     size_t firstByte = Shray_rank * alloc->bytesPerBlock;
     size_t lastByte = (Shray_rank + 1) * alloc->bytesPerBlock - 1;
+    uintptr_t firstPage = (uintptr_t)alloc->location + 
+        (uintptr_t)firstByte / ShrayPagesz * ShrayPagesz;
+    uintptr_t lastPage = (uintptr_t)alloc->location + 
+        (uintptr_t)lastByte / ShrayPagesz * ShrayPagesz;
 
-    /* Get the last page of the previous rank, and copy its contents to our copy of that
-     * page. */
-    if ((firstByte % ShrayPagesz != 0) && (Shray_rank != 0)) {
-
-        void *pageBoundary = (void *)((uintptr_t)alloc->location +
-                (uintptr_t)firstByte / ShrayPagesz * ShrayPagesz);
-
-        size_t count = (uintptr_t)alloc->location + firstByte - (uintptr_t)pageBoundary;
-
-        DBUG_PRINT("We are going to get [%p, %p[ from node %d\n", pageBoundary,
-                (void *)((uintptr_t)pageBoundary + count), Shray_rank - 1);
-
-        gasnet_get_bulk(pageBoundary, Shray_rank - 1, pageBoundary, count);
-
-        DBUG_PRINT("We got [%p, %p[ from node %d\n", pageBoundary,
-                (void *)((uintptr_t)pageBoundary + count), Shray_rank - 1);
-    }
-
-    /* Get the first page of the next rank, and copy its contents to our copy of that
-     * page. */
-    if ((lastByte % ShrayPagesz != ShrayPagesz - 1) &&
-            (Shray_rank != Shray_size - 1)) {
-
-        void *dest = (void *)((uintptr_t)alloc->location + lastByte + 1);
-
-        size_t count = roundUp((uintptr_t)lastByte, ShrayPagesz) * ShrayPagesz -
-            (uintptr_t)lastByte - 1;
-
-        DBUG_PRINT("We are going to get [%p, %p[ from node %d\n", dest,
-                (void *)((uintptr_t)dest + count), Shray_rank + 1);
-
-        gasnet_get_bulk(dest, Shray_rank + 1, dest, count);
-
-        DBUG_PRINT("We got [%p, %p[ from node %d\n", dest,
-                (void *)((uintptr_t)dest + count), Shray_rank + 1);
-    }
+    UpdatePage(firstPage, alloc);
+    if (firstPage != lastPage) UpdatePage(lastPage, alloc);
+    gasnet_wait_syncnbi_gets();
 
     resetCache(alloc);
 
