@@ -119,20 +119,25 @@ void registerHandler(void)
  * other pages asynchronously. */
 void UpdatePage(uintptr_t page, Allocation *alloc)
 {
-    for (unsigned int rank = 0; rank < Shray_size; rank++) {
+    DBUG_PRINT("Update page %p of allocation %p", (void *)page, alloc->location);
+
+    /* We have communication with a rank when allocStart <= page + ShrayPagesz - 1 and 
+     * allocEnd - 1 >= page. Solving the inequalities yields the following loop. */
+    uintptr_t location = (uintptr_t)alloc->location;
+    uintptr_t bytesPerBlock = alloc->bytesPerBlock;
+
+    unsigned int lastRank = (page + ShrayPagesz - location - 1) / bytesPerBlock;
+    unsigned int firstRank = roundUp(page - location - bytesPerBlock + 1, bytesPerBlock);
+
+    DBUG_PRINT("UpdatePage: we communicate with nodes %d, ..., %d.", firstRank, lastRank);
+
+    /* Extra condition because the last part of the last page may be write-owned by no-one. */
+    for (unsigned int rank = firstRank; rank <= lastRank && rank < Shray_size; rank++) {
 
         if (rank == Shray_rank) continue;
 
-        /* Inclusive */
-        uintptr_t allocStart = (uintptr_t)alloc->location + rank * alloc->bytesPerBlock;
-        /* allocStart is increasing in rank, so this will fail for subsequent 
-         * iterations as well. */
-        if (allocStart >= page + ShrayPagesz) break;
-
-        /* Exclusive */
-        uintptr_t allocEnd = (uintptr_t)alloc->location + 
-                             (rank + 1) * alloc->bytesPerBlock;
-        if (allocEnd <= page) continue;
+        uintptr_t allocStart = location + rank * bytesPerBlock;
+        uintptr_t allocEnd = location + (rank + 1) * bytesPerBlock;
         
         uintptr_t start = (allocStart < page) ? page : allocStart;
         uintptr_t end = (allocEnd > page + ShrayPagesz) ? page + ShrayPagesz : allocEnd;
@@ -142,7 +147,7 @@ void UpdatePage(uintptr_t page, Allocation *alloc)
     }
 }
 
-void resetCache()
+void resetCache(void)
 {
     size_t end = (cache.allUsed) ? cache.numberOfLines : cache.firstIn;
     for (size_t i = 0; i < end; i++) {
@@ -336,8 +341,9 @@ void ShraySync(void *array)
     UpdatePage(firstPage, alloc);
     if (firstPage != lastPage) UpdatePage(lastPage, alloc);
     gasnet_wait_syncnbi_gets();
+    DBUG_PRINT("We are done updating pages for %p", array);
 
-    resetCache(alloc);
+    resetCache();
 
     /* So no one reads from use before the communications are completed. */
     gasnetBarrier();
