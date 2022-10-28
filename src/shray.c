@@ -57,11 +57,11 @@ Allocation *findOwner(void *segfault)
      * segfault. */
     Allocation *alloc = heap;
 
-    while (alloc != NULL && !inRange(segfault, alloc)) {
+    while (alloc->location != NULL && !inRange(segfault, alloc)) {
         alloc = alloc->next;
     }
 
-    if (alloc == NULL) {
+    if (alloc->location == NULL) {
             printf("[node %d]: Segfault (%p) outside of DSM area\n", Shray_rank, segfault);
             gasnet_exit(1);
     }
@@ -159,6 +159,7 @@ Allocation *createAllocation(void)
 {
     Allocation *result;
     MALLOC_SAFE(result, sizeof(Allocation));
+    result->location = NULL;
     result->next = NULL;
 
     return result;
@@ -361,19 +362,20 @@ void ShrayFree(void *address)
      * link to heap (the head of the list). */
     Allocation **indirect = &heap;
 
-    while ((*indirect)->location != address) {
+    while ((*indirect)->location != address && (*indirect)->location != NULL) {
         indirect = &(*indirect)->next;
     }
 
-    if (*indirect == NULL) {
+    if ((*indirect)->location == NULL) {
         fprintf(stderr, "Illegal dsm free\n");
         gasnet_exit(1);
-    } else {
-        munmap(address, (*indirect)->size);
-        Allocation *deleteThis = *indirect;
-        *indirect = (*indirect)->next;
-        free(deleteThis);
     }
+
+    munmap(address, (*indirect)->size);
+    Allocation *deleteThis = *indirect;
+    *indirect = (*indirect)->next;
+    DBUG_PRINT("We free %p (should be %p)", deleteThis->location, address);
+    free(deleteThis);
 }
 
 void ShrayReport(void)

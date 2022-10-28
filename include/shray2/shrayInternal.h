@@ -29,7 +29,7 @@ typedef struct {
     bool allUsed;
 } Cache;
 
-/* A single allocation in the heap. */
+/* A single allocation in the heap. Tail is a dummy entry with location = NULL */
 typedef struct Allocation {
     void *location; 
     size_t size;
