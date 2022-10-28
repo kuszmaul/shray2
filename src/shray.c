@@ -57,13 +57,14 @@ Allocation *findOwner(void *segfault)
      * segfault. */
     Allocation *alloc = heap;
 
-    while (alloc->location != NULL && !inRange(segfault, alloc)) {
+    while (!inRange(segfault, alloc)) {
         alloc = alloc->next;
-    }
-
-    if (alloc->location == NULL) {
+#ifdef DEBUG
+        if (alloc == NULL) {
             printf("[node %d]: Segfault (%p) outside of DSM area\n", Shray_rank, segfault);
             gasnet_exit(1);
+        }
+#endif
     }
 
     return alloc;
@@ -159,7 +160,6 @@ Allocation *createAllocation(void)
 {
     Allocation *result;
     MALLOC_SAFE(result, sizeof(Allocation));
-    result->location = NULL;
     result->next = NULL;
 
     return result;
@@ -206,7 +206,7 @@ void ShrayInit(int *argc, char ***argv)
 
     ShrayPagesz = (size_t)pagesz * cacheLineSize;
 
-    heap = createAllocation();
+    heap = NULL;
 
     char *cacheSizeEnv = getenv("SHRAY_CACHESIZE");
     if (cacheSizeEnv == NULL) {
@@ -362,13 +362,14 @@ void ShrayFree(void *address)
      * link to heap (the head of the list). */
     Allocation **indirect = &heap;
 
-    while ((*indirect)->location != address && (*indirect)->location != NULL) {
+    while ((*indirect)->location != address) {
+#ifdef DEBUG
+        if (*indirect == NULL) {
+            fprintf(stderr, "Illegal dsm free\n");
+            gasnet_exit(1);
+        }
+#endif
         indirect = &(*indirect)->next;
-    }
-
-    if ((*indirect)->location == NULL) {
-        fprintf(stderr, "Illegal dsm free\n");
-        gasnet_exit(1);
     }
 
     munmap(address, (*indirect)->size);
