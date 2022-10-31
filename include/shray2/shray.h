@@ -59,23 +59,6 @@ size_t ShrayStart(size_t firstDimension);
 
 /** <!--********************************************************************-->
  *
- * @fn size_t ShrayStart(size_t firstDimension, size_t rank)
- *
- *   @brief       Determines the start of the first dimension of a distributed
- *                array `rank` can write to.
- *
- *   @param firstDimension Extent of the first dimension of the array.
- *   @param rank The rank for which to determine the start.
- *
- *   @return start such that `rank` is allowed to write to (i1, ..., id) for
- *           start <= i1 < end.
- *
- ******************************************************************************/
-
-size_t ShrayStartRank(size_t firstDimension, size_t rank);
-
-/** <!--********************************************************************-->
- *
  * @fn size_t ShrayEnd(size_t firstDimension)
  *
  *   @brief       Determines the end of the first dimension of a distributed
@@ -89,23 +72,6 @@ size_t ShrayStartRank(size_t firstDimension, size_t rank);
  ******************************************************************************/
 
 size_t ShrayEnd(size_t firstDimension);
-
-/** <!--********************************************************************-->
- *
- * @fn size_t ShrayEnd(size_t firstDimension, int rank)
- *
- *   @brief       Determines the end of the first dimension of a distributed
- *                array `rank` can write to.
- *
- *   @param firstDimension Extent of the first dimension of the array.
- *   @param rank The rank for which to determine the end.
- *
- *   @return end such that `rank` is allowed to write to (i1, ..., id) for
- *           start <= i1 < end.
- *
- ******************************************************************************/
-
-size_t ShrayEndRank(size_t firstDimension, size_t rank);
 
 /** <!--********************************************************************-->
  *

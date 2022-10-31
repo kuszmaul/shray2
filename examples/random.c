@@ -36,36 +36,40 @@ int rand_freq(int *freq, int *prefix, int n)
     return find_ceil(prefix, r, 0, n - 1);
 }
 
+int rand_n_prob(size_t n, size_t local_start, size_t local_end, int *freq, int *prefix)
+{
+    int r = rand();
+    int pi = rand_freq(freq, prefix, 3);
+
+    if (pi == 0) {
+        return local_start == 0
+            ? r % local_end /* there is no previous range */
+            : r % MIN(local_start, local_start - 1);
+    } else if (pi == 1) {
+        return local_start + (r % (local_end - local_start));
+    } else {
+        return local_end == n
+            ? local_start + (r % (local_end - local_start)) /* there is no range after */
+            : local_end + (r % (n - local_end));
+    }
+}
+
 void random_fill(size_t n, int local_prob, double *input, double *output)
 {
-    size_t size = ShraySize();
-    size_t rank = ShrayRank();
-    int *freq = malloc(size * sizeof(int));
-    int *prefix = malloc(size * sizeof(int));
-    if (!freq || !prefix) {
-        fprintf(stderr, "allocation for frequency data failed\n");
-        ShrayFinalize(1);
-    }
-
-    int other_rank_prob = MAX((100 - local_prob) / MAX(size - 1, 1), 1);
-    for (size_t i = 0; i < size; ++i) {
-        freq[i] = i == rank ? local_prob : other_rank_prob;
-    }
+    int other_rank_prob = MAX((100 - local_prob) / 2, 1);
+    int freq[3] = { other_rank_prob, local_prob, other_rank_prob };
+    int prefix[3] = { 0, 0, 0 };
 
     /* Fill our portion of the output array */
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
-        /* Determine a rank depending on the probability */
-        int target_rank = rand_freq(freq, prefix, size);
+    size_t shray_start = ShrayStart(n);
+    size_t shray_end = ShrayEnd(n);
+    for (size_t i = shray_start; i < shray_end; i++) {
+        /* Generate a random index with a certain probability. */
+        int r = rand_n_prob(n, shray_start, shray_end, freq, prefix);
 
-        /* Determine the actual index */
-        size_t start = ShrayStartRank(n, target_rank);
-        size_t end = ShrayEndRank(n, target_rank);
-        size_t index = rand() % (end - start);
-        output[i] = input[start + index];
+        /* Do an operation on that random index */
+        output[i] = input[r];
     }
-
-    free(freq);
-    free(prefix);
 }
 
 int main(int argc, char **argv)
