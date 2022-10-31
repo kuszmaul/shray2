@@ -295,23 +295,23 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
 size_t ShrayStart(size_t firstDimension)
 {
-    return Shray_rank * roundUp(firstDimension, Shray_size);
+    return ShrayStartRank(firstDimension, Shray_rank);
 }
 
-size_t ShrayStartOffset(size_t firstDimension, size_t offset)
+size_t ShrayStartRank(size_t firstDimension, size_t rank)
 {
-    return max(ShrayStart(firstDimension), offset);
+    return rank * roundUp(firstDimension, Shray_size);
 }
 
 size_t ShrayEnd(size_t firstDimension)
 {
-    return (Shray_rank == Shray_size - 1) ? firstDimension :
-        (Shray_rank + 1) * roundUp(firstDimension, Shray_size);
+    return ShrayEndRank(firstDimension, Shray_rank);
 }
 
-size_t ShrayEndOffset(size_t firstDimension, size_t offset)
+size_t ShrayEndRank(size_t firstDimension, size_t rank)
 {
-    return min(ShrayEnd(firstDimension), offset);
+    return (rank == Shray_size - 1) ? firstDimension :
+        (rank + 1) * roundUp(firstDimension, Shray_size);
 }
 
 void ShrayRealloc(void *array)
