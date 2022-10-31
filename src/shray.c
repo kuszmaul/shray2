@@ -134,13 +134,14 @@ static void UpdatePage(uintptr_t page, int index)
     uintptr_t location = (uintptr_t)heap.allocs[index].location;
     uintptr_t bytesPerBlock = heap.allocs[index].bytesPerBlock;
 
-    unsigned int lastRank = (page + ShrayPagesz - location - 1) / bytesPerBlock;
+    /* We max it because the last part of the last page may not be owned by anyone. */
+    unsigned int lastRank = min((page + ShrayPagesz - location - 1) / bytesPerBlock, 
+            Shray_size - 1);
     unsigned int firstRank = roundUp(page - location - bytesPerBlock + 1, bytesPerBlock);
 
     DBUG_PRINT("UpdatePage: we communicate with nodes %d, ..., %d.", firstRank, lastRank);
 
-    /* Extra condition because the last part of the last page may be write-owned by no-one. */
-    for (unsigned int rank = firstRank; rank <= lastRank && rank < Shray_size; rank++) {
+    for (unsigned int rank = firstRank; rank <= lastRank; rank++) {
 
         if (rank == Shray_rank) continue;
 
@@ -264,7 +265,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
         REALLOC_SAFE(heap.allocs, 2 * heap.size);
         heap.size *= 2;
     }
-    int index = heap.numberOfAllocs;
+    int index = heap.numberOfAllocs - 1;
     while ((uintptr_t)heap.allocs[index - 1].location > (uintptr_t)location && index > 0) {
         heap.allocs[index] = heap.allocs[index - 1];
         index--;
