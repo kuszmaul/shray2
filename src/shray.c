@@ -352,8 +352,8 @@ void ShrayFree(void *address)
     gasnetBarrier();
     BARRIERCOUNT
 
-    heap.numberOfAllocs--;
     int index = findOwner(address);
+    heap.numberOfAllocs--;
     while ((unsigned)index < heap.numberOfAllocs) {
         heap.allocs[index] = heap.allocs[index + 1];
         index++;
