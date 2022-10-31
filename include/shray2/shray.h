@@ -90,7 +90,7 @@ void ShraySync(void *array);
  *
  * @fn void ShrayRealloc(void *array);
  *
- *   @brief Allows a distributed buffer to be reused for a different distributed 
+ *   @brief Allows a distributed buffer to be reused for a different distributed
  *          array of the same size.
  *
  *   @param array   buffer we want to reallocate
@@ -124,7 +124,28 @@ void ShrayReport(void);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayFinalize(int exit_code)
+ * @fn size_t ShrayRank(void)
+ *
+ *   @brief         Returns the current Shray rank.
+ *
+ ******************************************************************************/
+
+size_t ShrayRank(void);
+
+
+/** <!--********************************************************************-->
+ *
+ * @fn size_t ShraySize(void)
+ *
+ *   @brief         Returns the number of Shray nodes.
+ *
+ ******************************************************************************/
+
+size_t ShraySize(void);
+
+/** <!--********************************************************************-->
+ *
+ * @fn size_t ShrayFinalize(int exit_code)
  *
  *   @brief         Last statement to be called in an application.
  *
@@ -135,7 +156,7 @@ void ShrayFinalize(int exit_code);
 /* The elipses are a function call block. Example usage:
  *
  * double duration;
- * TIME(duration, f(in, out); ShraySync(out);); 
+ * TIME(duration, f(in, out); ShraySync(out););
  * printf("Executing f took %lf seconds.\n", duration);
  *
  * */

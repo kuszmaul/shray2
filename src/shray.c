@@ -387,6 +387,16 @@ void ShrayReport(void)
             segfaultCounter * ShrayPagesz);
 }
 
+size_t ShrayRank(void)
+{
+    return Shray_rank;
+}
+
+size_t ShraySize(void)
+{
+    return Shray_size;
+}
+
 void ShrayFinalize(int exit_code)
 {
     gasnet_exit(exit_code);

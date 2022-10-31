@@ -8,6 +8,7 @@ foreach(file
 		hello
 		matrix
 		nbody
+		random
 		stencil)
 	set(EXAMPLE_TARGET "${file}_oshmem")
 
