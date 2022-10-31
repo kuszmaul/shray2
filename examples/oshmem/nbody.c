@@ -77,13 +77,13 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 //            }
 //        }
 //    }
-    
+
     for (int s = 0; s < p; s++) {
         shmem_getmem(pos_local, positions, pos_buffsize, s);
         shmem_getmem(mass_local, masses, mass_buffsize, s);
-        for (size_t I = 0; I < n / p; I += block) {
+        for (size_t Ib = 0; Ib < n / p; Ib += block) {
             for (size_t J = 0; J < n / p; J += block) {
-        for (size_t i = I; i < min(I + block, n / p); i++) {
+        for (size_t i = Ib; i < min(Ib + block, n / p); i++) {
             for (size_t j = J; j < min(J + block, n / p); j++) {
                 accel[i].x += accelerate(positions[i], pos_local[j], mass_local[j]).x;
                 accel[i].y += accelerate(positions[i], pos_local[j], mass_local[j]).y;
