@@ -245,13 +245,13 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     alloc->size = totalSize;
 
-    /* For the segfault handler, we need the start of each allocation to be 
-     * ShrayPagesz-aligned. We cheat a little by making it possible for this to be multiple 
-     * system-pages. So we mmap an extra page at the start and end, and then move the 
+    /* For the segfault handler, we need the start of each allocation to be
+     * ShrayPagesz-aligned. We cheat a little by making it possible for this to be multiple
+     * system-pages. So we mmap an extra page at the start and end, and then move the
      * pointer up. */
     if (Shray_rank == 0) {
         void *mmapAddress;
-        MMAP_SAFE(mmapAddress, mmap(NULL, alloc->size + 2 * ShrayPagesz, 
+        MMAP_SAFE(mmapAddress, mmap(NULL, alloc->size + 2 * ShrayPagesz,
                     PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
         alloc->location = (void *)(roundUp((uintptr_t)mmapAddress, ShrayPagesz) * ShrayPagesz);
         DBUG_PRINT("mmapAddress = %p, allocation start = %p", mmapAddress, alloc->location);
@@ -271,8 +271,8 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     alloc->bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
 
     uintptr_t firstByte = ((uintptr_t)alloc->location + Shray_rank * alloc->bytesPerBlock);
-    uintptr_t lastByte = (Shray_rank == Shray_size - 1) ? 
-        (uintptr_t)alloc->location + alloc->size - 1 : 
+    uintptr_t lastByte = (Shray_rank == Shray_size - 1) ?
+        (uintptr_t)alloc->location + alloc->size - 1 :
         (uintptr_t)alloc->location + (Shray_rank + 1) * alloc->bytesPerBlock - 1;
 
     /* First byte, last byte rounded down to page number. */
@@ -383,7 +383,7 @@ void ShrayReport(void)
 {
     fprintf(stderr,
             "Shray report P(%d): %zu segfaults, %zu barriers, "
-            "%zu bytes communicated.\n", Shray_rank, segfaultCounter, barrierCounter, 
+            "%zu bytes communicated.\n", Shray_rank, segfaultCounter, barrierCounter,
             segfaultCounter * ShrayPagesz);
 }
 

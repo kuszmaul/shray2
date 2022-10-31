@@ -99,7 +99,7 @@ int main(int argc, char **argv)
     TIME(duration, stencil(n, &in, &out, iterations););
 
     if (ShrayOutput) {
-        printf("Time %lfs, %lf Gflops/s\n", duration, 
+        printf("Time %lfs, %lf Gflops/s\n", duration,
                 9.0 * (n - 2) * (n - 2) * iterations / 1000000000.0 / duration);
     }
 
