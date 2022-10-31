@@ -33,10 +33,18 @@ typedef struct {
 typedef struct Allocation {
     void *location; 
     size_t size;
-    struct Allocation *next;
     /* The number of bytes owned by each node except the last one. */
     size_t bytesPerBlock;
 } Allocation;
+
+typedef struct Heap {
+    /* size of allocs */
+    size_t size;    
+    /* Array of allocs, sorted from low to high in location. */
+    Allocation *allocs;
+    /* Number of actual allocations in the allocs */
+    unsigned int numberOfAllocs;
+} Heap;
 
 /**************************************************
  * Error handling
@@ -85,6 +93,16 @@ typedef struct Allocation {
         variable = malloc(size);                                                        \
         if (variable == NULL) {                                                         \
             fprintf(stderr, "Line %d, node [%d]: malloc failed with size %zu\n",        \
+                    __LINE__, Shray_rank, size);                                        \
+            ShrayFinalize(1);                                                           \
+        }                                                                               \
+    }
+
+#define REALLOC_SAFE(variable, size)                                                    \
+    {                                                                                   \
+        variable = realloc(variable, size);                                             \
+        if (variable == NULL) {                                                         \
+            fprintf(stderr, "Line %d, node [%d]: realloc failed with size %zu\n",       \
                     __LINE__, Shray_rank, size);                                        \
             ShrayFinalize(1);                                                           \
         }                                                                               \

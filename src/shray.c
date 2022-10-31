@@ -10,7 +10,7 @@
  *****************************************************/
 
 static Cache cache;
-static Allocation *heap;
+static Heap heap;
 
 static unsigned int Shray_rank;
 static unsigned int Shray_size;
@@ -45,32 +45,39 @@ static inline size_t roundUp(size_t a, size_t b)
     return (a + b - 1) / b;
 }
 
-int inRange(void *address, Allocation* alloc)
+static int inRange(void *address, int index)
 {
-    return ((uintptr_t)alloc->location <= (uintptr_t)address) &&
-        ((uintptr_t)address < (uintptr_t)alloc->location + alloc->size);
+    return ((uintptr_t)heap.allocs[index].location <= (uintptr_t)address) &&
+        ((uintptr_t)address < (uintptr_t)heap.allocs[index].location + heap.allocs[index].size);
 }
 
-Allocation *findOwner(void *segfault)
+/* Simple binary search, assumes heap.allocs is sorted. Returns the index of the 
+ * allocation segfault belongs to. */
+static int findOwner(void *segfault)
 {
-    /* We advance through the allocations, until we find the one containing our
-     * segfault. */
-    Allocation *alloc = heap;
+    int low = 0;
+    int high = heap.numberOfAllocs - 1;
+    int middle = -1;
 
-    while (!inRange(segfault, alloc)) {
-        alloc = alloc->next;
-#ifdef DEBUG
-        if (alloc == NULL) {
-            printf("[node %d]: Segfault (%p) outside of DSM area\n", Shray_rank, segfault);
-            gasnet_exit(1);
-        }
-#endif
+    while (low <= high) {
+        middle = (low + high) / 2;
+        uintptr_t location = (uintptr_t)heap.allocs[middle].location;
+        if (location + heap.allocs[middle].size <= (uintptr_t)segfault) low = middle + 1;
+        else if ((uintptr_t)segfault < location) high = middle - 1;
+        else break;
     }
 
-    return alloc;
+#ifdef DEBUG
+    if (!inRange(segfault, middle)) {
+        fprintf(stderr, "%p is not in an allocation.\n", segfault); 
+        ShrayFinalize(1);
+    }
+#endif
+
+    return middle;
 }
 
-void SegvHandler(int sig, siginfo_t *si, void *unused)
+static void SegvHandler(int sig, siginfo_t *si, void *unused)
 {
     SEGFAULTCOUNT
     void *address = si->si_addr;
@@ -79,9 +86,9 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
 
     DBUG_PRINT("Segfault at %p.", address)
 
-    Allocation *alloc = findOwner(roundedAddress);
-    uintptr_t difference = (uintptr_t)roundedAddress - (uintptr_t)(alloc->location);
-    unsigned int owner = difference / alloc->bytesPerBlock;
+    int index = findOwner(roundedAddress);
+    uintptr_t difference = (uintptr_t)roundedAddress - (uintptr_t)(heap.allocs[index].location);
+    unsigned int owner = difference / heap.allocs[index].bytesPerBlock;
 
     DBUG_PRINT("Segfault is owned by node %d.", owner);
 
@@ -103,7 +110,7 @@ void SegvHandler(int sig, siginfo_t *si, void *unused)
     }
 }
 
-void registerHandler(void)
+static void registerHandler(void)
 {
     struct sigaction sa;
     sa.sa_flags = SA_SIGINFO;
@@ -118,14 +125,14 @@ void registerHandler(void)
 
 /* Helper function for ShraySync, updates page with the calculated contents from 
  * other pages asynchronously. */
-void UpdatePage(uintptr_t page, Allocation *alloc)
+static void UpdatePage(uintptr_t page, int index)
 {
-    DBUG_PRINT("Update page %p of allocation %p", (void *)page, alloc->location);
+    DBUG_PRINT("Update page %p of allocation %p", (void *)page, heap.allocs[index].location);
 
     /* We have communication with a rank when allocStart <= page + ShrayPagesz - 1 and 
      * allocEnd - 1 >= page. Solving the inequalities yields the following loop. */
-    uintptr_t location = (uintptr_t)alloc->location;
-    uintptr_t bytesPerBlock = alloc->bytesPerBlock;
+    uintptr_t location = (uintptr_t)heap.allocs[index].location;
+    uintptr_t bytesPerBlock = heap.allocs[index].bytesPerBlock;
 
     unsigned int lastRank = (page + ShrayPagesz - location - 1) / bytesPerBlock;
     unsigned int firstRank = roundUp(page - location - bytesPerBlock + 1, bytesPerBlock);
@@ -148,27 +155,12 @@ void UpdatePage(uintptr_t page, Allocation *alloc)
     }
 }
 
-void resetCache(void)
+static void resetCache(void)
 {
     size_t end = (cache.allUsed) ? cache.numberOfLines : cache.firstIn;
     for (size_t i = 0; i < end; i++) {
         MPROTECT_SAFE(cache.addresses[i], ShrayPagesz, PROT_WRITE);
     }
-}
-
-Allocation *createAllocation(void)
-{
-    Allocation *result;
-    MALLOC_SAFE(result, sizeof(Allocation));
-    result->next = NULL;
-
-    return result;
-}
-
-Allocation *insertAtHead(Allocation *head, Allocation *newHead)
-{
-    newHead->next = head;
-    return newHead;
 }
 
 /*****************************************************
@@ -206,7 +198,9 @@ void ShrayInit(int *argc, char ***argv)
 
     ShrayPagesz = (size_t)pagesz * cacheLineSize;
 
-    heap = NULL;
+    heap.size = sizeof(Allocation);
+    heap.numberOfAllocs = 0;
+    MALLOC_SAFE(heap.allocs, sizeof(Allocation));
 
     char *cacheSizeEnv = getenv("SHRAY_CACHESIZE");
     if (cacheSizeEnv == NULL) {
@@ -241,9 +235,7 @@ void ShrayInit(int *argc, char ***argv)
 
 void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 {
-    Allocation *alloc = createAllocation();
-
-    alloc->size = totalSize;
+    void *location;
 
     /* For the segfault handler, we need the start of each allocation to be 
      * ShrayPagesz-aligned. We cheat a little by making it possible for this to be multiple 
@@ -251,29 +243,41 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
      * pointer up. */
     if (Shray_rank == 0) {
         void *mmapAddress;
-        MMAP_SAFE(mmapAddress, mmap(NULL, alloc->size + 2 * ShrayPagesz, 
+        MMAP_SAFE(mmapAddress, mmap(NULL, totalSize + 2 * ShrayPagesz, 
                     PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
-        alloc->location = (void *)(roundUp((uintptr_t)mmapAddress, ShrayPagesz) * ShrayPagesz);
-        DBUG_PRINT("mmapAddress = %p, allocation start = %p", mmapAddress, alloc->location);
+        location = (void *)(roundUp((uintptr_t)mmapAddress, ShrayPagesz) * ShrayPagesz);
+        DBUG_PRINT("mmapAddress = %p, allocation start = %p", mmapAddress, location);
     }
 
-    /* Broadcast alloc->location to the other nodes. */
-    gasnet_coll_broadcast(gasnete_coll_team_all, &(alloc->location),
-            0, &(alloc->location), sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
+    /* Broadcast location to the other nodes. */
+    gasnet_coll_broadcast(gasnete_coll_team_all, &location, 0, &location, 
+            sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
     if (Shray_rank != 0) {
-        MMAP_SAFE(alloc->location, mmap(alloc->location, alloc->size + ShrayPagesz, PROT_NONE,
+        MMAP_SAFE(location, mmap(location, totalSize + ShrayPagesz, PROT_NONE,
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
     }
 
-    /* We distribute blockwise over the first dimension. */
-    size_t bytesPerLatterDimensions = alloc->size / firstDimension;
-    alloc->bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
+    /* Insert allocation into the heap, making sure allocs stays sorted. */
+    heap.numberOfAllocs++;
+    if (heap.numberOfAllocs > heap.size / sizeof(Allocation)) {
+        REALLOC_SAFE(heap.allocs, 2 * heap.size);
+        heap.size *= 2;
+    }
+    int index = heap.numberOfAllocs;
+    while ((uintptr_t)heap.allocs[index - 1].location > (uintptr_t)location && index > 0) {
+        heap.allocs[index] = heap.allocs[index - 1];
+        index--;
+    }
 
-    uintptr_t firstByte = ((uintptr_t)alloc->location + Shray_rank * alloc->bytesPerBlock);
+    /* We distribute blockwise over the first dimension. */
+    size_t bytesPerLatterDimensions = totalSize / firstDimension;
+    size_t bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
+
+    uintptr_t firstByte = ((uintptr_t)location + Shray_rank * bytesPerBlock);
     uintptr_t lastByte = (Shray_rank == Shray_size - 1) ? 
-        (uintptr_t)alloc->location + alloc->size - 1 : 
-        (uintptr_t)alloc->location + (Shray_rank + 1) * alloc->bytesPerBlock - 1;
+        (uintptr_t)location + totalSize - 1 : 
+        (uintptr_t)location + (Shray_rank + 1) * bytesPerBlock - 1;
 
     /* First byte, last byte rounded down to page number. */
     uintptr_t firstPage = firstByte / ShrayPagesz * ShrayPagesz;
@@ -282,15 +286,16 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     size_t segmentSize = lastPage - firstPage + ShrayPagesz;
 
     DBUG_PRINT("Made a DSM allocation [%p, %p[, of which we own [%p, %p[.",
-            alloc->location, (void *)((uintptr_t)alloc->location + alloc->size),
+            location, (void *)((uintptr_t)location + totalSize),
             (void *)firstByte, (void *)(lastByte + 1));
 
     MPROTECT_SAFE((void *)firstPage, segmentSize, PROT_READ | PROT_WRITE);
 
-    /* Insert a new allocation */
-    heap = insertAtHead(heap, alloc);
+    heap.allocs[index].location = location;
+    heap.allocs[index].size = totalSize;
+    heap.allocs[index].bytesPerBlock = bytesPerBlock;
 
-    return alloc->location;
+    return location;
 }
 
 size_t ShrayStart(size_t firstDimension)
@@ -329,18 +334,18 @@ void ShraySync(void *array)
     gasnetBarrier();
     BARRIERCOUNT
 
-    Allocation *alloc = findOwner(array);
+    int index = findOwner(array);
+    size_t bytesPerBlock = heap.allocs[index].bytesPerBlock;
+    uintptr_t location = (uintptr_t)heap.allocs[index].location;
 
     /* Synchronise in case the first or last page is co-owned with someone else. */
-    size_t firstByte = Shray_rank * alloc->bytesPerBlock;
-    size_t lastByte = (Shray_rank + 1) * alloc->bytesPerBlock - 1;
-    uintptr_t firstPage = (uintptr_t)alloc->location + 
-        (uintptr_t)firstByte / ShrayPagesz * ShrayPagesz;
-    uintptr_t lastPage = (uintptr_t)alloc->location + 
-        (uintptr_t)lastByte / ShrayPagesz * ShrayPagesz;
+    uintptr_t firstByte = Shray_rank * bytesPerBlock;
+    uintptr_t lastByte = (Shray_rank + 1) * bytesPerBlock - 1;
+    uintptr_t firstPage = location + firstByte / ShrayPagesz * ShrayPagesz;
+    uintptr_t lastPage = location + lastByte / ShrayPagesz * ShrayPagesz;
 
-    UpdatePage(firstPage, alloc);
-    if (firstPage != lastPage) UpdatePage(lastPage, alloc);
+    UpdatePage(firstPage, index);
+    if (firstPage != lastPage) UpdatePage(lastPage, index);
     gasnet_wait_syncnbi_gets();
     DBUG_PRINT("We are done updating pages for %p", array);
 
@@ -357,26 +362,12 @@ void ShrayFree(void *address)
     gasnetBarrier();
     BARRIERCOUNT
 
-    /* indirect iterates through the links of the nodes, e.g. the pointers
-     * to the next allocation. Double pointer is necessary because there is no
-     * link to heap (the head of the list). */
-    Allocation **indirect = &heap;
-
-    while ((*indirect)->location != address) {
-#ifdef DEBUG
-        if (*indirect == NULL) {
-            fprintf(stderr, "Illegal dsm free\n");
-            gasnet_exit(1);
-        }
-#endif
-        indirect = &(*indirect)->next;
+    heap.numberOfAllocs--;
+    int index = findOwner(address);
+    while ((unsigned)index < heap.numberOfAllocs) {
+        heap.allocs[index] = heap.allocs[index + 1];
+        index++;
     }
-
-    munmap(address, (*indirect)->size);
-    Allocation *deleteThis = *indirect;
-    *indirect = (*indirect)->next;
-    DBUG_PRINT("We free %p (should be %p)", deleteThis->location, address);
-    free(deleteThis);
 }
 
 void ShrayReport(void)
