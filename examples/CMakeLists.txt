@@ -17,8 +17,6 @@ foreach(suffix
 	endif()
 
 	foreach(file
-			1dstencil
-			1dstencil_shray
 			2dstencil
 			matrix
 			hello
