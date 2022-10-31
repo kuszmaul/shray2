@@ -17,14 +17,13 @@ foreach(suffix
 	endif()
 
 	foreach(file
-			1dstencil
-			1dstencil_shray
 			2dstencil
-			blas
+			matrix
 			hello
 			nbody
 			nbodyLoadbalance
 			polyhedral
+			random
 			vector)
 		set(SHRAY_TARGET "${PROJECT_NAME}${suffix}")
 		set(EXAMPLE_TARGET "${file}${suffix}")

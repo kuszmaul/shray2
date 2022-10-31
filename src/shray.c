@@ -237,9 +237,9 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 {
     void *location;
 
-    /* For the segfault handler, we need the start of each allocation to be 
-     * ShrayPagesz-aligned. We cheat a little by making it possible for this to be multiple 
-     * system-pages. So we mmap an extra page at the start and end, and then move the 
+    /* For the segfault handler, we need the start of each allocation to be
+     * ShrayPagesz-aligned. We cheat a little by making it possible for this to be multiple
+     * system-pages. So we mmap an extra page at the start and end, and then move the
      * pointer up. */
     if (Shray_rank == 0) {
         void *mmapAddress;
@@ -303,20 +303,10 @@ size_t ShrayStart(size_t firstDimension)
     return Shray_rank * roundUp(firstDimension, Shray_size);
 }
 
-size_t ShrayStartOffset(size_t firstDimension, size_t offset)
-{
-    return max(ShrayStart(firstDimension), offset);
-}
-
 size_t ShrayEnd(size_t firstDimension)
 {
     return (Shray_rank == Shray_size - 1) ? firstDimension :
         (Shray_rank + 1) * roundUp(firstDimension, Shray_size);
-}
-
-size_t ShrayEndOffset(size_t firstDimension, size_t offset)
-{
-    return min(ShrayEnd(firstDimension), offset);
 }
 
 void ShrayRealloc(void *array)
@@ -374,8 +364,18 @@ void ShrayReport(void)
 {
     fprintf(stderr,
             "Shray report P(%d): %zu segfaults, %zu barriers, "
-            "%zu bytes communicated.\n", Shray_rank, segfaultCounter, barrierCounter, 
+            "%zu bytes communicated.\n", Shray_rank, segfaultCounter, barrierCounter,
             segfaultCounter * ShrayPagesz);
+}
+
+size_t ShrayRank(void)
+{
+    return Shray_rank;
+}
+
+size_t ShraySize(void)
+{
+    return Shray_size;
 }
 
 void ShrayFinalize(int exit_code)
