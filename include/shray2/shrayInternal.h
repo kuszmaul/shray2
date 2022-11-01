@@ -88,6 +88,13 @@ typedef struct Heap {
         }                                                                               \
     }
 
+#define MUNMAP_SAFE(address, length)                                                    \
+    {                                                                                   \
+        if (munmap(address, length) == -1) {                                            \
+            perror("munmap failed");                                                    \
+        }                                                                               \
+    }
+
 #define MALLOC_SAFE(variable, size)                                                     \
     {                                                                                   \
         variable = malloc(size);                                                        \
