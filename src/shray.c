@@ -266,7 +266,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
         heap.size *= 2;
     }
     int index = heap.numberOfAllocs - 1;
-    while ((uintptr_t)heap.allocs[index - 1].location > (uintptr_t)location && index > 0) {
+    while (index > 0 && (uintptr_t)heap.allocs[index - 1].location > (uintptr_t)location) {
         heap.allocs[index] = heap.allocs[index - 1];
         index--;
     }
