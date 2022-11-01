@@ -354,6 +354,9 @@ void ShrayFree(void *address)
     BARRIERCOUNT
 
     int index = findOwner(address);
+    /* We leave potentially two pages mapped due to the alignment in ShrayMalloc, but 
+     * who cares. */
+    MUNMAP_SAFE(heap.allocs[index].location, heap.allocs[index].size);
     heap.numberOfAllocs--;
     while ((unsigned)index < heap.numberOfAllocs) {
         heap.allocs[index] = heap.allocs[index + 1];
