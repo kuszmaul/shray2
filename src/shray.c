@@ -401,7 +401,7 @@ void helpGet(uintptr_t start, uintptr_t end, Allocation *alloc)
             lastOwner);
     assert(firstOwner > Shray_rank || lastOwner < Shray_rank);
 
-    for (unsigned int rank = firstOwner; rank < lastOwner; rank++) {
+    for (unsigned int rank = firstOwner; rank <= lastOwner; rank++) {
         uintptr_t theirStart = (location + Shray_rank * bytesPerBlock) / 
             ShrayPagesz * ShrayPagesz;
         uintptr_t theirEnd = (rank == Shray_size - 1) ? 
@@ -481,15 +481,15 @@ void ShrayGetComplete(void *address)
 
     gasnet_wait_syncnbi_gets();
 
-    DBUG_PRINT("Can read to [%p, %p[ again", (void *)prefetch->block1start, 
-            (void *)prefetch->block1end);
     if (prefetch->block1start < prefetch->block1end) {
+        DBUG_PRINT("Can read to [%p, %p[ again", (void *)prefetch->block1start, 
+            (void *)prefetch->block1end);
         MPROTECT_SAFE((void *)prefetch->block1start, prefetch->block1end - prefetch->block1start,
                 PROT_READ | PROT_WRITE);
     }
-    DBUG_PRINT("Can read to [%p, %p[ again", (void *)prefetch->block2start, 
-            (void *)prefetch->block2end);
     if (prefetch->block2start < prefetch->block2end) {
+        DBUG_PRINT("Can read to [%p, %p[ again", (void *)prefetch->block2start, 
+            (void *)prefetch->block2end);
         MPROTECT_SAFE((void *)prefetch->block2start, prefetch->block2end - prefetch->block2start,
                 PROT_READ | PROT_WRITE);
     }
