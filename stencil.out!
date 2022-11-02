@@ -1,0 +1,293 @@
+	[node 0]: Made a DSM allocation [0x7fef4c50d000, 0x7fef7bffd800[, of which we own [0x7fef4c50d000, 0x7fef64285400[.
+	[node 0]: Made a DSM allocation [0x7fef1ca1a000, 0x7fef4c50a800[, of which we own [0x7fef1ca1a000, 0x7fef34792400[.
+	[node 1]: Made a DSM allocation [0x7fef4c50d000, 0x7fef7bffd800[, of which we own [0x7fef64285400, 0x7fef7bffd800[.
+	[node 1]: Made a DSM allocation [0x7fef1ca1a000, 0x7fef4c50a800[, of which we own [0x7fef34792400, 0x7fef4c50a800[.
+	[node 1]: We are going to get [0x7fef64286000, 0x7fef64298000[.
+		Of this allocation, we already have [0x7fef64285000, 0x7fef7bffe000[
+	[node 1]: Get [0x7fef64286000, 0x7fef64285000[
+	[node 1]: Get [0x7fef7bffe000, 0x7fef64298000[
+	[node 0]: We are going to get [0x7fef4c521000, 0x7fef4c534000[.
+		Of this allocation, we already have [0x7fef4c50d000, 0x7fef64286000[
+	[node 0]: Get [0x7fef4c521000, 0x7fef4c50d000[
+	[node 0]: Get [0x7fef64286000, 0x7fef4c534000[
+	[node 0]: We are going to get [0x7fef64272000, 0x7fef64285000[.
+		Of this allocation, we already have [0x7fef4c50d000, 0x7fef64286000[
+	[node 0]: Get [0x7fef64272000, 0x7fef4c50d000[
+	[node 0]: Get [0x7fef64286000, 0x7fef64285000[
+	[node 1]: Segfault at 0x7fef64271b88.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef64286000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7f01ca017000 to 0x7fef64271000
+	[node 1]: Segfault at 0x7fef64272000.
+	[node 1]: Segfault is owned by node 0.
+	[node 1]: We remap 0x7f01ca018000 to 0x7fef64272000
+	[node 1]: Segfault at 0x7fef64273000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: We remap 0x7fef88638000 to 0x7fef64286000
+	[node 1]: We remap 0x7f01ca019000 to 0x7fef64273000
+	[node 0]: Segfault at 0x7fef64287000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: Segfault at 0x7fef64274000.
+	[node 1]: Segfault is owned by node 0.
+	[node 1]: We remap 0x7f01ca01a000 to 0x7fef64274000
+	[node 0]: We remap 0x7fef88639000 to 0x7fef64287000
+	[node 1]: Segfault at 0x7fef64275000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef64288000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7f01ca01b000 to 0x7fef64275000
+	[node 0]: We remap 0x7fef8863a000 to 0x7fef64288000
+	[node 1]: Segfault at 0x7fef64276000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef64289000.
+	[node 0]: Segfault is owned by node 1.
+	[node 0]: We remap 0x7fef8863b000 to 0x7fef64289000
+	[node 1]: We remap 0x7f01ca01c000 to 0x7fef64276000
+	[node 1]: Segfault at 0x7fef64277000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef6428a000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7f01ca01d000 to 0x7fef64277000
+	[node 0]: We remap 0x7fef8863c000 to 0x7fef6428a000
+	[node 0]: Segfault at 0x7fef6428b000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: Segfault at 0x7fef64278000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: We remap 0x7fef8863d000 to 0x7fef6428b000
+	[node 1]: We remap 0x7f01ca01e000 to 0x7fef64278000
+	[node 1]: Segfault at 0x7fef64279000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef6428c000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7f01ca01f000 to 0x7fef64279000
+	[node 0]: We remap 0x7fef8863e000 to 0x7fef6428c000
+	[node 1]: Segfault at 0x7fef6427a000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef6428d000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7f01ca020000 to 0x7fef6427a000
+	[node 0]: We remap 0x7fef8863f000 to 0x7fef6428d000
+	[node 1]: Segfault at 0x7fef6427b000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef6428e000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64271000 to 0x7fef6427b000
+	[node 0]: We remap 0x7fef88640000 to 0x7fef6428e000
+	[node 1]: Segfault at 0x7fef6427c000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef6428f000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64272000 to 0x7fef6427c000
+	[node 0]: We remap 0x7fef88641000 to 0x7fef6428f000
+	[node 1]: Segfault at 0x7fef6427d000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef64290000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64273000 to 0x7fef6427d000
+	[node 0]: We remap 0x7fef64286000 to 0x7fef64290000
+	[node 1]: Segfault at 0x7fef6427e000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef64291000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64274000 to 0x7fef6427e000
+	[node 0]: We remap 0x7fef64287000 to 0x7fef64291000
+	[node 1]: Segfault at 0x7fef6427f000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef64292000.
+	[node 0]: Segfault is owned by node 1.
+	[node 0]: We remap 0x7fef64288000 to 0x7fef64292000
+	[node 1]: We remap 0x7fef64275000 to 0x7fef6427f000
+	[node 0]: Segfault at 0x7fef64293000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: Segfault at 0x7fef64280000.
+	[node 1]: Segfault is owned by node 0.
+	[node 1]: We remap 0x7fef64276000 to 0x7fef64280000
+	[node 0]: We remap 0x7fef64289000 to 0x7fef64293000
+	[node 1]: Segfault at 0x7fef64281000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef64294000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64277000 to 0x7fef64281000
+	[node 0]: We remap 0x7fef6428a000 to 0x7fef64294000
+	[node 1]: Segfault at 0x7fef64282000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef64295000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64278000 to 0x7fef64282000
+	[node 0]: We remap 0x7fef6428b000 to 0x7fef64295000
+	[node 1]: Segfault at 0x7fef64283000.
+	[node 1]: Segfault is owned by node 0.
+	[node 1]: We remap 0x7fef64279000 to 0x7fef64283000
+	[node 0]: Segfault at 0x7fef64296000.
+	[node 0]: Segfault is owned by node 1.
+	[node 0]: We remap 0x7fef6428c000 to 0x7fef64296000
+	[node 0]: Segfault at 0x7fef64297000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: Segfault at 0x7fef64284000.
+	[node 1]: Segfault is owned by node 0.
+	[node 1]: We remap 0x7fef6427a000 to 0x7fef64284000
+	[node 0]: We remap 0x7fef6428d000 to 0x7fef64297000
+	[node 0]: Segfault at 0x7fef64298000.
+	[node 0]: Segfault is owned by node 1.
+	[node 0]: We remap 0x7fef6428e000 to 0x7fef64298000
+	[node 0]: Update page 0x7fef1ca1a000 of allocation 0x7fef1ca1a000
+	[node 1]: Update page 0x7fef34792000 of allocation 0x7fef1ca1a000
+	[node 1]: UpdatePage: we communicate with nodes 0, ..., 1.
+	[node 1]: UpdatePage: we get [0x7fef34792000, 0x7fef34792400[ from 0
+	[node 0]: UpdatePage: we communicate with nodes 0, ..., 0.
+	[node 0]: Update page 0x7fef34792000 of allocation 0x7fef1ca1a000
+	[node 0]: UpdatePage: we communicate with nodes 0, ..., 1.
+	[node 0]: UpdatePage: we get [0x7fef34792400, 0x7fef34793000[ from 1
+	[node 1]: Update page 0x7fef4c50a000 of allocation 0x7fef1ca1a000
+	[node 1]: UpdatePage: we communicate with nodes 1, ..., 1.
+	[node 1]: We are done updating pages for 0x7fef1ca1a000
+	[node 0]: We are done updating pages for 0x7fef1ca1a000
+	[node 1]: We are going to get [0x7fef34793000, 0x7fef347a5000[.
+		Of this allocation, we already have [0x7fef34792000, 0x7fef4c50b000[
+	[node 1]: Get [0x7fef34793000, 0x7fef34792000[
+	[node 1]: Get [0x7fef4c50b000, 0x7fef347a5000[
+	[node 0]: We are going to get [0x7fef1ca2e000, 0x7fef1ca41000[.
+		Of this allocation, we already have [0x7fef1ca1a000, 0x7fef34793000[
+	[node 0]: Get [0x7fef1ca2e000, 0x7fef1ca1a000[
+	[node 0]: Get [0x7fef34793000, 0x7fef1ca41000[
+	[node 0]: We are going to get [0x7fef3477f000, 0x7fef34792000[.
+		Of this allocation, we already have [0x7fef1ca1a000, 0x7fef34793000[
+	[node 0]: Get [0x7fef3477f000, 0x7fef1ca1a000[
+	[node 0]: Get [0x7fef34793000, 0x7fef34792000[
+	[node 1]: We are going to get [0x7fef4c4e4000, 0x7fef4c4f6000[.
+		Of this allocation, we already have [0x7fef34792000, 0x7fef4c50b000[
+	[node 1]: Get [0x7fef4c4e4000, 0x7fef34792000[
+	[node 1]: Get [0x7fef4c50b000, 0x7fef4c4f6000[
+	[node 0]: Segfault at 0x7fef34793000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: Segfault at 0x7fef3477eb88.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: We remap 0x7fef6428f000 to 0x7fef34793000
+	[node 1]: We remap 0x7fef6427b000 to 0x7fef3477e000
+	[node 0]: Segfault at 0x7fef34794000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: Segfault at 0x7fef3477f000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: We remap 0x7fef64290000 to 0x7fef34794000
+	[node 1]: We remap 0x7fef6427c000 to 0x7fef3477f000
+	[node 1]: Segfault at 0x7fef34780000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef34795000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef6427d000 to 0x7fef34780000
+	[node 1]: Segfault at 0x7fef34781000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: We remap 0x7fef64291000 to 0x7fef34795000
+	[node 0]: Segfault at 0x7fef34796000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef6427e000 to 0x7fef34781000
+	[node 1]: Segfault at 0x7fef34782000.
+	[node 0]: We remap 0x7fef64292000 to 0x7fef34796000
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef34797000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef6427f000 to 0x7fef34782000
+	[node 0]: We remap 0x7fef64293000 to 0x7fef34797000
+	[node 1]: Segfault at 0x7fef34783000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef34798000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64280000 to 0x7fef34783000
+	[node 1]: Segfault at 0x7fef34784000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: We remap 0x7fef64294000 to 0x7fef34798000
+	[node 0]: Segfault at 0x7fef34799000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64281000 to 0x7fef34784000
+	[node 0]: We remap 0x7fef64295000 to 0x7fef34799000
+	[node 1]: Segfault at 0x7fef34785000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef3479a000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64282000 to 0x7fef34785000
+	[node 1]: Segfault at 0x7fef34786000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: We remap 0x7fef64296000 to 0x7fef3479a000
+	[node 0]: Segfault at 0x7fef3479b000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64283000 to 0x7fef34786000
+	[node 0]: We remap 0x7fef64297000 to 0x7fef3479b000
+	[node 1]: Segfault at 0x7fef34787000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef3479c000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef64284000 to 0x7fef34787000
+	[node 0]: We remap 0x7fef64298000 to 0x7fef3479c000
+	[node 1]: Segfault at 0x7fef34788000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef3479d000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef3477e000 to 0x7fef34788000
+	[node 0]: We remap 0x7fef34793000 to 0x7fef3479d000
+	[node 1]: Segfault at 0x7fef34789000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef3479e000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef3477f000 to 0x7fef34789000
+	[node 0]: We remap 0x7fef34794000 to 0x7fef3479e000
+	[node 1]: Segfault at 0x7fef3478a000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef3479f000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef34780000 to 0x7fef3478a000
+	[node 0]: We remap 0x7fef34795000 to 0x7fef3479f000
+	[node 1]: Segfault at 0x7fef3478b000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef347a0000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef34781000 to 0x7fef3478b000
+	[node 0]: We remap 0x7fef34796000 to 0x7fef347a0000
+	[node 1]: Segfault at 0x7fef3478c000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef347a1000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef34782000 to 0x7fef3478c000
+	[node 0]: We remap 0x7fef34797000 to 0x7fef347a1000
+	[node 1]: Segfault at 0x7fef3478d000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef347a2000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef34783000 to 0x7fef3478d000
+	[node 0]: We remap 0x7fef34798000 to 0x7fef347a2000
+	[node 1]: Segfault at 0x7fef3478e000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef347a3000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef34784000 to 0x7fef3478e000
+	[node 0]: We remap 0x7fef34799000 to 0x7fef347a3000
+	[node 1]: Segfault at 0x7fef3478f000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef347a4000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef34785000 to 0x7fef3478f000
+	[node 0]: We remap 0x7fef3479a000 to 0x7fef347a4000
+	[node 1]: Segfault at 0x7fef34790000.
+	[node 1]: Segfault is owned by node 0.
+	[node 0]: Segfault at 0x7fef347a5000.
+	[node 0]: Segfault is owned by node 1.
+	[node 1]: We remap 0x7fef34786000 to 0x7fef34790000
+	[node 0]: We remap 0x7fef3479b000 to 0x7fef347a5000
+	[node 1]: Segfault at 0x7fef34791000.
+	[node 1]: Segfault is owned by node 0.
+	[node 1]: We remap 0x7fef34787000 to 0x7fef34791000
+	[node 0]: Update page 0x7fef4c50d000 of allocation 0x7fef4c50d000
+	[node 0]: UpdatePage: we communicate with nodes 0, ..., 0.
+	[node 0]: Update page 0x7fef64285000 of allocation 0x7fef4c50d000
+	[node 0]: UpdatePage: we communicate with nodes 0, ..., 1.
+	[node 0]: UpdatePage: we get [0x7fef64285400, 0x7fef64286000[ from 1
+	[node 1]: Update page 0x7fef64285000 of allocation 0x7fef4c50d000
+	[node 1]: UpdatePage: we communicate with nodes 0, ..., 1.
+	[node 1]: UpdatePage: we get [0x7fef64285000, 0x7fef64285400[ from 0
+	[node 1]: Update page 0x7fef7bffd000 of allocation 0x7fef4c50d000
+	[node 1]: UpdatePage: we communicate with nodes 1, ..., 1.
+	[node 1]: We are done updating pages for 0x7fef4c50d000
+	[node 0]: We are done updating pages for 0x7fef4c50d000
+Time 0.289537s, 6.214336 Gflops/s
+Shray report P(1): 0 segfaults, 0 barriers, 0 bytes communicated.
+Shray report P(0): 0 segfaults, 0 barriers, 0 bytes communicated.

@@ -15,6 +15,20 @@
  * Data structures
  **************************************************/
 
+/* FIXME we may want to be able to synchronize for each prefetch separately. This 
+ * can be done with gasnet_wait_syncnb_all, but we need to add handles to this. */
+typedef struct Prefetch {
+    /* In practice we round this down to the page boundary. */
+    void *location;
+    /* Actually fetched size */
+    size_t size;
+    struct Prefetch *next;
+    uintptr_t block1start;
+    uintptr_t block1end;
+    uintptr_t block2start;
+    uintptr_t block2end;
+} Prefetch;
+
 typedef struct {
     /* addresses[i] is a pointer to the virtual page 
      * stored in the ith cache line, or a reserved 

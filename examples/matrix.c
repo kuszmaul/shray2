@@ -13,13 +13,36 @@ void init(double *matrix, size_t n, double value)
 
 void matmul(double *A, double *B, double *C, size_t n)
 {
-    size_t start = ShrayStart(n);
-    size_t end = ShrayEnd(n);
+	unsigned int p = ShraySize();
+	unsigned int s = ShrayRank();
 
-    /* Calculates C(start:end,:) = A(start:end,:) B. */
+    /* Add A[s][t] B[t] to C. We start with t = 0 (B[0] = B), and repeat the 
+     * asynchronous get B[t + 1] - compute A[s][t] B[t] cycle. */
+
+    ShrayGet(B + n / p * n * ((s + 1) % p), n / p * n * sizeof(double));
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-            end - start, n, n, 1.0, A + start * n,
-            n, B, n, 0.0, C + start * n, n);
+            n / p, n, n / p, 1.0, &A[0 * n / p], n, B + n / p * n * s, n, 1.0, C, n);
+
+    for (unsigned int i = 1; i < p; i++) {
+        /* The block we calculate */
+        int t = (i + s) % p;
+
+        ShrayGetComplete(B + n / p * n * t);
+        printf("Get %d completed\n", i);
+
+        /* Get the next block */
+        if ((t + 1) % p != s) {
+            ShrayGet(B + n / p * n * (t + 1) % p, n / p * n * sizeof(double));
+        }
+
+        /* blas can operate on subarrays, so no need to pack A[s][t]. 
+         * A[s][t] is an n / p x n / p matrix, and a submatrix of A which 
+         * has leading dimension n. B[t] is a n / p x n matrix, and C is 
+         * an n / p x n matrix. */
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                n / p, n, n / p, 1.0, &A[t * n / p], n, B + n / p * n * t, n, 1.0, C, n);
+        ShrayGetFree(B + n / p * n * t % p);
+    }
 }
 
 /* If A, B are all one's, C should be n at every entry. */

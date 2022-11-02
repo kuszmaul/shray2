@@ -11,6 +11,7 @@
 
 static Cache cache;
 static Heap heap;
+static Prefetch *prefetches;
 
 static unsigned int Shray_rank;
 static unsigned int Shray_size;
@@ -75,6 +76,21 @@ static int findOwner(void *segfault)
 #endif
 
     return middle;
+}
+
+static Prefetch *createPrefetch(void)
+{
+    Prefetch *result;
+    MALLOC_SAFE(result, sizeof(Prefetch));
+    result->next = NULL;
+
+    return result;
+}
+
+static Prefetch *insertPrefetchAtHead(Prefetch *head, Prefetch *newHead)
+{
+    newHead->next = head;
+    return newHead;
 }
 
 static void SegvHandler(int sig, siginfo_t *si, void *unused)
@@ -202,6 +218,7 @@ void ShrayInit(int *argc, char ***argv)
     heap.size = sizeof(Allocation);
     heap.numberOfAllocs = 0;
     MALLOC_SAFE(heap.allocs, sizeof(Allocation));
+    prefetches = NULL;
 
     char *cacheSizeEnv = getenv("SHRAY_CACHESIZE");
     if (cacheSizeEnv == NULL) {
@@ -364,6 +381,125 @@ void ShrayFree(void *address)
     }
 }
 
+/* Gets [start, end[ asynchronously and sets the protection to PROT_WRITE. Assumes 
+ * start, end are page-aligned and not owned by our rank. */
+void helpGet(uintptr_t start, uintptr_t end, Allocation *alloc)
+{
+    if (end <= start) return;
+
+    uintptr_t location = (uintptr_t)alloc->location;
+    size_t size = alloc->size;
+    uintptr_t bytesPerBlock = alloc->bytesPerBlock;
+
+    MPROTECT_SAFE((void *)start, end - start, PROT_WRITE);
+    unsigned int firstOwner = (start - location) / bytesPerBlock;
+    /* We take the max with Shay_size because the last part of the last page is not owned by 
+     * anyone. */
+    unsigned int lastOwner = min((end - 1 - location) / bytesPerBlock, Shray_size - 1);
+
+    DBUG_PRINT("Get [%p, %p[ from nodes %d, ..., %d", (void *)start, (void *)end, firstOwner,
+            lastOwner);
+    assert(firstOwner > Shray_rank || lastOwner < Shray_rank);
+
+    for (unsigned int rank = firstOwner; rank < lastOwner; rank++) {
+        uintptr_t theirStart = (location + Shray_rank * bytesPerBlock) / 
+            ShrayPagesz * ShrayPagesz;
+        uintptr_t theirEnd = (rank == Shray_size - 1) ? 
+            roundUp(location + size - 1, ShrayPagesz) * ShrayPagesz :
+            roundUp(location + (Shray_rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
+        uintptr_t dest = max(start, theirStart);
+        size_t nbytes = min(end, theirEnd) - max(start, theirStart);
+
+        /* FIXME this is never executed */
+        DBUG_PRINT("We get [%p, %p[ from node %d", (void *)dest, (void *)(dest + nbytes), rank);
+
+        gasnet_get_nbi_bulk((void *)dest, rank, (void *)dest, nbytes);
+    }
+}
+
+void ShrayGet(void *address, size_t size)
+{
+    /* We make the maximal subarray [start, end[ of [address, address + size[ available,
+     * such that start, end are rounded to page boundaries. 
+     *
+     * We only get pages we do not partially own to avoid needless communication, and to 
+     * not mess up the protections of owned pages. 
+     * 
+     * If our node owns [ourStart, ourEnd[ (rounded to pages!), then we need to fetch 
+     * [start, end[ \cap [ourStart, ourEnd[^c = 
+     * [start, end[ \cap (]-\infty, ourStart[ \cup [ourEnd, \infty[) = 
+     * ([start, end[ \cap ]-\infty, ourStart[) \cup ([start, end[ \cap [ourEnd, \infty[) = 
+     * [start, min(end, ourStart)[ \cup [max(start, ourEnd), end[. 
+     *
+     * This union is disjoint as min(end, ourStart) <= ourStart < ourEnd <= max(start, ourEnd).
+     */
+    uintptr_t start = roundUp((uintptr_t)address, ShrayPagesz) * ShrayPagesz;
+    uintptr_t end = ((uintptr_t)address + size) / ShrayPagesz * ShrayPagesz;
+
+    Allocation *alloc = heap.allocs + findOwner((void *)start);
+    if (findOwner((void *)start) != findOwner((void *)end)) {
+        DBUG_PRINT("ShrayGet [%p, %p[ is not within a single allocation.", (void *)start, 
+                (void *)end);
+    }
+
+    uintptr_t location = (uintptr_t)alloc->location;
+    size_t bytesPerBlock = alloc->bytesPerBlock; 
+    uintptr_t ourStart = location + Shray_rank * bytesPerBlock / ShrayPagesz * ShrayPagesz;
+    uintptr_t ourEnd = (Shray_rank == Shray_size - 1) ? 
+        roundUp(location + alloc->size - 1, ShrayPagesz) * ShrayPagesz  :
+        location + roundUp((Shray_rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
+
+    DBUG_PRINT("We are going to get [%p, %p[."
+            "\n\t\tOf this allocation, we already have [%p, %p[", 
+            (void *)start, (void *)end, (void *)ourStart, (void *)ourEnd);
+
+    DBUG_PRINT("Get [%p, %p[", (void *)start, (void *)min(end, ourStart));
+    helpGet(start, min(end, ourStart), alloc);
+    DBUG_PRINT("Get [%p, %p[", (void *)max(start, ourEnd), (void *)end);
+    helpGet(max(start, ourEnd), end, alloc);
+
+    Prefetch *prefetch = createPrefetch();
+    prefetch->location = address;
+    prefetch->block1start = start;
+    prefetch->block1end = min(end, ourStart);
+    prefetch->block1start = max(start, ourEnd);
+    prefetch->block1end = ourEnd;
+
+    prefetches = insertPrefetchAtHead(prefetches, prefetch);
+}
+
+void ShrayGetComplete(void *address)
+{
+    Prefetch *prefetch = prefetches;
+    while (prefetch != NULL && prefetch->location != address) {
+        prefetch = prefetch->next;
+    }
+
+    if (prefetch == NULL) {
+        DBUG_PRINT("%p was not prefetched.", address); 
+    }
+
+    gasnet_wait_syncnbi_gets();
+
+    DBUG_PRINT("Can read to [%p, %p[ again", (void *)prefetch->block1start, 
+            (void *)prefetch->block1end);
+    if (prefetch->block1start < prefetch->block1end) {
+        MPROTECT_SAFE((void *)prefetch->block1start, prefetch->block1end - prefetch->block1start,
+                PROT_READ | PROT_WRITE);
+    }
+    DBUG_PRINT("Can read to [%p, %p[ again", (void *)prefetch->block2start, 
+            (void *)prefetch->block2end);
+    if (prefetch->block2start < prefetch->block2end) {
+        MPROTECT_SAFE((void *)prefetch->block2start, prefetch->block2end - prefetch->block2start,
+                PROT_READ | PROT_WRITE);
+    }
+}
+
+void ShrayGetFree(void *address) 
+{
+    return;
+}
+
 void ShrayReport(void)
 {
     fprintf(stderr,
@@ -372,12 +508,12 @@ void ShrayReport(void)
             segfaultCounter * ShrayPagesz);
 }
 
-size_t ShrayRank(void)
+unsigned int ShrayRank(void)
 {
     return Shray_rank;
 }
 
-size_t ShraySize(void)
+unsigned int ShraySize(void)
 {
     return Shray_size;
 }

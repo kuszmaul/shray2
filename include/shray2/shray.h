@@ -130,7 +130,7 @@ void ShrayReport(void);
  *
  ******************************************************************************/
 
-size_t ShrayRank(void);
+unsigned int ShrayRank(void);
 
 
 /** <!--********************************************************************-->
@@ -141,7 +141,7 @@ size_t ShrayRank(void);
  *
  ******************************************************************************/
 
-size_t ShraySize(void);
+unsigned int ShraySize(void);
 
 /** <!--********************************************************************-->
  *
@@ -152,6 +152,18 @@ size_t ShraySize(void);
  ******************************************************************************/
 
 void ShrayFinalize(int exit_code);
+
+/* Asynchronous get to be used when the communication pattern is (partially) known. 
+ * We round to page boundaries to get a contiguous block 
+ * [a, b[ \subseteq [address, address + size[. Accessing the block 
+ * [address, address + size[ is forbidden until ShrayGetComplete has been called. */
+void ShrayGet(void *address, size_t size);
+
+/* Completes ShrayGet. */
+void ShrayGetComplete(void *address);
+
+/* Frees the memory used by ShrayGet. */
+void ShrayGetFree(void *address);
 
 /* The elipses are a function call block. Example usage:
  *
@@ -171,4 +183,3 @@ void ShrayFinalize(int exit_code);
     }
 
 #endif
-
