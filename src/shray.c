@@ -68,12 +68,10 @@ static int findOwner(void *segfault)
         else break;
     }
 
-#ifdef DEBUG
     if (!inRange(segfault, middle)) {
-        fprintf(stderr, "%p is not in an allocation.\n", segfault); 
+        DBUG_PRINT("%p is not in an allocation.\n", segfault); 
         ShrayFinalize(1);
     }
-#endif
 
     return middle;
 }
@@ -402,15 +400,14 @@ void helpGet(uintptr_t start, uintptr_t end, Allocation *alloc)
     assert(firstOwner > Shray_rank || lastOwner < Shray_rank);
 
     for (unsigned int rank = firstOwner; rank <= lastOwner; rank++) {
-        uintptr_t theirStart = (location + Shray_rank * bytesPerBlock) / 
+        uintptr_t theirStart = (location + rank * bytesPerBlock) / 
             ShrayPagesz * ShrayPagesz;
         uintptr_t theirEnd = (rank == Shray_size - 1) ? 
             roundUp(location + size - 1, ShrayPagesz) * ShrayPagesz :
-            roundUp(location + (Shray_rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
+            roundUp(location + (rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
         uintptr_t dest = max(start, theirStart);
         size_t nbytes = min(end, theirEnd) - max(start, theirStart);
 
-        /* FIXME this is never executed */
         DBUG_PRINT("We get [%p, %p[ from node %d", (void *)dest, (void *)(dest + nbytes), rank);
 
         gasnet_get_nbi_bulk((void *)dest, rank, (void *)dest, nbytes);

@@ -33,6 +33,7 @@ double reduce(double *arr, size_t n)
 
         for (size_t i = 0; i < n / p; i++) {
             sum += arr[i + rank * n / p];
+//            if (ShrayRank() == 1) printf("%zu %lf\n", i + rank * n / p, arr[i + rank * n / p]);
         }
 
         ShrayGetFree(arr + rank * n / p);
