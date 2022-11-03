@@ -68,11 +68,14 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
     size_t block = 200;
 
     int p = shmem_n_pes();
+    int s = shmem_my_pe();
 
     size_t pos_buffsize = n / p * sizeof(Point);
     size_t mass_buffsize = n / p * sizeof(double);
     Point *pos_local = malloc(pos_buffsize);
     double *mass_local = malloc(mass_buffsize);
+    Point *pos_local_async = malloc(pos_buffsize);
+    double *mass_local_async = malloc(mass_buffsize);
 
     for (size_t i = 0; i < n / p; i++) {
         accel[i].x = 0.0;
@@ -80,9 +83,46 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
         accel[i].z = 0.0;
     }
 
-    for (int s = 0; s < p; s++) {
-        shmem_getmem(pos_local, positions, pos_buffsize, s);
-        shmem_getmem(mass_local, masses, mass_buffsize, s);
+    /* We calculate the acceleration with respect to the bodies of P(s), ..., P(s - 1). 
+     * We have a different starting point on each processor for load balancing, and
+     * we and overlap some communication with computation. */
+
+    /* Acceleration with respect to local bodies. */
+    shmem_getmem_nbi(pos_local_async, positions + (s + 1) % p * n / p, 
+            n / p * sizeof(Point), (s + 1) % p); 
+    shmem_getmem_nbi(mass_local_async, masses + (s + 1) % p * n / p, 
+            n / p * sizeof(double), (s + 1) % p); 
+
+    for (size_t Ib = 0; Ib < n / p; Ib += block) {
+        for (size_t J = 0; J < n / p; J += block) {
+    for (size_t i = Ib; i < min(Ib + block, n / p); i++) {
+        for (size_t j = J; j < min(J + block, n / p); j++) {
+            accel[i].x += accelerate(positions[i], positions[j], masses[j]).x;
+            accel[i].y += accelerate(positions[i], positions[j], masses[j]).y;
+            accel[i].z += accelerate(positions[i], positions[j], masses[j]).z;
+            flopCounter += 16 * 3;
+        }
+    }
+        }
+    }
+
+    for (int t = 1; t < p; t++) {
+        shmem_quiet();
+        Point *temp_pos = pos_local;
+        pos_local = pos_local_async;
+        pos_local_async = temp_pos;
+
+        double *temp_mass = mass_local;
+        mass_local = mass_local_async;
+        mass_local_async = temp_mass;
+
+        if ((t + 1) % p != s) {
+            shmem_getmem_nbi(pos_local_async, positions + (t + 1) % p * n / p, 
+                    n / p * sizeof(Point), (t + 1) % p); 
+            shmem_getmem_nbi(mass_local_async, masses + (t + 1) % p * n / p, 
+                    n / p * sizeof(double), (t + 1) % p); 
+        }
+
         for (size_t Ib = 0; Ib < n / p; Ib += block) {
             for (size_t J = 0; J < n / p; J += block) {
         for (size_t i = Ib; i < min(Ib + block, n / p); i++) {
@@ -99,6 +139,8 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 
     free(pos_local);
     free(mass_local);
+    free(pos_local_async);
+    free(mass_local_async);
 }
 
 void advance(Point *positions, Point *velocities, double *masses,
