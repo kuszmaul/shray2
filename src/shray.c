@@ -162,8 +162,8 @@ static void UpdatePage(uintptr_t page, int index)
         uintptr_t allocStart = location + rank * bytesPerBlock;
         uintptr_t allocEnd = location + (rank + 1) * bytesPerBlock;
         
-        uintptr_t start = (allocStart < page) ? page : allocStart;
-        uintptr_t end = (allocEnd > page + ShrayPagesz) ? page + ShrayPagesz : allocEnd;
+        uintptr_t start = max(page, allocStart);
+        uintptr_t end = min(page + ShrayPagesz, allocEnd);
 
         DBUG_PRINT("UpdatePage: we get [%p, %p[ from %d", (void *)start, (void *)end, rank);
         gasnet_get_nbi_bulk((void *)start, rank, (void *)start, end - start);
@@ -434,7 +434,7 @@ void ShrayGet(void *address, size_t size)
     uintptr_t end = ((uintptr_t)address + size) / ShrayPagesz * ShrayPagesz;
 
     Allocation *alloc = heap.allocs + findOwner((void *)start);
-    if (findOwner((void *)start) != findOwner((void *)end)) {
+    if (findOwner((void *)start) != findOwner((void *)(end - 1))) {
         DBUG_PRINT("ShrayGet [%p, %p[ is not within a single allocation.", (void *)start, 
                 (void *)end);
     }
@@ -479,14 +479,14 @@ void ShrayGetComplete(void *address)
     gasnet_wait_syncnbi_gets();
 
     if (prefetch->block1start < prefetch->block1end) {
-        DBUG_PRINT("Can read to [%p, %p[ again", (void *)prefetch->block1start, 
-            (void *)prefetch->block1end);
+        DBUG_PRINT("ShrayGetComplete: Can read to [%p, %p[ again", 
+                (void *)prefetch->block1start, (void *)prefetch->block1end);
         MPROTECT_SAFE((void *)prefetch->block1start, prefetch->block1end - prefetch->block1start,
                 PROT_READ | PROT_WRITE);
     }
     if (prefetch->block2start < prefetch->block2end) {
-        DBUG_PRINT("Can read to [%p, %p[ again", (void *)prefetch->block2start, 
-            (void *)prefetch->block2end);
+        DBUG_PRINT("ShrayGetComplete: Can read to [%p, %p[ again", 
+                (void *)prefetch->block2start, (void *)prefetch->block2end);
         MPROTECT_SAFE((void *)prefetch->block2start, prefetch->block2end - prefetch->block2start,
                 PROT_READ | PROT_WRITE);
     }
