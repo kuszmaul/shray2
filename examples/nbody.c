@@ -4,6 +4,8 @@
 
 #define min(a, b) ((a) < (b) ? a : b)
 
+size_t flopCount = 0;
+
 typedef struct {
     double x;
     double y;
@@ -45,32 +47,51 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
     size_t start = ShrayStart(n);
     size_t end = ShrayEnd(n);
+    unsigned int p = ShraySize();
+    unsigned int s = ShrayRank();
 
     /* For segfaults it would be best to have block = 1000. For physical cache performance
      * something like block = 100. So that is why we block twice. */
-    size_t cacheBlock = end - start;
-//    size_t cacheBlock = 1000;
     size_t block = 200;
 
-    for (size_t I1 = start; I1 < end; I1 += cacheBlock) {
-        for (size_t J1 = 0; J1 < n; J1 += cacheBlock) {
-    for (size_t I2 = I1; I2 < I1 + cacheBlock; I2 += block) {
-        for (size_t J2 = J1; J2 < J1 + cacheBlock; J2 += block) {
-    for (size_t i = I2; i < min(I2 + block, end); i++) {
-                accel[i].x = 0.0;
-                accel[i].y = 0.0;
-                accel[i].z = 0.0;
-        for (size_t j = J2; j < min(J2 + block, n); j++) {
-                accel[i].x +=
-                    accelerate(positions[i], positions[j], masses[j]).x;
-                accel[i].y +=
-                    accelerate(positions[i], positions[j], masses[j]).y;
-                accel[i].z +=
-                    accelerate(positions[i], positions[j], masses[j]).z;
-        }
+    for (size_t i = start; i < end; i++) {
+        accel[i].x = 0.0;
+        accel[i].y = 0.0;
+        accel[i].z = 0.0;
     }
+
+    /* Accelerate with respect to P((s + t) % p) and prefetch the next block. */
+    for (unsigned int t = 0; t < p; t++) {
+        size_t Jstart = (s + t) % p * n / p;
+        if (t != 0) {
+            ShrayGetComplete(&positions[Jstart]);
+            ShrayGetComplete(&masses[Jstart]);
         }
-    }
+
+        for (size_t Ib = start; Ib < end; Ib += block) {
+            for (size_t J = Jstart; J < Jstart + n / p; J += block) {
+                for (size_t i = Ib; i < min(Ib + block, end); i++) {
+                    for (size_t j = J; j < min(J + block, Jstart + n / p); j++) {
+                        accel[i].x +=
+                            accelerate(positions[i], positions[j], masses[j]).x;
+                        accel[i].y +=
+                            accelerate(positions[i], positions[j], masses[j]).y;
+                        accel[i].z +=
+                            accelerate(positions[i], positions[j], masses[j]).z;
+                        flopCount += 16 * 3;
+                    }
+                }
+            }
+        }
+
+        if (t != 0) {
+            ShrayGetFree(&positions[Jstart]);
+            ShrayGetFree(&masses[Jstart]);
+        }
+        
+        if (t != p - 1) {
+            ShrayGet(&positions[(s + t + 1) % p * n / p], n / p * sizeof(Point));
+            ShrayGet(&masses[(s + t + 1) % p * n / p], n / p * sizeof(double));
         }
     }
 }
@@ -100,10 +121,14 @@ int main(int argc, char **argv)
 
     if (argc != 3) {
         printf("Usage: n, iterations\n");
-        ShrayFinalize(0);
+        ShrayFinalize(1);
     }
 
     size_t n = atoll(argv[1]);
+    if (n % ShraySize() != 0) {
+        printf("Please make sure the number of nodes divides n.\n");
+        ShrayFinalize(1);
+    }
     int iterations = atoi(argv[2]);
 
     Point *positions = (Point *)ShrayMalloc(n, n * sizeof(Point));
@@ -120,9 +145,12 @@ int main(int argc, char **argv)
         advance(positions, velocities, masses, accel, 0.1, n);
     });
 
+    printf("Expected flops %zu, actual flops %zu\n", 
+            16 * 3 * n * n * iterations, flopCount * ShraySize());
+
     if (ShrayOutput) {
         printf("Time: %lfs, %lf Gflops/s\n", duration, 
-                16 * n * n * iterations / 1000000000 / duration);
+                16.0 * n * n * iterations / 1000000000 / duration);
     }
 
     ShrayFree(positions);

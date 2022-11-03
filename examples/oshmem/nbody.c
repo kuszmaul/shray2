@@ -3,6 +3,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <shmem.h>
+#include <sys/time.h>
+
+size_t flopCounter = 0;
+
+#define TIME(duration, fncalls)                                        \
+    {                                                                  \
+        struct timeval tv1, tv2;                                       \
+        gettimeofday(&tv1, NULL);                                      \
+        fncalls                                                        \
+        gettimeofday(&tv2, NULL);                                      \
+        duration = (double) (tv2.tv_usec - tv1.tv_usec) / 1000000 +    \
+         (double) (tv2.tv_sec - tv1.tv_sec);                           \
+    }
 
 #define min(a, b) ((a) < (b) ? a : b)
 
@@ -30,6 +43,7 @@ void init_doubles(double *v, size_t n, double k)
     }
 }
 
+/* 16 flops */
 Point accelerate(Point pos1, Point pos2, double mass)
 {
     double n = pow(pow(pos2.x - pos1.x, 2) + pow(pos2.y - pos1.y, 2) +
@@ -88,6 +102,7 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
                 accel[i].x += accelerate(positions[i], pos_local[j], mass_local[j]).x;
                 accel[i].y += accelerate(positions[i], pos_local[j], mass_local[j]).y;
                 accel[i].z += accelerate(positions[i], pos_local[j], mass_local[j]).z;
+                flopCounter += 16 * 3;
             }
         }
             }
@@ -138,8 +153,17 @@ int main(int argc, char **argv)
     init_doubles(masses, n, 1);
     shmem_barrier_all();
 
+    double duration;
+    TIME(duration,
     for (int i = 0; i < iterations; i++) {
         advance(positions, velocities, masses, accel, 0.1, n);
+    });
+
+    printf("Actual flops: %zu, expected flops: %zu\n", flopCounter * shmem_n_pes(), 
+            16 * 3 * n * n * iterations);
+    if (shmem_my_pe() == 0) {
+        printf("Time: %lfs, %lf Gflops/s\n", duration, 
+                3 * 16 * n * n * iterations / 1000000000 / duration);
     }
 
     shmem_free(positions);
