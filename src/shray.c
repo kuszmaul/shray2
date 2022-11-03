@@ -381,7 +381,7 @@ void ShrayFree(void *address)
 
 /* Gets [start, end[ asynchronously and sets the protection to PROT_WRITE. Assumes 
  * start, end are page-aligned and not owned by our rank. */
-void helpGet(uintptr_t start, uintptr_t end, Allocation *alloc)
+static inline void helpGet(uintptr_t start, uintptr_t end, Allocation *alloc)
 {
     if (end <= start) return;
 
@@ -391,7 +391,7 @@ void helpGet(uintptr_t start, uintptr_t end, Allocation *alloc)
 
     MPROTECT_SAFE((void *)start, end - start, PROT_WRITE);
     unsigned int firstOwner = (start - location) / bytesPerBlock;
-    /* We take the max with Shay_size because the last part of the last page is not owned by 
+    /* We take the min with Shay_size because the last part of the last page is not owned by 
      * anyone. */
     unsigned int lastOwner = min((end - 1 - location) / bytesPerBlock, Shray_size - 1);
 
@@ -403,7 +403,7 @@ void helpGet(uintptr_t start, uintptr_t end, Allocation *alloc)
         uintptr_t theirStart = (location + rank * bytesPerBlock) / 
             ShrayPagesz * ShrayPagesz;
         uintptr_t theirEnd = (rank == Shray_size - 1) ? 
-            roundUp(location + size - 1, ShrayPagesz) * ShrayPagesz :
+            roundUp(location + size, ShrayPagesz) * ShrayPagesz :
             roundUp(location + (rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
         uintptr_t dest = max(start, theirStart);
         size_t nbytes = min(end, theirEnd) - max(start, theirStart);
@@ -441,9 +441,9 @@ void ShrayGet(void *address, size_t size)
 
     uintptr_t location = (uintptr_t)alloc->location;
     size_t bytesPerBlock = alloc->bytesPerBlock; 
-    uintptr_t ourStart = location + Shray_rank * bytesPerBlock / ShrayPagesz * ShrayPagesz;
+    uintptr_t ourStart = (location + Shray_rank * bytesPerBlock) / ShrayPagesz * ShrayPagesz;
     uintptr_t ourEnd = (Shray_rank == Shray_size - 1) ? 
-        roundUp(location + alloc->size - 1, ShrayPagesz) * ShrayPagesz  :
+        roundUp(location + alloc->size, ShrayPagesz) * ShrayPagesz  :
         location + roundUp((Shray_rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
 
     DBUG_PRINT("We are going to get [%p, %p[."
@@ -459,8 +459,8 @@ void ShrayGet(void *address, size_t size)
     prefetch->location = address;
     prefetch->block1start = start;
     prefetch->block1end = min(end, ourStart);
-    prefetch->block1start = max(start, ourEnd);
-    prefetch->block1end = ourEnd;
+    prefetch->block2start = max(start, ourEnd);
+    prefetch->block2end = end;
 
     prefetches = insertPrefetchAtHead(prefetches, prefetch);
 }
@@ -494,6 +494,9 @@ void ShrayGetComplete(void *address)
 
 void ShrayGetFree(void *address) 
 {
+    /* Locate the prefetch associated to this address, unmap and then map the memory 
+     * again (mapping with PROT_NONE) and remove the prefetch from the list (or other 
+     * datastructure). */
     return;
 }
 
