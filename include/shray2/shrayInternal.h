@@ -20,15 +20,12 @@
 typedef struct Prefetch {
     /* In practice we round this down to the page boundary. */
     void *location;
-    /* Actually fetched size */
-    size_t size;
     struct Prefetch *next;
     uintptr_t block1start;
     uintptr_t block1end;
     uintptr_t block2start;
     uintptr_t block2end;
 } Prefetch;
-
 typedef struct {
     /* addresses[i] is a pointer to the virtual page 
      * stored in the ith cache line, or a reserved 
@@ -105,6 +102,8 @@ typedef struct Heap {
 #define MUNMAP_SAFE(address, length)                                                    \
     {                                                                                   \
         if (munmap(address, length) == -1) {                                            \
+            fprintf(stderr, "[node %d] unmapping [%p, %p[\n", Shray_rank, address,      \
+                    (void *)((uintptr_t)address + length));                             \
             perror("munmap failed");                                                    \
         }                                                                               \
     }
@@ -138,22 +137,6 @@ typedef struct Heap {
         fprintf(stderr, "\t[node %d]: " fmt "\n", Shray_rank, __VA_ARGS__);
 #else
     #define DBUG_PRINT(fmt, ...)
-#endif
-
-/**************************************************
- * Graphing segfaults
- **************************************************/
-
-#ifdef GRAPH 
-    #define PROFILE
-    #define GRAPH_SEGV(segfault, segvNo)                                          \
-        {                                                                         \
-            if (Shray_rank == 0) {                                                \
-                fprintf(stderr, "%zu, %zu\n", segvNo, segfault / ShrayPagesz);    \
-            }                                                                     \
-        }
-#else
-    #define GRAPH_SEGV(segfault, segvNo)
 #endif
 
 /**************************************************

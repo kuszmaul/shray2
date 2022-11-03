@@ -96,7 +96,6 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
     SEGFAULTCOUNT
     void *address = si->si_addr;
     void *roundedAddress = (void *)((uintptr_t)address / ShrayPagesz * ShrayPagesz);
-    GRAPH_SEGV((uintptr_t)address, segfaultCounter)
 
     DBUG_PRINT("Segfault at %p.", address)
 
@@ -170,12 +169,68 @@ static void UpdatePage(uintptr_t page, int index)
     }
 }
 
+/* Gets [start, end[ asynchronously and sets the protection to PROT_WRITE. Assumes 
+ * start, end are page-aligned and not owned by our rank. */
+static inline void helpGet(uintptr_t start, uintptr_t end, Allocation *alloc)
+{
+    if (end <= start) return;
+
+    uintptr_t location = (uintptr_t)alloc->location;
+    size_t size = alloc->size;
+    uintptr_t bytesPerBlock = alloc->bytesPerBlock;
+
+    MPROTECT_SAFE((void *)start, end - start, PROT_WRITE);
+    unsigned int firstOwner = (start - location) / bytesPerBlock;
+    /* We take the min with Shay_size because the last part of the last page is not owned by 
+     * anyone. */
+    unsigned int lastOwner = min((end - 1 - location) / bytesPerBlock, Shray_size - 1);
+
+    DBUG_PRINT("Get [%p, %p[ from nodes %d, ..., %d", (void *)start, (void *)end, firstOwner,
+            lastOwner);
+    assert(firstOwner > Shray_rank || lastOwner < Shray_rank);
+
+    for (unsigned int rank = firstOwner; rank <= lastOwner; rank++) {
+        uintptr_t theirStart = (location + rank * bytesPerBlock) / 
+            ShrayPagesz * ShrayPagesz;
+        uintptr_t theirEnd = (rank == Shray_size - 1) ? 
+            roundUp(location + size, ShrayPagesz) * ShrayPagesz :
+            roundUp(location + (rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
+        uintptr_t dest = max(start, theirStart);
+        size_t nbytes = min(end, theirEnd) - max(start, theirStart);
+
+        DBUG_PRINT("We get [%p, %p[ from node %d", (void *)dest, (void *)(dest + nbytes), rank);
+
+        gasnet_get_nbi_bulk((void *)dest, rank, (void *)dest, nbytes);
+    }
+}
+
 static void resetCache(void)
 {
     size_t end = (cache.allUsed) ? cache.numberOfLines : cache.firstIn;
     for (size_t i = 0; i < end; i++) {
         MPROTECT_SAFE(cache.addresses[i], ShrayPagesz, PROT_WRITE);
     }
+}
+
+static void freePrefetch(Prefetch *prefetch)
+{
+    if (prefetch->block1end > prefetch->block1start) {
+        size_t size = prefetch->block1end - prefetch->block1start;
+        void *start = (void *)prefetch->block1start;
+        MUNMAP_SAFE(start, size);
+        MMAP_SAFE(start, mmap(start, size, PROT_NONE, 
+                    MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
+    }
+
+    if (prefetch->block2end > prefetch->block2start) {
+        size_t size = prefetch->block2end - prefetch->block2start;
+        void *start = (void *)prefetch->block2start;
+        MUNMAP_SAFE(start, size);
+        MMAP_SAFE(start, mmap(start, size, PROT_NONE, 
+                    MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
+    }
+
+    free(prefetch);
 }
 
 /*****************************************************
@@ -379,41 +434,6 @@ void ShrayFree(void *address)
     }
 }
 
-/* Gets [start, end[ asynchronously and sets the protection to PROT_WRITE. Assumes 
- * start, end are page-aligned and not owned by our rank. */
-static inline void helpGet(uintptr_t start, uintptr_t end, Allocation *alloc)
-{
-    if (end <= start) return;
-
-    uintptr_t location = (uintptr_t)alloc->location;
-    size_t size = alloc->size;
-    uintptr_t bytesPerBlock = alloc->bytesPerBlock;
-
-    MPROTECT_SAFE((void *)start, end - start, PROT_WRITE);
-    unsigned int firstOwner = (start - location) / bytesPerBlock;
-    /* We take the min with Shay_size because the last part of the last page is not owned by 
-     * anyone. */
-    unsigned int lastOwner = min((end - 1 - location) / bytesPerBlock, Shray_size - 1);
-
-    DBUG_PRINT("Get [%p, %p[ from nodes %d, ..., %d", (void *)start, (void *)end, firstOwner,
-            lastOwner);
-    assert(firstOwner > Shray_rank || lastOwner < Shray_rank);
-
-    for (unsigned int rank = firstOwner; rank <= lastOwner; rank++) {
-        uintptr_t theirStart = (location + rank * bytesPerBlock) / 
-            ShrayPagesz * ShrayPagesz;
-        uintptr_t theirEnd = (rank == Shray_size - 1) ? 
-            roundUp(location + size, ShrayPagesz) * ShrayPagesz :
-            roundUp(location + (rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
-        uintptr_t dest = max(start, theirStart);
-        size_t nbytes = min(end, theirEnd) - max(start, theirStart);
-
-        DBUG_PRINT("We get [%p, %p[ from node %d", (void *)dest, (void *)(dest + nbytes), rank);
-
-        gasnet_get_nbi_bulk((void *)dest, rank, (void *)dest, nbytes);
-    }
-}
-
 void ShrayGet(void *address, size_t size)
 {
     /* We make the maximal subarray [start, end[ of [address, address + size[ available,
@@ -497,7 +517,19 @@ void ShrayGetFree(void *address)
     /* Locate the prefetch associated to this address, unmap and then map the memory 
      * again (mapping with PROT_NONE) and remove the prefetch from the list (or other 
      * datastructure). */
-    return;
+    Prefetch **indirect = &prefetches;
+
+    while ((*indirect) != NULL && (*indirect)->location != address) {
+        indirect = &(*indirect)->next;
+    }
+
+    if (*indirect == NULL) {
+        DBUG_PRINT("Try to free %p but was not gotten", address);
+    }
+
+    DBUG_PRINT("Free %p", (*indirect)->location);
+    freePrefetch(*indirect);
+    *indirect = (*indirect)->next;
 }
 
 void ShrayReport(void)

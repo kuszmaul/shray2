@@ -43,7 +43,7 @@ void matmul(double *A, double *B, double *C, size_t n)
                 n / p, n, n / p, 1.0, &A[s * n / p * n + t * n / p], n,
                 &B[t * n / p * n], n, 1.0, &C[s * n / p * n], n); 
 
-        ShrayGetFree(B + n / p * n * (t % p));
+        ShrayGetFree(B + n / p * n * t);
     }
 }
 
@@ -68,10 +68,14 @@ int main(int argc, char **argv)
 
     if (argc != 2) {
         printf("Takes one command-line argument, size of matrix.\n");
-        exit(EXIT_FAILURE);
+        ShrayFinalize(1);
     }
 
     size_t n = atol(argv[1]);
+    if (n % ShraySize() != 0) {
+        fprintf(stderr, "For now only supports dimension divisible by number of nodes.\n");
+        ShrayFinalize(1);
+    }
 
     double *A = ShrayMalloc(n, n * n * sizeof(double));
     double *B = ShrayMalloc(n, n * n * sizeof(double));
