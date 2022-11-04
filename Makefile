@@ -25,7 +25,7 @@ release: $(RELEASE)
 debug: FLAGS += -DDEBUG -g -fsanitize=undefined
 debug: $(DEBUG)
 
-profile: FLAGS += -DPROFILE
+profile: FLAGS += -DPROFILE -pg
 profile: $(PROFILE)
 
 graph: FLAGS += -DGRAPH
