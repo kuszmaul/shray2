@@ -153,16 +153,44 @@ unsigned int ShraySize(void);
 
 void ShrayFinalize(int exit_code);
 
-/* Asynchronous get to be used when the communication pattern is (partially) known. 
- * We round to page boundaries to get a contiguous block 
- * [a, b[ \subseteq [address, address + size[. Accessing the block 
- * [address, address + size[ is forbidden until ShrayGetComplete has been called. */
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayGet(void *address, size_t size);
+ *
+ *   @brief Asynchronous get to be used when the communication pattern is (partially) known. 
+ *          Gotten memory may not be read between the ShrayGet and ShrayGetComplete.
+ *
+ *   @param address   Start of the memory we get (the system will round this up to pagesize)
+ *          size      Number of bytes we get (system will round this down to pagesize).
+ *
+ ******************************************************************************/
+
 void ShrayGet(void *address, size_t size);
 
-/* Completes ShrayGet. */
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayGetComplete(void *address);
+ *
+ *   @brief Needs to be called after each ShrayGet, as late as possible. Finishes
+ *          the asynchronous get, so reading to that memory is only legal after this call.
+ *
+ *   @param address   Argument of the complementing ShrayGet
+ *
+ ******************************************************************************/
+
 void ShrayGetComplete(void *address);
 
-/* Frees the memory used by ShrayGet. */
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayGetFree(void *address);
+ *
+ *   @brief Needs to be called after we are done with the memory from ShrayGet. Cleans 
+ *          up the memory.
+ *
+ *   @param address   Argument of the complementing ShrayGet
+ *
+ ******************************************************************************/
+
 void ShrayGetFree(void *address);
 
 /* The elipses are a function call block. Example usage:
