@@ -26,6 +26,7 @@ typedef struct Prefetch {
     uintptr_t block2start;
     uintptr_t block2end;
 } Prefetch;
+
 typedef struct {
     /* addresses[i] is a pointer to the virtual page 
      * stored in the ith cache line, or a reserved 
