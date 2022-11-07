@@ -54,7 +54,7 @@ static int inRange(void *address, int index)
 
 /* Simple binary search, assumes heap.allocs is sorted. Returns the index of the 
  * allocation segfault belongs to. */
-static int findOwner(void *segfault)
+static int findAlloc(void *segfault)
 {
     int low = 0;
     int high = heap.numberOfAllocs - 1;
@@ -99,7 +99,7 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
 
     DBUG_PRINT("Segfault at %p.", address)
 
-    int index = findOwner(roundedAddress);
+    int index = findAlloc(roundedAddress);
     uintptr_t difference = (uintptr_t)roundedAddress - (uintptr_t)(heap.allocs[index].location);
     unsigned int owner = difference / heap.allocs[index].bytesPerBlock;
 
@@ -395,7 +395,7 @@ void ShraySync(void *array)
     gasnetBarrier();
     BARRIERCOUNT
 
-    int index = findOwner(array);
+    int index = findAlloc(array);
     size_t bytesPerBlock = heap.allocs[index].bytesPerBlock;
     uintptr_t location = (uintptr_t)heap.allocs[index].location;
 
@@ -423,7 +423,7 @@ void ShrayFree(void *address)
     gasnetBarrier();
     BARRIERCOUNT
 
-    int index = findOwner(address);
+    int index = findAlloc(address);
     /* We leave potentially two pages mapped due to the alignment in ShrayMalloc, but 
      * who cares. */
     MUNMAP_SAFE(heap.allocs[index].location, heap.allocs[index].size);
@@ -453,8 +453,8 @@ void ShrayGet(void *address, size_t size)
     uintptr_t start = roundUp((uintptr_t)address, ShrayPagesz) * ShrayPagesz;
     uintptr_t end = ((uintptr_t)address + size) / ShrayPagesz * ShrayPagesz;
 
-    Allocation *alloc = heap.allocs + findOwner((void *)start);
-    if (findOwner((void *)start) != findOwner((void *)(end - 1))) {
+    Allocation *alloc = heap.allocs + findAlloc((void *)start);
+    if (findAlloc((void *)start) != findAlloc((void *)(end - 1))) {
         DBUG_PRINT("ShrayGet [%p, %p[ is not within a single allocation.", (void *)start, 
                 (void *)end);
     }
