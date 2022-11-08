@@ -1,15 +1,17 @@
 include /usr/local/gasnet/include/mpi-conduit/mpi-seq.mak
 
 SHMEM_C = /home/thomas/repos/shmemBuild/bin/oshcc
-FLAGS = -pg -I../include/shray2
+FLAGS = -g -I../include/shray2 -O3 -march=native
 GASNET_PROGRAMS = $(wildcard gasnet/*.c)
 SHMEM_PROGRAMS = $(wildcard shmem/*.c)
 SHRAY_PROGRAMS = $(wildcard shray/*.c)
+SEQUENTIAL_PROGRAMS = $(wildcard seq/*.c)
 GASNET = $(patsubst gasnet/%.c, bin/%_gasnet, $(GASNET_PROGRAMS))
 SHMEM = $(patsubst shmem/%.c, bin/%_shmem, $(SHMEM_PROGRAMS))
 SHRAY = $(patsubst shray/%.c, bin/%_shray, $(SHRAY_PROGRAMS))
+SEQUENTIAL = $(patsubst seq/%.c, bin/%, $(SEQUENTIAL_PROGRAMS))
 
-all: $(GASNET) $(SHMEM) $(SHRAY)
+all: $(GASNET) $(SHMEM) $(SHRAY) $(SEQUENTIAL)
 
 shray.o: ../src/shray.c ../include/shray2/shray.h
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
@@ -28,6 +30,9 @@ bin/%_shmem: shmem/%.c
 
 bin/%_shray: %.o shray.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
+
+bin/%: seq/%.c
+	gcc $(FLAGS) $^ -o $@
 
 clean:
 	$(RM) bin/*
