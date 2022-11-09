@@ -15,30 +15,9 @@
  * Data structures
  **************************************************/
 
-/* FIXME we may want to be able to synchronize for each prefetch separately. This 
- * can be done with gasnet_wait_syncnb_all, but we need to add handles to this. */
-typedef struct Prefetch {
-    /* In practice we round this down to the page boundary. */
-    void *location;
-    struct Prefetch *next;
-    uintptr_t block1start;
-    uintptr_t block1end;
-    uintptr_t block2start;
-    uintptr_t block2end;
-} Prefetch;
-
 typedef struct {
-    /* addresses[i] is a pointer to the virtual page 
-     * stored in the ith cache line, or a reserved 
-     * piece of memory in case the cache line is empty. */
-    void **addresses;
-    /* The position of the first cache line admitted. */
-    size_t firstIn;
-    /* This determines the size of our cache. */
-    size_t numberOfLines;
-    /* True when we have used the last cache line for the first time. Optimisation
-     * for resetCache in low-communication applications. */ 
-    bool allUsed;
+    size_t usedMemory;
+    size_t maximumMemory;
 } Cache;
 
 /* A single allocation in the heap. */
@@ -47,6 +26,8 @@ typedef struct Allocation {
     size_t size;
     /* The number of bytes owned by each node except the last one. */
     size_t bytesPerBlock;
+    Bitmap local;
+    Bitmap prefetched;
 } Allocation;
 
 typedef struct Heap {
