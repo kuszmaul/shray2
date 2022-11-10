@@ -155,43 +155,29 @@ void ShrayFinalize(int exit_code);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayGet(void *address, size_t size);
+ * @fn void ShrayPrefetch(void *address, size_t size);
  *
- *   @brief Asynchronous get to be used when the communication pattern is (partially) known. 
- *          Gotten memory may not be read between the ShrayGet and ShrayGetComplete.
+ *   @brief Asynchronous prefetches subset of [address, address + size[.
  *
- *   @param address   Start of the memory we get (the system will round this up to pagesize)
- *          size      Number of bytes we get (system will round this down to pagesize).
+ *   @param address   Start of the memory we get (the system will round this up).
+ *          size      Number of bytes we get (system will round this down).
  *
  ******************************************************************************/
 
-void ShrayGet(void *address, size_t size);
+void ShrayPrefetch(void *address, size_t size);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayGetComplete(void *address);
+ * @fn void ShrayDiscard(void *address, size_t size);
  *
- *   @brief Needs to be called after each ShrayGet, as late as possible. Finishes
- *          the asynchronous get, so reading to that memory is only legal after this call.
+ *   @brief Hint to free prefetched memory [address, address + size[. 
  *
- *   @param address   Argument of the complementing ShrayGet
- *
- ******************************************************************************/
-
-void ShrayGetComplete(void *address);
-
-/** <!--********************************************************************-->
- *
- * @fn void ShrayGetFree(void *address);
- *
- *   @brief Needs to be called after we are done with the memory from ShrayGet. Cleans 
- *          up the memory.
- *
- *   @param address   Argument of the complementing ShrayGet
+ *   @param address  start of memory we free. 
+ *          size     number of bytes starting from address to free.
  *
  ******************************************************************************/
 
-void ShrayGetFree(void *address);
+void ShrayDiscard(void *address, size_t size);
 
 /* The elipses are a function call block. Example usage:
  *

@@ -16,7 +16,7 @@ double reduce(double *arr, size_t n)
 	unsigned int s = ShrayRank();
 
     double sum = 0.0;
-    ShrayGet(arr + (s + 1) % p * n / p, n / p * sizeof(double));
+    ShrayPrefetch(arr + (s + 1) % p * n / p, n / p * sizeof(double));
 
     for (size_t i = 0; i < n / p; i++) {
         sum += arr[i + s * n / p];
@@ -25,10 +25,8 @@ double reduce(double *arr, size_t n)
     for (unsigned int t = 1; t < p; t++) {
         unsigned int rank = (t + s) % p;
 
-        ShrayGetComplete(arr + rank * n / p);
-
         if (t != p - 1) {
-            ShrayGet(arr + (rank + 1) % p * n / p, n / p * sizeof(double));
+            ShrayPrefetch(arr + (rank + 1) % p * n / p, n / p * sizeof(double));
         }
 
         for (size_t i = 0; i < n / p; i++) {
@@ -36,7 +34,7 @@ double reduce(double *arr, size_t n)
 //            if (ShrayRank() == 1) printf("%zu %lf\n", i + rank * n / p, arr[i + rank * n / p]);
         }
 
-        ShrayGetFree(arr + rank * n / p);
+        ShrayDiscard(arr + rank * n / p, n / p * sizeof(double));
     }
 
     return sum;

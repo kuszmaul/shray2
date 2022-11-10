@@ -16,6 +16,12 @@
  **************************************************/
 
 typedef struct {
+    uint64_t *bits;
+    /* Number of bits, not uint64_ts. */
+    size_t size;
+} Bitmap;
+
+typedef struct {
     size_t usedMemory;
     size_t maximumMemory;
 } Cache;
@@ -38,6 +44,11 @@ typedef struct Heap {
     /* Number of actual allocations in the allocs */
     unsigned int numberOfAllocs;
 } Heap;
+
+typedef struct {
+    size_t start;
+    size_t end;
+} Range;
 
 /**************************************************
  * Error handling

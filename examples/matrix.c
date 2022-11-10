@@ -19,7 +19,7 @@ void matmul(double *A, double *B, double *C, size_t n)
     /* Add A[s][t] B[t] to C. We start with t = s, and repeat the 
      * asynchronous get B[t + 1] - compute A[s][t] B[t] cycle. */
 
-    ShrayGet(B + n / p * n * ((s + 1) % p), n / p * n * sizeof(double));
+    ShrayPrefetch(B + n / p * n * ((s + 1) % p), n / p * n * sizeof(double));
     /* A[s][t] is a n / p x n / p matrix, B[t] an n / p x n matrix. So 
      * for the dgemm routine m = n / p, k = n / p, n = n. As B[t], C[t] are 
      * contiguous, we do not have to treat them as submatrices. We treat 
@@ -32,18 +32,16 @@ void matmul(double *A, double *B, double *C, size_t n)
         /* The block we calculate */
         int t = (i + s) % p;
 
-        ShrayGetComplete(B + n / p * n * t);
-
         /* Get the next block */
         if ((t + 1) % p != s) {
-            ShrayGet(B + n / p * n * ((t + 1) % p), n / p * n * sizeof(double));
+            ShrayPrefetch(B + n / p * n * ((t + 1) % p), n / p * n * sizeof(double));
         }
 
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                 n / p, n, n / p, 1.0, &A[s * n / p * n + t * n / p], n,
                 &B[t * n / p * n], n, 1.0, &C[s * n / p * n], n); 
 
-        ShrayGetFree(B + n / p * n * t);
+        ShrayDiscard(B + n / p * n * t, n / p * n * sizeof(double));
     }
 }
 

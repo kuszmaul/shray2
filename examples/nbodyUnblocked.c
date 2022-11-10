@@ -61,10 +61,6 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
     /* Accelerate with respect to P((s + t) % p) and prefetch the next block. */
     for (unsigned int t = 0; t < p; t++) {
         size_t Jstart = (s + t) % p * n / p;
-        if (t != 0) {
-            ShrayGetComplete(&positions[Jstart]);
-            ShrayGetComplete(&masses[Jstart]);
-        }
 
         for (size_t i = start; i < end; i++) {
             for (size_t j = Jstart; j < Jstart + n / p; j++) {
@@ -78,13 +74,13 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
         }
 
         if (t != 0) {
-            ShrayGetFree(&positions[Jstart]);
-            ShrayGetFree(&masses[Jstart]);
+            ShrayDiscard(&positions[Jstart], n / p * sizeof(Point));
+            ShrayDiscard(&masses[Jstart], n / p * sizeof(double));
         }
         
         if (t != p - 1) {
-            ShrayGet(&positions[(s + t + 1) % p * n / p], n / p * sizeof(Point));
-            ShrayGet(&masses[(s + t + 1) % p * n / p], n / p * sizeof(double));
+            ShrayPrefetch(&positions[(s + t + 1) % p * n / p], n / p * sizeof(Point));
+            ShrayPrefetch(&masses[(s + t + 1) % p * n / p], n / p * sizeof(double));
         }
     }
 }
