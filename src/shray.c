@@ -25,6 +25,12 @@ static size_t cacheLineSize;
 
 #include "utils.c"
 
+static void gasnetBarrier(void)
+{
+    gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS);
+    gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);
+}
+
 static int inRange(void *address, int index)
 {
     return ((uintptr_t)heap.allocs[index].location <= (uintptr_t)address) &&
@@ -68,23 +74,30 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
     void *address = si->si_addr;
     uintptr_t roundedAddress = (uintptr_t)address / ShrayPagesz * ShrayPagesz;
 
-    DBUG_PRINT("Segfault at %p.", address)
-
     Allocation *alloc = heap.allocs + findAlloc((void *)roundedAddress);
 
     size_t pageNumber = (roundedAddress - (uintptr_t)alloc->location) / ShrayPagesz;
 
     if (BitmapCheck(alloc->prefetched, pageNumber)) {
         Range range = BitmapSurrounding(alloc->prefetched, pageNumber);
+
+        DBUG_PRINT("%p is currently being prefetched, along with surrounding pages [%zu, %zu[",
+               address, range.start, range.end);
+
         gasnet_wait_syncnbi_gets();
 
         MPROTECT_SAFE((void *)((uintptr_t)alloc->location + range.start * ShrayPagesz),
                     (range.end - range.start) * ShrayPagesz, PROT_READ);
 
-        BitmapSetOnes(alloc->local, range.end, range.end);
+        DBUG_PRINT("We set pages [%zu, %zu[ to locally available, and to not waiting", 
+                range.start, range.end);
+
+        BitmapSetOnes(alloc->local, range.start, range.end);
         BitmapSetZeroes(alloc->prefetched, range.start, range.end);
     } else {
+        DBUG_PRINT("%p is not being prefetched, perform blocking fetch.", address);
         if (cache.usedMemory + ShrayPagesz > cache.maximumMemory) {
+            DBUG_PRINT("We free up %zu bytes of cache memory", cache.maximumMemory / 10);
             evict(alloc, cache.maximumMemory / 10);
         }
 
@@ -100,6 +113,9 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
         gasnet_get((void *)roundedAddress, owner, (void *)roundedAddress, ShrayPagesz);
 
         MPROTECT_SAFE((void *)roundedAddress, ShrayPagesz, PROT_READ);
+
+        DBUG_PRINT("We set pages [%zu, %zu[ to locally available.", 
+                pageNumber, pageNumber + 1);
 
         BitmapSetOnes(alloc->local, pageNumber, pageNumber + 1);
     }
