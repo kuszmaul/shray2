@@ -185,6 +185,9 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
      * anyone. */
     unsigned int lastOwner = min((end - 1 - location) / bytesPerBlock, Shray_size - 1);
 
+    BitmapSetOnes(alloc->prefetched, 
+            (start - location) / ShrayPagesz, (end - location) / ShrayPagesz);
+
     DBUG_PRINT("Get [%p, %p[ from nodes %d, ..., %d", (void *)start, (void *)end, firstOwner,
             lastOwner);
     assert(firstOwner > Shray_rank || lastOwner < Shray_rank);
@@ -202,9 +205,6 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 
         gasnet_get_nbi_bulk((void *)dest, rank, (void *)dest, nbytes);
     }
-
-    BitmapSetOnes(alloc->prefetched, 
-            (start - location) / ShrayPagesz, (end - location) / ShrayPagesz);
 }
 
 /* TODO */
@@ -323,9 +323,14 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     MPROTECT_SAFE((void *)firstPage, segmentSize, PROT_READ | PROT_WRITE);
 
+    size_t totalPages = (roundUp((uintptr_t)location + totalSize, ShrayPagesz) * ShrayPagesz -
+        (uintptr_t)location) / ShrayPagesz;
+
     heap.allocs[index].location = location;
     heap.allocs[index].size = totalSize;
     heap.allocs[index].bytesPerBlock = bytesPerBlock;
+    MALLOC_SAFE(heap.allocs[index].local.bits, roundUp(totalPages, 64));
+    MALLOC_SAFE(heap.allocs[index].prefetched.bits, roundUp(totalPages, 64));
 
     return location;
 }
@@ -388,6 +393,8 @@ void ShrayFree(void *address)
     /* We leave potentially two pages mapped due to the alignment in ShrayMalloc, but 
      * who cares. */
     MUNMAP_SAFE(heap.allocs[index].location, heap.allocs[index].size);
+    free(heap.allocs[index].prefetched.bits);
+    free(heap.allocs[index].local.bits);
     heap.numberOfAllocs--;
     while ((unsigned)index < heap.numberOfAllocs) {
         heap.allocs[index] = heap.allocs[index + 1];
@@ -429,13 +436,11 @@ void ShrayPrefetch(void *address, size_t size)
         roundUp(location + alloc->size, ShrayPagesz) * ShrayPagesz  :
         location + roundUp((Shray_rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
 
-    DBUG_PRINT("We are going to get [%p, %p[."
+    DBUG_PRINT("Prefetch issued for [%p, %p[."
             "\n\t\tOf this allocation, we already have [%p, %p[", 
             (void *)start, (void *)end, (void *)ourStart, (void *)ourEnd);
 
-    DBUG_PRINT("Get [%p, %p[", (void *)start, (void *)min(end, ourStart));
     helpPrefetch(start, min(end, ourStart), alloc);
-    DBUG_PRINT("Get [%p, %p[", (void *)max(start, ourEnd), (void *)end);
     helpPrefetch(max(start, ourEnd), end, alloc);
 }
 

@@ -1,10 +1,10 @@
 CC = gcc
 FLAGS = -Wall -Wextra -O3 -march=native
 
-all: bitmap
+all: bin/bitmap
 
-bin/bitmap: bitmap.c 
-	$(CC) $(FLAGS) $^ -o $@
+bin/bitmap: bitmap.c ../src/utils.c
+	$(CC) $(FLAGS) $< -o $@
 
 clean:
 	$(RM) bin/*

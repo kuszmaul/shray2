@@ -30,8 +30,8 @@ void relax(size_t n, double **in, double **out)
 {
     size_t start = MAX(ShrayStart(n), 1);
     size_t end = MIN(ShrayEnd(n), n - 1);
-    ShrayPrefetch((*in) + start * n, n * sizeof(double));
-    ShrayPrefetch((*in) + (end - 1) * n, n * sizeof(double));
+    ShrayPrefetch((*in) + (start - 1) * n, n * sizeof(double));
+    ShrayPrefetch((*in) + end * n, n * sizeof(double));
 
     /* Inner part */
     for (size_t i = start + 1; i < end - 1; i++) {
@@ -44,6 +44,7 @@ void relax(size_t n, double **in, double **out)
         }
     }
 
+    /* first row */
     for (size_t j = 1; j < n - 1; j++) {
         (*out)[start * n + j] = a * (*in)[(start - 1) * n + j] +
                          b * (*in)[start * n + j - 1] +
@@ -52,6 +53,7 @@ void relax(size_t n, double **in, double **out)
                          e * (*in)[(start + 1) * n + j];
     }
 
+    /* last row */
     for (size_t j = 1; j < n - 1; j++) {
         (*out)[start * n + j] = a * (*in)[(end - 1 - 1) * n + j] +
                          b * (*in)[(end - 1) * n + j - 1] +
@@ -60,8 +62,8 @@ void relax(size_t n, double **in, double **out)
                          e * (*in)[(end - 1 + 1) * n + j];
     }
 
-    ShrayDiscard((*in) + start * n, n * sizeof(double));
-    ShrayDiscard((*in) + (end - 1) * n, n * sizeof(double));
+    ShrayDiscard((*in) + (start - 1) * n, n * sizeof(double));
+    ShrayDiscard((*in) + end * n, n * sizeof(double));
 }
 
 void stencil(size_t n, double **in, double **out, int iterations)

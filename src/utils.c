@@ -25,7 +25,7 @@ static inline uintptr_t roundUp(uintptr_t a, uintptr_t b)
  *************************************************/
 
 /* Returns 0 iff the index'th bit of bitmap is 0. */
-static inline int BitmapCheck(Bitmap bitmap, size_t index)
+static inline uint64_t BitmapCheck(Bitmap bitmap, size_t index)
 {
     return bitmap.bits[index / 64] & (0x8000000000000000u >> (index % 64));
 }
@@ -67,15 +67,16 @@ static void BitmapSetZeroes(Bitmap bitmap, size_t start, size_t end)
     int lastZeroes = end % 64;
 
     if (firstZeroes != 64) {
-        bitmap.bits[start / 64] &= 0xFFFFFFFFFFFFFFFFu - ((1 << firstZeroes) - 1);
+        bitmap.bits[start / 64] &= 0xFFFFFFFFFFFFFFFFu - 
+            (((uint64_t)1 << firstZeroes) - 1);
     }
 
     if (lastZeroes != 0) {
-        bitmap.bits[end / 64] &= (1 << lastZeroes) - 1;
+        bitmap.bits[(end - 1) / 64] &= ((uint64_t)1 << lastZeroes) - 1;
     }
 
-    for (size_t i = start / 64; i <= (end - 1) / 64; i++) {
-        bitmap.bits[i / 64] = 0;
+    for (long i = start / 64 + 1; i < (long)(end - 1) / 64; i++) {
+        bitmap.bits[i] = 0;
     }
 }
 
@@ -87,15 +88,16 @@ static void BitmapSetOnes(Bitmap bitmap, size_t start, size_t end)
     int lastOnes = end % 64;
 
     if (firstOnes != 64) {
-        bitmap.bits[start / 64] |= (1 << firstOnes) - 1;
+        bitmap.bits[start / 64] |= ((uint64_t)1 << firstOnes) - 1;
     }
 
     if (lastOnes != 0) {
-        bitmap.bits[end / 64] |= 0xFFFFFFFFFFFFFFFFu - ((1 << (64 - lastOnes)) - 1);
+        bitmap.bits[(end - 1) / 64] |= 0xFFFFFFFFFFFFFFFFu -  (((uint64_t)1 << (64 - lastOnes)) - 1);
     }
 
-    for (size_t i = start / 64; i <= (end - 1) / 64; i++) {
-        bitmap.bits[i / 64] = 0xFFFFFFFFFFFFFFFFu;
+    printf("Set zero from int %zu to %zu\n", start / 64 + 1, (long)(end - 1)  / 64 - 1);
+    for (long i = start / 64 + 1; i < (long)(end - 1) / 64; i++) {
+        bitmap.bits[i] = 0xFFFFFFFFFFFFFFFFu;
     }
 }
 

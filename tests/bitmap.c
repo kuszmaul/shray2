@@ -46,15 +46,62 @@ int testSurrounding(void)
             range2.start == 64 && range2.end == 64 * 3 - 2); 
 }
 
+int testCheck(void)
+{
+    /* Only has a one on position 70 */
+    uint64_t *bits = malloc(2 * sizeof(uint64_t));
+    bits[0] = 0; bits[1] = 0x0200000000000000u;
+
+    Bitmap bitmap = {bits, 110};
+
+    printf("Only the 71th bit is one right?\n");
+    BitmapPrint(bitmap);
+
+    printf("Pos 70: %zu, Pos 69: %zu, Pos 71: %zu\n", BitmapCheck(bitmap, 70), 
+            BitmapCheck(bitmap, 69), BitmapCheck(bitmap, 71));
+
+    return (BitmapCheck(bitmap, 70) && !BitmapCheck(bitmap, 69) && !BitmapCheck(bitmap, 71)); 
+}
+
+void testSetting(void)
+{
+    /* The last two bits are dummies. */
+    uint64_t *bits = malloc(3 * sizeof(uint64_t));
+    bits[0] = 0xFFFFFFFFFFFFFFFFu; bits[1] = 0xFFFFFFFFFFFFFFFFu; bits[2] = 0xFFFFFFFFFFFFFFFFu;
+
+    Bitmap bitmap = {bits, 64 * 3 - 2};
+
+    printf("190 1s\n");
+    BitmapPrint(bitmap);
+
+    printf("We set [5, 180[ to 0\n");
+    BitmapSetZeroes(bitmap, 5, 180);
+    BitmapPrint(bitmap);
+
+    printf("We set [6, 179[ to 1\n");
+    BitmapSetOnes(bitmap, 6, 179);
+    BitmapPrint(bitmap);
+
+    free(bits);
+}
+
 int main(void)
 {
     testPrint();
 
-    if (testSurrounding) {
+    if (testSurrounding()) {
         printf("BitmapSurrounding works as expected\n");
     } else {
         printf("BitmapSurrounding does not work as expected\n");
     }
+
+    if (testCheck()) {
+        printf("BitmapCheck works as expected\n");
+    } else {
+        printf("BitmapCheck does not work as expected\n");
+    }
+
+    testSetting();
 
     return 0;
 }
