@@ -72,7 +72,7 @@ static void BitmapSetZeroes(Bitmap bitmap, size_t start, size_t end)
     }
 
     if (lastZeroes != 0) {
-        bitmap.bits[(end - 1) / 64] &= ((uint64_t)1 << lastZeroes) - 1;
+        bitmap.bits[(end - 1) / 64] &= ((uint64_t)1 << (64 - lastZeroes)) - 1;
     }
 
     for (long i = start / 64 + 1; i < (long)(end - 1) / 64; i++) {
@@ -107,33 +107,51 @@ static Range BitmapSurrounding(Bitmap bitmap, size_t index)
 {
     Range range;
 
-    size_t toTheRight = index / 64;
-    size_t toTheLeft = index / 64;
-    range.end = index + countBitsRight(bitmap.bits[toTheRight], index % 64);
-    range.start = index - countBitsLeft(bitmap.bits[toTheLeft], index % 64);
-    toTheRight++;
+    range.start = index + 1 - countBitsLeft(bitmap.bits[index / 64], index % 64);
+    /* We have 1s until the start of this integer and it is not the first. */
+    if (range.start % 64 == 0 && index / 64 != 0) {
+        size_t toTheLeft = index / 64 - 1;
 
-    while (bitmap.bits[toTheRight] == 0xFFFFFFFFFFFFFFFFu && 
-            toTheRight < roundUp(bitmap.size, 64)) 
-    {
-        range.end += 64;
-        toTheRight++;
+        while (toTheLeft > 0 && bitmap.bits[toTheLeft] == 0xFFFFFFFFFFFFFFFFu) {
+            range.start -= 64;
+            toTheLeft--;
+        }
+
+        /* In this case we have taken the left-most integer into account already. */
+        if (!(index / 64 == 0 && toTheLeft == 0)) {
+            range.start -= countBitsLeft(bitmap.bits[toTheLeft], 63);
+        }
     }
 
-    while (bitmap.bits[toTheLeft] == 0xFFFFFFFFFFFFFFFFu &&
-            toTheLeft > 0)
-    {
-        range.start -= 64;
-        toTheLeft--;
+    /* We are the last integer. */
+    if (index / 64 == (bitmap.size - 1) / 64) {
+        range.end = min(index + countBitsRight(bitmap.bits[index / 64], index % 64), 
+                bitmap.size);
+        return range;
     }
 
-    range.start -= countBitsRight(bitmap.bits[toTheLeft], 0);
+    range.end = index + countBitsRight(bitmap.bits[index / 64], index % 64);
 
-    if (toTheRight == (bitmap.size + 63) / 64) {
-        /* Last integer in the bitmap. */
-        range.end += max(bitmap.size % 64, countBitsRight(bitmap.bits[toTheRight], 0)); 
-    } else {
-        range.end += countBitsRight(bitmap.bits[toTheRight], 0);
+    /* We have 1s until the end of this integer and we are not the last integer. */
+    if (range.end % 64 == 0) {
+        size_t toTheRight = index / 64 + 1;
+
+        while (toTheRight < (bitmap.size - 1) / 64 && 
+                bitmap.bits[toTheRight] == 0xFFFFFFFFFFFFFFFFu)
+        {
+            range.end += 64;
+            toTheRight++;
+        }
+
+        /* We are not the last integer in the bitmap. */
+        if (toTheRight < (bitmap.size - 1) / 64) {
+            range.end += countBitsRight(bitmap.bits[toTheRight], 0);
+        }
+
+        /* We are the last integer in the bitmap. */
+        if (toTheRight == (bitmap.size - 1) / 64) {
+            range.end += min(countBitsRight(bitmap.bits[toTheRight], 0), bitmap.size % 64);
+        }
     }
 
     return range;

@@ -34,16 +34,21 @@ int testSurrounding(void)
     uint64_t *bits = malloc(3 * sizeof(uint64_t));
     bits[0] = 0x0FFFFFFFFFFFFFF8u; bits[1] = 0xFFFFFFFFFFFFFFFFu; bits[2] = 0xFFFFFFFFFFFFFFFFu;
 
-    Bitmap bitmap = {bits, 64 * 3 - 2};
+    Bitmap bitmap = {bits, 190};
 
-    /* Should be [4, 61[ for 3 < index < 61, and [64, 64 * 3 - 2[ index > 63. */
+    /* Should be [4, 61[ for 3 < index < 61, and [64, 190[ index > 63. */
     Range range1 = BitmapSurrounding(bitmap, 17); 
     Range range2 = BitmapSurrounding(bitmap, 100); 
+    Range range3 = BitmapSurrounding(bitmap, 188); 
 
     free(bits);
 
+//    printf("[%zu, %zu[ [%zu, %zu[ [%zu, %zu[\n", 
+//            range1.start, range1.end, range2.start, range2.end, range3.start, range3.end);
+
     return (range1.start == 4 && range1.end == 61 && 
-            range2.start == 64 && range2.end == 64 * 3 - 2); 
+            range2.start == 64 && range2.end == 190 && 
+            range3.start == 64 && range3.end == 190); 
 }
 
 int testCheck(void)
@@ -85,6 +90,12 @@ void testSetting(void)
     free(bits);
 }
 
+int testCount(void)
+{
+    uint64_t bla = 0xF0F0F0F0F0F0F0F0u;
+    return (countBitsLeft(bla, 8) == 1) && (countBitsRight(bla, 0) == 4);
+}
+
 int main(void)
 {
     testPrint();
@@ -99,6 +110,12 @@ int main(void)
         printf("BitmapCheck works as expected\n");
     } else {
         printf("BitmapCheck does not work as expected\n");
+    }
+
+    if (testCount()) {
+        printf("countBitsRight and countBitsLeft work as expected\n");
+    } else {
+        printf("countBitsRight and countBitsLeft do not work as expected\n");
     }
 
     testSetting();
