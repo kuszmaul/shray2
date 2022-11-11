@@ -340,10 +340,10 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     heap.allocs[index].size = totalSize;
     heap.allocs[index].bytesPerBlock = bytesPerBlock;
     heap.allocs[index].usedMemory = 0;
-//    BitmapCreate(&(heap.allocs[index].local), totalPages);
-//    BitmapCreate(&(heap.allocs[index].prefetched), totalPages);
-    MALLOC_SAFE(heap.allocs[index].local.bits, roundUp(totalPages, 64));
-    MALLOC_SAFE(heap.allocs[index].prefetched.bits, roundUp(totalPages, 64));
+    BitmapCreate(&(heap.allocs[index].local), totalPages);
+    BitmapCreate(&(heap.allocs[index].prefetched), totalPages);
+//    MALLOC_SAFE(heap.allocs[index].local.bits, roundUp(totalPages, 64));
+//    MALLOC_SAFE(heap.allocs[index].prefetched.bits, roundUp(totalPages, 64));
 
     return location;
 }

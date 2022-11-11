@@ -13,7 +13,7 @@
 
 #define TEST(function)                                        \
     {                                                       \
-        if (#function) {                                     \
+        if (function) {                                     \
             printf("%s was succesfull\n", #function);         \
         } else {                                            \
             printf("%s was unsuccesfull\n", #function);      \
@@ -80,9 +80,6 @@ int testCheck(void)
     printf("Only the 71th bit is one right?\n");
     BitmapPrint(bitmap);
 
-    printf("Pos 70: %zu, Pos 69: %zu, Pos 71: %zu\n", BitmapCheck(bitmap, 70), 
-            BitmapCheck(bitmap, 69), BitmapCheck(bitmap, 71));
-
     return (BitmapCheck(bitmap, 70) && !BitmapCheck(bitmap, 69) && !BitmapCheck(bitmap, 71)); 
 }
 
@@ -122,20 +119,20 @@ int testStencil(void)
     BitmapSetZeroes(bitmap, 0, 100000);
     BitmapSetOnes(bitmap, 97637, 97656);
 
-    int success = BitmapCheck(bitmap, 97636);
+    int success = !BitmapCheck(bitmap, 97636);
     free(bitmap.bits);
 
-    return (success) ? 1 : 0;
+    return success;
 }
 
 int main(void)
 {
     testPrint();
 
-    TEST(testSurrounding);
-    TEST(testCheck);
-    TEST(testCount);
-    TEST(testStencil);
+    TEST(testSurrounding());
+    TEST(testCheck());
+    TEST(testCount());
+    TEST(testStencil());
 
     testSetting();
 

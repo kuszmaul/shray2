@@ -26,14 +26,14 @@ static inline uintptr_t roundUp(uintptr_t a, uintptr_t b)
 
 void BitmapCreate(Bitmap *bitmap, size_t size)
 {
-    MALLOC_SAFE(bitmap->bits, roundUp(size, 64));
+    MALLOC_SAFE(bitmap->bits, roundUp(size, 64) * sizeof(uint64_t));
     bitmap->size = size;
 }
 
-/* Returns 0 iff the index'th bit of bitmap is 0. */
-static inline uint64_t BitmapCheck(Bitmap bitmap, size_t index)
+/* Returns true iff the index'th bit of bitmap is 1. */
+static inline int BitmapCheck(Bitmap bitmap, size_t index)
 {
-    return bitmap.bits[index / 64] & (0x8000000000000000u >> (index % 64));
+    return ((bitmap.bits[index / 64] & (0x8000000000000000u >> (index % 64))) != (uint64_t)0);
 }
 
 /* FIXME Can we get rid of the loop by a smart number theory thing? */
