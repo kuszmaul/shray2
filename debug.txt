@@ -1,0 +1,66 @@
+mpirun -n 2 st -e gdb --args bin/2dstencil_debug 10000 1
+SHRAY_CACHELINE=1
+SHRAY_CACHESIZE=4096000
+
+
+        [node 1]: Made a DSM allocation [0x7fffb850d000, 0x7fffe7ffd800[, of which we own [0x7fffd0285400, 0x7fffe7ffd800[.
+        [node 1]: Made a DSM allocation [0x7fff88a1a000, 0x7fffb850a800[, of which we own [0x7fffa0792400, 0x7fffb850a800[.
+        [node 1]: Update page 0x7fffd0285000 of allocation 0x7fffb850d000
+        [node 1]: UpdatePage: we communicate with nodes 0, ..., 1.
+        [node 1]: UpdatePage: we get [0x7fffd0285000, 0x7fffd0285400[ from 0
+        [node 1]: Update page 0x7fffe7ffd000 of allocation 0x7fffb850d000
+        [node 1]: UpdatePage: we communicate with nodes 1, ..., 1.
+        [node 1]: We are done updating pages for 0x7fffb850d000
+        [node 1]: Prefetch issued for [0x7fffd0271b80, 0x7fffd0285400[, we actually get [0x7fffd0272000, 0x7fffd0285000[.
+        [node 1]: We set page numbers [97637, 97656[ to prefetched.
+        [node 1]: Prefetch [0x7fffd0272000, 0x7fffd0285000[ from nodes 0, ..., 0
+        [node 1]: We prefetch [0x7fffd0272000, 0x7fffd0285000[ from node 0
+        [node 1]: Prefetch issued for [0x7fffe7fe9f80, 0x7fffe7ffd800[, we actually get [0x7fffe7fea000, 0x7fffe7ffd000[.
+Done with inner part
+
+Thread 1 "2dstencil_debug" received signal SIGSEGV, Segmentation fault.
+0x000055555556bc72 in relax ()
+(gdb) n
+Single stepping until exit from function relax,
+which has no line number information.
+SegvHandler (sig=11, si=0x7fffffffce70, unused=0x7fffffffcd40) at src/shray.c:72
+72      {
+(gdb)
+74          void *address = si->si_addr;
+(gdb)
+75          uintptr_t roundedAddress = (uintptr_t)address / ShrayPagesz * ShrayPagesz;
+(gdb)
+77          Allocation *alloc = heap.allocs + findAlloc((void *)roundedAddress);
+(gdb) print roundedAddress
+$1 = 140736685608960
+(gdb) print (void *)roundedAddress
+$2 = (void *) 0x7fffd0271000
+(gdb) n
+79          size_t pageNumber = (roundedAddress - (uintptr_t)alloc->location) / ShrayPagesz;
+(gdb) print pageNumber
+$3 = <optimized out>
+(gdb) print alloc->location
+$4 = (void *) 0x7fffb850d000
+(gdb) print (uintptr_t)alloc->location
+$5 = 140736285691904
+(gdb) n
+81          if (BitmapCheck(alloc->prefetched, pageNumber)) {
+(gdb) print pageNumber
+$6 = 97636
+(gdb) n
+82              Range range = BitmapSurrounding(alloc->prefetched, pageNumber);
+(gdb)
+54          while (integer & mask) {
+(gdb)
+82              Range range = BitmapSurrounding(alloc->prefetched, pageNumber);
+(gdb)
+84              DBUG_PRINT("%p is currently being prefetched, along with [%p, %p[",
+(gdb)
+        [node 1]: 0x7fffd0271b88 is currently being prefetched, along with [0x7fffd024d000, 0x7fffd028d000[
+88              gasnet_wait_syncnbi_gets();
+(gdb)
+
+Claims to have prefetched something that is not true. Like the start has been rounded down 
+instead of up.  helpPrefetch has calculated the page number correctly, namely 97637. 
+The question is, why is [97600, 97637[ set to one? Or is there a mistake in the 
+range check and BitmapCheck?

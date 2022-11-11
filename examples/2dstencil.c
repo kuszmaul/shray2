@@ -44,6 +44,8 @@ void relax(size_t n, double **in, double **out)
         }
     }
 
+    printf("Done with inner part\n");
+
     /* first row */
     for (size_t j = 1; j < n - 1; j++) {
         (*out)[start * n + j] = a * (*in)[(start - 1) * n + j] +

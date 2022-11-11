@@ -2,6 +2,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define MALLOC_SAFE(variable, size)                                                     \
+    {                                                                                   \
+        variable = malloc(size);                                                        \
+        if (variable == NULL) {                                                         \
+            fprintf(stderr, "Line %d: malloc failed with size %zu\n",                   \
+                    __LINE__, size);                                                    \
+        }                                                                               \
+    }
+
+#define TEST(function)                                        \
+    {                                                       \
+        if (#function) {                                     \
+            printf("%s was succesfull\n", #function);         \
+        } else {                                            \
+            printf("%s was unsuccesfull\n", #function);      \
+        }                                                   \
+    }
+
 typedef struct {
     uint64_t *bits;
     /* Number of bits, not uint64_ts. */
@@ -96,27 +114,28 @@ int testCount(void)
     return (countBitsLeft(bla, 8) == 1) && (countBitsRight(bla, 0) == 4);
 }
 
+int testStencil(void)
+{
+    Bitmap bitmap;
+    BitmapCreate(&bitmap, 100000);
+
+    BitmapSetZeroes(bitmap, 0, 100000);
+    BitmapSetOnes(bitmap, 97637, 97656);
+
+    int success = BitmapCheck(bitmap, 97636);
+    free(bitmap.bits);
+
+    return (success) ? 1 : 0;
+}
+
 int main(void)
 {
     testPrint();
 
-    if (testSurrounding()) {
-        printf("BitmapSurrounding works as expected\n");
-    } else {
-        printf("BitmapSurrounding does not work as expected\n");
-    }
-
-    if (testCheck()) {
-        printf("BitmapCheck works as expected\n");
-    } else {
-        printf("BitmapCheck does not work as expected\n");
-    }
-
-    if (testCount()) {
-        printf("countBitsRight and countBitsLeft work as expected\n");
-    } else {
-        printf("countBitsRight and countBitsLeft do not work as expected\n");
-    }
+    TEST(testSurrounding);
+    TEST(testCheck);
+    TEST(testCount);
+    TEST(testStencil);
 
     testSetting();
 

@@ -34,6 +34,7 @@ typedef struct Allocation {
     size_t bytesPerBlock;
     Bitmap local;
     Bitmap prefetched;
+    size_t usedMemory;
 } Allocation;
 
 typedef struct Heap {

@@ -24,6 +24,12 @@ static inline uintptr_t roundUp(uintptr_t a, uintptr_t b)
  * Bitmap stuff 
  *************************************************/
 
+void BitmapCreate(Bitmap *bitmap, size_t size)
+{
+    MALLOC_SAFE(bitmap->bits, roundUp(size, 64));
+    bitmap->size = size;
+}
+
 /* Returns 0 iff the index'th bit of bitmap is 0. */
 static inline uint64_t BitmapCheck(Bitmap bitmap, size_t index)
 {

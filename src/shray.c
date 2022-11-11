@@ -103,6 +103,7 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
         }
 
         cache.usedMemory += ShrayPagesz;
+        alloc->usedMemory += ShrayPagesz;
 
         uintptr_t difference = roundedAddress - (uintptr_t)alloc->location;
         unsigned int owner = difference / alloc->bytesPerBlock;
@@ -186,11 +187,14 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
      * anyone. */
     unsigned int lastOwner = min((end - 1 - location) / bytesPerBlock, Shray_size - 1);
 
+    DBUG_PRINT("We set page numbers [%zu, %zu[ to prefetched.", 
+            (start - location) / ShrayPagesz, (end - location) / ShrayPagesz);
+
     BitmapSetOnes(alloc->prefetched, 
             (start - location) / ShrayPagesz, (end - location) / ShrayPagesz);
 
-    DBUG_PRINT("Get [%p, %p[ from nodes %d, ..., %d", (void *)start, (void *)end, firstOwner,
-            lastOwner);
+    DBUG_PRINT("Prefetch [%p, %p[ from nodes %d, ..., %d", 
+            (void *)start, (void *)end, firstOwner, lastOwner);
     assert(firstOwner > Shray_rank || lastOwner < Shray_rank);
 
     for (unsigned int rank = firstOwner; rank <= lastOwner; rank++) {
@@ -202,16 +206,21 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
         uintptr_t dest = max(start, theirStart);
         size_t nbytes = min(end, theirEnd) - max(start, theirStart);
 
-        DBUG_PRINT("We get [%p, %p[ from node %d", (void *)dest, (void *)(dest + nbytes), rank);
+        DBUG_PRINT("We prefetch [%p, %p[ from node %d", 
+                (void *)dest, (void *)(dest + nbytes), rank);
 
         gasnet_get_nbi_bulk((void *)dest, rank, (void *)dest, nbytes);
     }
 }
 
-/* TODO */
-static void resetCache(void)
+/* Resetting the protections is done by ShrayRealloc and ShraySync */
+static void resetCache(Allocation *alloc)
 {
-    return;
+    cache.usedMemory -= alloc->usedMemory;  
+    alloc->usedMemory = 0;
+    BitmapSetZeroes(alloc->local, 0, alloc->local.size);
+    BitmapSetZeroes(alloc->prefetched, 0, alloc->prefetched.size);
+    gasnet_wait_syncnbi_gets();
 }
 
 /*****************************************************
@@ -330,6 +339,9 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     heap.allocs[index].location = location;
     heap.allocs[index].size = totalSize;
     heap.allocs[index].bytesPerBlock = bytesPerBlock;
+    heap.allocs[index].usedMemory = 0;
+//    BitmapCreate(&(heap.allocs[index].local), totalPages);
+//    BitmapCreate(&(heap.allocs[index].prefetched), totalPages);
     MALLOC_SAFE(heap.allocs[index].local.bits, roundUp(totalPages, 64));
     MALLOC_SAFE(heap.allocs[index].prefetched.bits, roundUp(totalPages, 64));
 
@@ -353,7 +365,7 @@ void ShrayRealloc(void *array)
     gasnetBarrier();
     BARRIERCOUNT;
 
-    resetCache();
+    resetCache(heap.allocs + findAlloc(array));
 }
 
 void ShraySync(void *array)
@@ -377,7 +389,7 @@ void ShraySync(void *array)
     gasnet_wait_syncnbi_gets();
     DBUG_PRINT("We are done updating pages for %p", array);
 
-    resetCache();
+    resetCache(heap.allocs + findAlloc(array));
 
     /* So no one reads from use before the communications are completed. */
     gasnetBarrier();
@@ -437,9 +449,8 @@ void ShrayPrefetch(void *address, size_t size)
         roundUp(location + alloc->size, ShrayPagesz) * ShrayPagesz  :
         location + roundUp((Shray_rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
 
-    DBUG_PRINT("Prefetch issued for [%p, %p[."
-            "\n\t\tOf this allocation, we already have [%p, %p[", 
-            (void *)start, (void *)end, (void *)ourStart, (void *)ourEnd);
+    DBUG_PRINT("Prefetch issued for [%p, %p[, we actually get [%p, %p[.",
+            address, (void *)((uintptr_t)address + size), (void *)start, (void *)end);
 
     helpPrefetch(start, min(end, ourStart), alloc);
     helpPrefetch(max(start, ourEnd), end, alloc);
@@ -470,6 +481,7 @@ void ShrayDiscard(void *address, size_t size)
     BitmapSetZeroes(alloc->local, firstPageNumber, lastPageNumber);
 
     cache.usedMemory -= (lastPageNumber - firstPageNumber) * ShrayPagesz;
+    alloc->usedMemory -= (lastPageNumber - firstPageNumber) * ShrayPagesz;
 }
 
 void ShrayReport(void)
