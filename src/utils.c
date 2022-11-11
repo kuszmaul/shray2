@@ -95,7 +95,6 @@ static void BitmapSetOnes(Bitmap bitmap, size_t start, size_t end)
         bitmap.bits[(end - 1) / 64] |= 0xFFFFFFFFFFFFFFFFu -  (((uint64_t)1 << (64 - lastOnes)) - 1);
     }
 
-    printf("Set zero from int %zu to %zu\n", start / 64 + 1, (long)(end - 1)  / 64 - 1);
     for (long i = start / 64 + 1; i < (long)(end - 1) / 64; i++) {
         bitmap.bits[i] = 0xFFFFFFFFFFFFFFFFu;
     }

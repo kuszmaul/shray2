@@ -81,15 +81,16 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
     if (BitmapCheck(alloc->prefetched, pageNumber)) {
         Range range = BitmapSurrounding(alloc->prefetched, pageNumber);
 
-        DBUG_PRINT("%p is currently being prefetched, along with surrounding pages [%zu, %zu[",
-               address, range.start, range.end);
+        DBUG_PRINT("%p is currently being prefetched, along with [%p, %p[",
+               address, (void *)((uintptr_t)alloc->location + range.start * ShrayPagesz), 
+               (void *)((uintptr_t)alloc->location + range.end * ShrayPagesz));
 
         gasnet_wait_syncnbi_gets();
 
         MPROTECT_SAFE((void *)((uintptr_t)alloc->location + range.start * ShrayPagesz),
                     (range.end - range.start) * ShrayPagesz, PROT_READ);
 
-        DBUG_PRINT("We set pages [%zu, %zu[ to locally available, and to not waiting", 
+        DBUG_PRINT("We set numbers [%zu, %zu[ to locally available, and to not waiting", 
                 range.start, range.end);
 
         BitmapSetOnes(alloc->local, range.start, range.end);
@@ -459,11 +460,11 @@ void ShrayDiscard(void *address, size_t size)
     gasnet_wait_syncnbi_gets();
 
     MUNMAP_SAFE((void *)actualStart, actualEnd - actualStart);
-    MMAP_SAFE(address, mmap(address, actualEnd - actualStart, PROT_NONE, 
+    MMAP_SAFE(address, mmap((void *)actualStart, actualEnd - actualStart, PROT_NONE, 
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
 
-    size_t firstPageNumber = actualStart / ShrayPagesz;
-    size_t lastPageNumber = actualEnd / ShrayPagesz;
+    size_t firstPageNumber = (actualStart - (uintptr_t)alloc->location) / ShrayPagesz;
+    size_t lastPageNumber = (actualEnd - (uintptr_t)alloc->location) / ShrayPagesz;
 
     BitmapSetZeroes(alloc->prefetched, firstPageNumber, lastPageNumber);
     BitmapSetZeroes(alloc->local, firstPageNumber, lastPageNumber);
