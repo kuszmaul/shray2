@@ -125,7 +125,7 @@ int BitmapCheck(Bitmap *bitmap, size_t index)
     return ((bitmap->bits[integer(index)] & (0x8000000000000000u >> bit(index))) != (uint64_t)0);
 }
 
-/* Sets [start, end[ to zero. TODO use memset*/
+/* Sets [start, end[ to zero. */
 void BitmapSetZeroes(Bitmap *bitmap, size_t start, size_t end)
 {
     /* Number of bits to be set to zero in the first / last uint64_t. */
@@ -149,12 +149,14 @@ void BitmapSetZeroes(Bitmap *bitmap, size_t start, size_t end)
         bitmap->bits[(end - 1) / 64] &= lastZeroesBits;
     }
 
+    /* Sets the rest of the bits to 0, one integer at a time. Did not use memset as it uses 
+     * char, whose size and representation is implementation defined */
     for (long i = start / 64 + 1; i < (long)(end - 1) / 64; i++) {
         bitmap->bits[i] = 0;
     }
 }
 
-/* Sets [start, end[ to one. TODO use memset */
+/* Sets [start, end[ to one. */
 void BitmapSetOnes(Bitmap *bitmap, size_t start, size_t end)
 {
     /* Number of bits to be set to one in the first / last uint64_t. */
@@ -178,6 +180,8 @@ void BitmapSetOnes(Bitmap *bitmap, size_t start, size_t end)
         bitmap->bits[endIndex] |= lastOneBits;
     }
 
+    /* Sets the rest of the bits to 1, one integer at a time. Did not use memset as it uses 
+     * char, whose size and representation is implementation defined */
     for (long i = start / 64 + 1; i < (long)(end - 1) / 64; i++) {
         bitmap->bits[i] = 0xFFFFFFFFFFFFFFFFu;
     }
