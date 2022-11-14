@@ -92,13 +92,22 @@ static void BitmapSetOnes(Bitmap bitmap, size_t start, size_t end)
     /* Number of bits to be set to one in the first / last uint64_t. */
     int firstOnes = 64 - start % 64;
     int lastOnes = end % 64;
+    size_t startIndex = start / 64;
+    size_t endIndex = (end - 1) / 64;
+    uint64_t firstOneBits = ((uint64_t)1 << firstOnes) - 1;
+    uint64_t lastOneBits = 0xFFFFFFFFFFFFFFFFu -  (((uint64_t)1 << (64 - lastOnes)) - 1);
+
+    if (startIndex == endIndex) {
+        bitmap.bits[startIndex] |= firstOneBits & lastOneBits;
+        return;
+    }
 
     if (firstOnes != 64) {
-        bitmap.bits[start / 64] |= ((uint64_t)1 << firstOnes) - 1;
+        bitmap.bits[startIndex] |= firstOneBits;
     }
 
     if (lastOnes != 0) {
-        bitmap.bits[(end - 1) / 64] |= 0xFFFFFFFFFFFFFFFFu -  (((uint64_t)1 << (64 - lastOnes)) - 1);
+        bitmap.bits[endIndex] |= lastOneBits;
     }
 
     for (long i = start / 64 + 1; i < (long)(end - 1) / 64; i++) {
