@@ -1,4 +1,6 @@
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <shray2/shray.h>
 

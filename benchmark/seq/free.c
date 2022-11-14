@@ -33,10 +33,9 @@
             fprintf(stderr, "Unmapping [%p, %p[\n", address,                            \
                     (void *)((uintptr_t)address + length));                             \
             perror("munmap failed");                                                    \
+            exit(EXIT_FAILURE);                                                         \
         }                                                                               \
     }
-
-
 
 int main(int argc, char **argv)
 {

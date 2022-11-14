@@ -105,6 +105,18 @@ void testSetting(void)
     free(bits);
 }
 
+void testSetting2(void)
+{
+    Bitmap bitmap;
+    BitmapCreate(&bitmap, 1000);
+
+    BitmapSetZeroes(bitmap, 0, 1000);
+    /* Only 960 zeroes after this. That is exactly 976 / 64 * 64 */
+    BitmapSetOnes(bitmap, 976, 983);
+
+    BitmapPrint(bitmap);
+}
+
 int testCount(void)
 {
     uint64_t bla = 0xF0F0F0F0F0F0F0F0u;
@@ -118,6 +130,10 @@ int testStencil(void)
 
     BitmapSetZeroes(bitmap, 0, 100000);
     BitmapSetOnes(bitmap, 97637, 97656);
+
+    for (size_t i = 0; i < 100000; i++) {
+        if (BitmapCheck(bitmap, i)) printf("%zu\n", i);
+    }
 
     int success = !BitmapCheck(bitmap, 97636);
     free(bitmap.bits);
@@ -135,6 +151,8 @@ int main(void)
     TEST(testStencil());
 
     testSetting();
+
+    testSetting2();
 
     return 0;
 }

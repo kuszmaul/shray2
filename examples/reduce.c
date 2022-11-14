@@ -1,5 +1,7 @@
 #include <shray2/shray.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 void init(double *arr, size_t n)
 {

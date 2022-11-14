@@ -10,16 +10,11 @@
 #include <gasnet_coll.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include "bitmap.h"
 
 /**************************************************
  * Data structures
  **************************************************/
-
-typedef struct {
-    uint64_t *bits;
-    /* Number of bits, not uint64_ts. */
-    size_t size;
-} Bitmap;
 
 typedef struct {
     size_t usedMemory;
@@ -32,8 +27,8 @@ typedef struct Allocation {
     size_t size;
     /* The number of bytes owned by each node except the last one. */
     size_t bytesPerBlock;
-    Bitmap local;
-    Bitmap prefetched;
+    Bitmap *local;
+    Bitmap *prefetched;
     size_t usedMemory;
 } Allocation;
 
@@ -45,11 +40,6 @@ typedef struct Heap {
     /* Number of actual allocations in the allocs */
     unsigned int numberOfAllocs;
 } Heap;
-
-typedef struct {
-    size_t start;
-    size_t end;
-} Range;
 
 /**************************************************
  * Error handling

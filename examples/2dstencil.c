@@ -10,6 +10,9 @@
 #include <assert.h>
 #include <shray2/shray.h>
 
+#define MAX(a, b) ((a) > (b)) ? (a) : (b)
+#define MIN(a, b) ((a) > (b)) ? (b) : (a)
+
 /* The coefficients of the five-point stencil. */
 const double a = 0.50;
 const double b = 0.33;

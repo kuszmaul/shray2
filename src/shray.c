@@ -2,7 +2,9 @@
  * phi_s(k) = k + s * roundUp(n, p), in the higher dimensional case,
  * we distribute blockwise along the first dimension. */
 
+#include "shray.h"
 #include "../include/shray2/shray.h"
+#include "bitmap.h"
 #include <assert.h>
 
 /*****************************************************
@@ -23,7 +25,21 @@ static size_t cacheLineSize;
  * Helper functions
  *****************************************************/
 
-#include "utils.c"
+static inline size_t max(size_t x, size_t y)
+{
+    return x > y ? x : y;
+}
+
+static inline size_t min(size_t x, size_t y)
+{
+    return x < y ? x : y;
+}
+
+/* Returns ceil(a / b) */
+static inline uintptr_t roundUp(uintptr_t a, uintptr_t b)
+{
+    return (a + b - 1) / b;
+}
 
 static void gasnetBarrier(void)
 {
@@ -257,8 +273,8 @@ static void resetCache(Allocation *alloc)
 {
     cache.usedMemory -= alloc->usedMemory;  
     alloc->usedMemory = 0;
-    BitmapSetZeroes(alloc->local, 0, alloc->local.size);
-    BitmapSetZeroes(alloc->prefetched, 0, alloc->prefetched.size);
+    BitmapSetZeroes(alloc->local, 0, alloc->local->size);
+    BitmapSetZeroes(alloc->prefetched, 0, alloc->prefetched->size);
     gasnet_wait_syncnbi_gets();
 }
 
@@ -379,10 +395,8 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     heap.allocs[index].size = totalSize;
     heap.allocs[index].bytesPerBlock = bytesPerBlock;
     heap.allocs[index].usedMemory = 0;
-    BitmapCreate(&(heap.allocs[index].local), totalPages);
-    BitmapCreate(&(heap.allocs[index].prefetched), totalPages);
-//    MALLOC_SAFE(heap.allocs[index].local.bits, roundUp(totalPages, 64));
-//    MALLOC_SAFE(heap.allocs[index].prefetched.bits, roundUp(totalPages, 64));
+    heap.allocs[index].local = BitmapCreate(totalPages);
+    heap.allocs[index].prefetched = BitmapCreate(totalPages);
 
     return location;
 }
@@ -445,8 +459,8 @@ void ShrayFree(void *address)
     /* We leave potentially two pages mapped due to the alignment in ShrayMalloc, but 
      * who cares. */
     MUNMAP_SAFE(heap.allocs[index].location, heap.allocs[index].size);
-    free(heap.allocs[index].prefetched.bits);
-    free(heap.allocs[index].local.bits);
+    BitmapFree(heap.allocs[index].local);
+    BitmapFree(heap.allocs[index].prefetched);
     heap.numberOfAllocs--;
     while ((unsigned)index < heap.numberOfAllocs) {
         heap.allocs[index] = heap.allocs[index + 1];

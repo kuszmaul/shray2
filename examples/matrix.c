@@ -1,5 +1,7 @@
 #include <shray2/shray.h>
 #include <cblas.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 /* Initializes n x n matrix to value. */
 void init(double *matrix, size_t n, double value)

@@ -1,7 +1,9 @@
 #ifndef SHRAY__GUARD
 #define SHRAY__GUARD
 
-#include "shrayInternal.h"
+#include <stddef.h>
+#include <stdbool.h>
+#include <sys/time.h>
 
 /** <!--********************************************************************-->
  *
