@@ -61,8 +61,37 @@ static int findAlloc(void *segfault)
     return middle;
 }
 
-/* Evicts at least size bytes from the index'th allocation. 
+/* Evicts at least size bytes from the index'th allocation.
  * FIXME What would be a suitable algorithm here? */
+
+// FIFO
+//
+// - When eviction is needed: go through the list starting at the front and delete
+// until you have enough space: O(n) where n is the size of the cache
+// - Insertion O(1)
+// - Deletion O(1)
+//
+// problem: evict is called in the signal handler, can not do memory allocations
+// solution: use a ringbuffer
+//
+// problem: need to update bookkeeping but cache contains no such information
+// solution: each cache entry contains some additional data: pointer to
+// allocation entry
+//
+// ----
+// LFU:
+// For LFU the issue is that we don't know how often a cache entry is used.
+// memory accesses are implicit, we only notice segmentation faults.
+//
+// This is also the reason why any frequency-based algorithm will not work
+// without some to way actually track access. We could allow users to provide
+// this information but that (1) increases the burden on the user and (2) is
+// hard to predict and get right.
+//
+// ----
+// LRU:
+// same issue as with LFU, we can't track proper accesses since no page fault
+// occurs and it is implicitly handled by the system
 static void evict(Allocation *alloc, size_t size)
 {
     return;
@@ -93,12 +122,22 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
         DBUG_PRINT("We set numbers [%zu, %zu[ to locally available, and to not waiting", 
                 range.start, range.end);
 
+        // TODO: this only updates the administration of the current alloc.
+        // Since gasnet_wait_syncnbi_gets waits until *all* non-blocking gets
+        // have finished we might also need to update bookkeeping of other
+        // allocations?
         BitmapSetOnes(alloc->local, range.start, range.end);
         BitmapSetZeroes(alloc->prefetched, range.start, range.end);
     } else {
         DBUG_PRINT("%p is not being prefetched, perform blocking fetch.", address);
         if (cache.usedMemory + ShrayPagesz > cache.maximumMemory) {
             DBUG_PRINT("We free up %zu bytes of cache memory", cache.maximumMemory / 10);
+            // TODO: why is the allocation passed as an argument? The cache
+            // might contain data from many allocations, so why prioritize this
+            // one? What if the cache is full with data from other allocations,
+            // and then we get a page fault on the current allocation. In that
+            // case there is nothing to evict from the cache for our current
+            // allocation.
             evict(alloc, cache.maximumMemory / 10);
         }
 
