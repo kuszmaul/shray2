@@ -108,7 +108,7 @@ static int findAlloc(void *segfault)
 // LRU:
 // same issue as with LFU, we can't track proper accesses since no page fault
 // occurs and it is implicitly handled by the system
-static void evict(Allocation *alloc, size_t size)
+static void evict(size_t size)
 {
     return;
 }
@@ -138,23 +138,15 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
         DBUG_PRINT("We set numbers [%zu, %zu[ to locally available, and to not waiting", 
                 range.start, range.end);
 
-        // TODO: this only updates the administration of the current alloc.
-        // Since gasnet_wait_syncnbi_gets waits until *all* non-blocking gets
-        // have finished we might also need to update bookkeeping of other
-        // allocations?
-        BitmapSetOnes(alloc->local, range.start, range.end);
-        BitmapSetZeroes(alloc->prefetched, range.start, range.end);
+        for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
+            BitmapSetOnes(heap.allocs[i].local, range.start, range.end);
+            BitmapSetZeroes(heap.allocs[i].prefetched, range.start, range.end);
+        }
     } else {
         DBUG_PRINT("%p is not being prefetched, perform blocking fetch.", address);
         if (cache.usedMemory + ShrayPagesz > cache.maximumMemory) {
             DBUG_PRINT("We free up %zu bytes of cache memory", cache.maximumMemory / 10);
-            // TODO: why is the allocation passed as an argument? The cache
-            // might contain data from many allocations, so why prioritize this
-            // one? What if the cache is full with data from other allocations,
-            // and then we get a page fault on the current allocation. In that
-            // case there is nothing to evict from the cache for our current
-            // allocation.
-            evict(alloc, cache.maximumMemory / 10);
+            evict(cache.maximumMemory / 10);
         }
 
         cache.usedMemory += ShrayPagesz;
