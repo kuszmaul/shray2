@@ -18,5 +18,6 @@ foreach(file
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			BLAS::BLAS
-			cinterface)
+			cinterface
+			m)
 endforeach(file)

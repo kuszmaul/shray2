@@ -2,6 +2,7 @@
 results/*
 bin/*
 *.out
+*.o
 *.mod
 build/
 CMakeCache.txt

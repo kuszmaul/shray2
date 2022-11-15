@@ -22,9 +22,10 @@ foreach(suffix
 			hello
 			nbody
 			nbodyLoadbalance
+			nbodyUnblocked
 			polyhedral
 			random
-			vector)
+			reduce)
 		set(SHRAY_TARGET "${PROJECT_NAME}${suffix}")
 		set(EXAMPLE_TARGET "${file}${suffix}")
 
