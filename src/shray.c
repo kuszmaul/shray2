@@ -451,8 +451,8 @@ void ShrayFree(void *address)
     /* We leave potentially two pages mapped due to the alignment in ShrayMalloc, but 
      * who cares. */
     MUNMAP_SAFE(heap.allocs[index].location, heap.allocs[index].size);
-    BitmapFree(heap.allocs[index].local);
-    BitmapFree(heap.allocs[index].prefetched);
+//    BitmapFree(heap.allocs[index].local);
+//    BitmapFree(heap.allocs[index].prefetched);
     heap.numberOfAllocs--;
     while ((unsigned)index < heap.numberOfAllocs) {
         heap.allocs[index] = heap.allocs[index + 1];

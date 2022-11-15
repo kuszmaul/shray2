@@ -1,6 +1,7 @@
 #include "bitmap.h"
 #include <stdio.h>
 #include <sys/mman.h>
+#include <immintrin.h>
 
 /*******************************************
  * Error handling macros
@@ -55,12 +56,36 @@ static inline uintptr_t roundUp(uintptr_t a, uintptr_t b)
     return (a + b - 1) / b;
 }
 
-/* FIXME Can we get rid of the loop by a smart number theory thing? */
-/* Counts how many consecutive bits in integer are 1 starting from the index'th bit. */
-static inline int countBitsRight(uint64_t integer, unsigned int index) 
+#ifdef __GNUC__
+#include "immintrin.h"
+static inline int countBitsLeft(uint64_t integer, int bit) 
+{
+    /* Now we want to know how many consecutive trailing bits are one. */
+    integer >>= 63 - bit; 
+
+    /* Now we want to know how many trailing bits are 0. */
+    integer = ~integer;
+
+    return __builtin_ctzl(integer);
+}
+
+static inline int countBitsRight(uint64_t integer, int bit) 
+{
+    /* Now we want to know how many consecutive leading bits are one. */
+    integer <<= bit;
+
+    /* Now we want to know how many consecutive leading bits are 0. */
+    integer = ~integer;
+
+    return __builtin_clzl(integer);
+}
+
+#else
+
+static inline int countBitsRight(uint64_t integer, int bit) 
 {
     int result = 0;
-    uint64_t mask = 0x8000000000000000u >> index;
+    uint64_t mask = 0x8000000000000000u >> bit;
 
     while (integer & mask) {
         result++;
@@ -68,18 +93,6 @@ static inline int countBitsRight(uint64_t integer, unsigned int index)
     }
 
     return result;
-}
-
-/* Returns n such that bitmap->bits[n] contains the index'th bit of the bitmap. */ 
-inline static size_t integer(size_t index)
-{
-    return index / 64;
-}
-
-/* Returns the p such that the pth bit of bitmap->bits[n] is the index'th bit of the bitmap. */
-inline static int bit(size_t index)
-{
-    return index % 64;
 }
 
 static inline int countBitsLeft(uint64_t integer, int bit) 
@@ -93,6 +106,20 @@ static inline int countBitsLeft(uint64_t integer, int bit)
     }
 
     return result;
+}
+
+#endif /* __GNUC__ */
+
+/* Returns n such that bitmap->bits[n] contains the index'th bit of the bitmap. */ 
+inline static size_t integer(size_t index)
+{
+    return index / 64;
+}
+
+/* Returns the p such that the pth bit of bitmap->bits[n] is the index'th bit of the bitmap. */
+inline static int bit(size_t index)
+{
+    return index % 64;
 }
 
 /*******************************************
@@ -115,7 +142,7 @@ Bitmap *BitmapCreate(size_t size)
 
 void BitmapFree(Bitmap *bitmap)
 {
-    MUNMAP_SAFE(bitmap->bits, bitmap->size);
+    MUNMAP_SAFE(bitmap->bits, roundUp(bitmap->size, 64));
     free(bitmap);
 }
 
