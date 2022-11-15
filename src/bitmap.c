@@ -214,6 +214,20 @@ void BitmapSetOnes(Bitmap *bitmap, size_t start, size_t end)
     }
 }
 
+void BitmapReset(Bitmap *bitmap)
+{
+    MUNMAP_SAFE(bitmap->bits, roundUp(bitmap->size, 64) * sizeof(uint64_t));
+    MMAP_SAFE(bitmap->bits, mmap(NULL, roundUp(bitmap->size, 64) * sizeof(uint64_t), 
+                PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+}
+
+void BitmapCopyOnes(Bitmap *dest, Bitmap *src)
+{
+    for (size_t i = 0; i < roundUp(dest->size, 64); i++) {
+        dest->bits[i] |= src->bits[i];
+    }
+}
+
 /* Returns maximal set [start, end[ containing index such that bitmap[i] = 1 
  * for i in [start, end[. */
 Range BitmapSurrounding(Bitmap *bitmap, size_t index)
@@ -257,7 +271,7 @@ BitmapEnd:
             bitmap->bits[toTheRight] == 0xFFFFFFFFFFFFFFFFu)
     {
         range.end += 64;
-        if (toTheRight == (bitmap->size - 1) / 64) return Range;
+        if (toTheRight == (bitmap->size - 1) / 64) return range;
         toTheRight++;
     }
 

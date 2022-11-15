@@ -139,8 +139,8 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
                 range.start, range.end);
 
         for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
-            BitmapSetOnes(heap.allocs[i].local, range.start, range.end);
-            BitmapSetZeroes(heap.allocs[i].prefetched, range.start, range.end);
+            BitmapCopyOnes(heap.allocs[i].local, heap.allocs[i].prefetched);
+            BitmapReset(heap.allocs[i].prefetched);
         }
     } else {
         DBUG_PRINT("%p is not being prefetched, perform blocking fetch.", address);
