@@ -142,7 +142,7 @@ Bitmap *BitmapCreate(size_t size)
 
 void BitmapFree(Bitmap *bitmap)
 {
-    MUNMAP_SAFE(bitmap->bits, roundUp(bitmap->size, 64));
+    MUNMAP_SAFE(bitmap->bits, roundUp(bitmap->size, 64) * sizeof(uint64_t));
     free(bitmap);
 }
 
