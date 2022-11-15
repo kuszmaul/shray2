@@ -98,6 +98,7 @@ void stencil(size_t n, double **in, double **out, int iterations)
 
         /* Switch buffers. This is allowed because every processor is done writing to
          * out at this point, hence does not need to read from in anymore. */
+        ShrayRealloc(*in);
         double *temp = *in;
         *in = *out;
         *out = temp;

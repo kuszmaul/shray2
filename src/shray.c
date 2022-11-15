@@ -53,7 +53,7 @@ static int inRange(void *address, int index)
         ((uintptr_t)address < (uintptr_t)heap.allocs[index].location + heap.allocs[index].size);
 }
 
-/* Simple binary search, assumes heap.allocs is sorted. Returns the index of the 
+/* Simple binary search, assumes heap.allocs is sorted. Returns the index of the
  * allocation segfault belongs to. */
 static int findAlloc(void *segfault)
 {
@@ -70,7 +70,7 @@ static int findAlloc(void *segfault)
     }
 
     if (!inRange(segfault, middle)) {
-        DBUG_PRINT("%p is not in an allocation.\n", segfault); 
+        DBUG_PRINT("%p is not in an allocation.\n", segfault);
         ShrayFinalize(1);
     }
 
@@ -119,6 +119,8 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
     void *address = si->si_addr;
     uintptr_t roundedAddress = (uintptr_t)address / ShrayPagesz * ShrayPagesz;
 
+    DBUG_PRINT("Segfault %p", address);
+
     Allocation *alloc = heap.allocs + findAlloc((void *)roundedAddress);
 
     size_t pageNumber = (roundedAddress - (uintptr_t)alloc->location) / ShrayPagesz;
@@ -127,7 +129,7 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
         Range range = BitmapSurrounding(alloc->prefetched, pageNumber);
 
         DBUG_PRINT("%p is currently being prefetched, along with [%p, %p[",
-               address, (void *)((uintptr_t)alloc->location + range.start * ShrayPagesz), 
+               address, (void *)((uintptr_t)alloc->location + range.start * ShrayPagesz),
                (void *)((uintptr_t)alloc->location + range.end * ShrayPagesz));
 
         gasnet_wait_syncnbi_gets();
@@ -135,13 +137,21 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
         MPROTECT_SAFE((void *)((uintptr_t)alloc->location + range.start * ShrayPagesz),
                     (range.end - range.start) * ShrayPagesz, PROT_READ);
 
-        DBUG_PRINT("We set numbers [%zu, %zu[ to locally available, and to not waiting", 
+        DBUG_PRINT("We set numbers [%zu, %zu[ to locally available, and to not waiting",
                 range.start, range.end);
 
         for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
             BitmapCopyOnes(heap.allocs[i].local, heap.allocs[i].prefetched);
             BitmapReset(heap.allocs[i].prefetched);
         }
+    } else if (BitmapCheck(alloc->local, pageNumber)) {
+        /* Page was set to local by a different prefetch, we still have to make it
+         * read protected. */
+        Range range = BitmapSurrounding(alloc->local, pageNumber);
+        DBUG_PRINT("We set [%zu, %zu[ to PROT_READ after having previously been prefetched.",
+                range.start, range.end);
+        MPROTECT_SAFE((void *)((uintptr_t)alloc->location + range.start * ShrayPagesz),
+                    (range.end - range.start) * ShrayPagesz, PROT_READ);
     } else {
         DBUG_PRINT("%p is not being prefetched, perform blocking fetch.", address);
         if (cache.usedMemory + ShrayPagesz > cache.maximumMemory) {
@@ -163,7 +173,7 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
 
         MPROTECT_SAFE((void *)roundedAddress, ShrayPagesz, PROT_READ);
 
-        DBUG_PRINT("We set pages [%zu, %zu[ to locally available.", 
+        DBUG_PRINT("We set pages [%zu, %zu[ to locally available.",
                 pageNumber, pageNumber + 1);
 
         BitmapSetOnes(alloc->local, pageNumber, pageNumber + 1);
@@ -185,23 +195,23 @@ static void registerHandler(void)
     }
 }
 
-/* Helper function for ShraySync, updates page with the calculated contents from 
+/* Helper function for ShraySync, updates page with the calculated contents from
  * other pages asynchronously. */
 static void UpdatePage(uintptr_t page, int index)
 {
-    DBUG_PRINT("Update page %p of allocation %p", (void *)page, heap.allocs[index].location);
+//    DBUG_PRINT("Update page %p of allocation %p", (void *)page, heap.allocs[index].location);
 
-    /* We have communication with a rank when allocStart <= page + ShrayPagesz - 1 and 
+    /* We have communication with a rank when allocStart <= page + ShrayPagesz - 1 and
      * allocEnd - 1 >= page. Solving the inequalities yields the following loop. */
     uintptr_t location = (uintptr_t)heap.allocs[index].location;
     uintptr_t bytesPerBlock = heap.allocs[index].bytesPerBlock;
 
     /* We max it because the last part of the last page may not be owned by anyone. */
-    unsigned int lastRank = min((page + ShrayPagesz - location - 1) / bytesPerBlock, 
+    unsigned int lastRank = min((page + ShrayPagesz - location - 1) / bytesPerBlock,
             Shray_size - 1);
     unsigned int firstRank = roundUp(page - location - bytesPerBlock + 1, bytesPerBlock);
 
-    DBUG_PRINT("UpdatePage: we communicate with nodes %d, ..., %d.", firstRank, lastRank);
+//    DBUG_PRINT("UpdatePage: we communicate with nodes %d, ..., %d.", firstRank, lastRank);
 
     for (unsigned int rank = firstRank; rank <= lastRank; rank++) {
 
@@ -209,16 +219,16 @@ static void UpdatePage(uintptr_t page, int index)
 
         uintptr_t allocStart = location + rank * bytesPerBlock;
         uintptr_t allocEnd = location + (rank + 1) * bytesPerBlock;
-        
+
         uintptr_t start = max(page, allocStart);
         uintptr_t end = min(page + ShrayPagesz, allocEnd);
 
-        DBUG_PRINT("UpdatePage: we get [%p, %p[ from %d", (void *)start, (void *)end, rank);
+//        DBUG_PRINT("UpdatePage: we get [%p, %p[ from %d", (void *)start, (void *)end, rank);
         gasnet_get_nbi_bulk((void *)start, rank, (void *)start, end - start);
     }
 }
 
-/* Gets [start, end[ asynchronously and sets the protection to PROT_WRITE. Assumes 
+/* Gets [start, end[ asynchronously and sets the protection to PROT_WRITE. Assumes
  * start, end are page-aligned and not owned by our rank. */
 static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *alloc)
 {
@@ -230,30 +240,29 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 
     MPROTECT_SAFE((void *)start, end - start, PROT_WRITE);
     unsigned int firstOwner = (start - location) / bytesPerBlock;
-    /* We take the min with Shay_size because the last part of the last page is not owned by 
+    /* We take the min with Shay_size because the last part of the last page is not owned by
      * anyone. */
     unsigned int lastOwner = min((end - 1 - location) / bytesPerBlock, Shray_size - 1);
 
-    DBUG_PRINT("We set page numbers [%zu, %zu[ to prefetched.", 
+    DBUG_PRINT("We set page numbers [%zu, %zu[ to prefetched.",
             (start - location) / ShrayPagesz, (end - location) / ShrayPagesz);
 
-    BitmapSetOnes(alloc->prefetched, 
+    BitmapSetOnes(alloc->prefetched,
             (start - location) / ShrayPagesz, (end - location) / ShrayPagesz);
 
-    DBUG_PRINT("Prefetch [%p, %p[ from nodes %d, ..., %d", 
+    DBUG_PRINT("Prefetch [%p, %p[ from nodes %d, ..., %d",
             (void *)start, (void *)end, firstOwner, lastOwner);
-    assert(firstOwner > Shray_rank || lastOwner < Shray_rank);
 
     for (unsigned int rank = firstOwner; rank <= lastOwner; rank++) {
-        uintptr_t theirStart = (location + rank * bytesPerBlock) / 
+        uintptr_t theirStart = (location + rank * bytesPerBlock) /
             ShrayPagesz * ShrayPagesz;
-        uintptr_t theirEnd = (rank == Shray_size - 1) ? 
+        uintptr_t theirEnd = (rank == Shray_size - 1) ?
             roundUp(location + size, ShrayPagesz) * ShrayPagesz :
             roundUp(location + (rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
         uintptr_t dest = max(start, theirStart);
         size_t nbytes = min(end, theirEnd) - max(start, theirStart);
 
-        DBUG_PRINT("We prefetch [%p, %p[ from node %d", 
+        DBUG_PRINT("We prefetch [%p, %p[ from node %d",
                 (void *)dest, (void *)(dest + nbytes), rank);
 
         gasnet_get_nbi_bulk((void *)dest, rank, (void *)dest, nbytes);
@@ -263,11 +272,11 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 /* Resetting the protections is done by ShrayRealloc and ShraySync */
 static void resetCache(Allocation *alloc)
 {
-    cache.usedMemory -= alloc->usedMemory;  
+    cache.usedMemory -= alloc->usedMemory;
     alloc->usedMemory = 0;
-    BitmapSetZeroes(alloc->local, 0, alloc->local->size);
-    BitmapSetZeroes(alloc->prefetched, 0, alloc->prefetched->size);
-    gasnet_wait_syncnbi_gets();
+
+    BitmapReset(alloc->local);
+    BitmapReset(alloc->prefetched);
 }
 
 /*****************************************************
@@ -332,14 +341,14 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
      * pointer up. */
     if (Shray_rank == 0) {
         void *mmapAddress;
-        MMAP_SAFE(mmapAddress, mmap(NULL, totalSize + 2 * ShrayPagesz, 
+        MMAP_SAFE(mmapAddress, mmap(NULL, totalSize + 2 * ShrayPagesz,
                     PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
         location = (void *)(roundUp((uintptr_t)mmapAddress, ShrayPagesz) * ShrayPagesz);
         DBUG_PRINT("mmapAddress = %p, allocation start = %p", mmapAddress, location);
     }
 
     /* Broadcast location to the other nodes. */
-    gasnet_coll_broadcast(gasnete_coll_team_all, &location, 0, &location, 
+    gasnet_coll_broadcast(gasnete_coll_team_all, &location, 0, &location,
             sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
     if (Shray_rank != 0) {
@@ -364,8 +373,8 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     size_t bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
 
     uintptr_t firstByte = ((uintptr_t)location + Shray_rank * bytesPerBlock);
-    uintptr_t lastByte = (Shray_rank == Shray_size - 1) ? 
-        (uintptr_t)location + totalSize - 1 : 
+    uintptr_t lastByte = (Shray_rank == Shray_size - 1) ?
+        (uintptr_t)location + totalSize - 1 :
         (uintptr_t)location + (Shray_rank + 1) * bytesPerBlock - 1;
 
     /* First byte, last byte rounded down to page number. */
@@ -410,7 +419,26 @@ void ShrayRealloc(void *array)
     gasnetBarrier();
     BARRIERCOUNT;
 
-    resetCache(heap.allocs + findAlloc(array));
+    Allocation *alloc = heap.allocs + findAlloc(array);
+    resetCache(alloc);
+
+    /* We cannot allow writes to invalid memory. */
+    gasnet_wait_syncnbi_gets();
+
+    MPROTECT_SAFE(alloc->location, alloc->size, PROT_NONE);
+
+    uintptr_t firstByte = ((uintptr_t)alloc->location + Shray_rank * alloc->bytesPerBlock);
+    uintptr_t lastByte = (Shray_rank == Shray_size - 1) ?
+        (uintptr_t)alloc->location + alloc->size - 1 :
+        (uintptr_t)alloc->location + (Shray_rank + 1) * alloc->bytesPerBlock - 1;
+
+    /* First byte, last byte rounded down to page number. */
+    uintptr_t firstPage = firstByte / ShrayPagesz * ShrayPagesz;
+    uintptr_t lastPage = lastByte / ShrayPagesz * ShrayPagesz;
+
+    size_t segmentSize = lastPage - firstPage + ShrayPagesz;
+
+    MPROTECT_SAFE((void *)firstPage, segmentSize, PROT_READ | PROT_WRITE);
 }
 
 void ShraySync(void *array)
@@ -432,7 +460,7 @@ void ShraySync(void *array)
     UpdatePage(firstPage, index);
     if (firstPage != lastPage) UpdatePage(lastPage, index);
     gasnet_wait_syncnbi_gets();
-    DBUG_PRINT("We are done updating pages for %p", array);
+//    DBUG_PRINT("We are done updating pages for %p", array);
 
     resetCache(heap.allocs + findAlloc(array));
 
@@ -448,7 +476,7 @@ void ShrayFree(void *address)
     BARRIERCOUNT
 
     int index = findAlloc(address);
-    /* We leave potentially two pages mapped due to the alignment in ShrayMalloc, but 
+    /* We leave potentially two pages mapped due to the alignment in ShrayMalloc, but
      * who cares. */
     MUNMAP_SAFE(heap.allocs[index].location, heap.allocs[index].size);
 //    BitmapFree(heap.allocs[index].local);
@@ -465,16 +493,16 @@ void ShrayFree(void *address)
 void ShrayPrefetch(void *address, size_t size)
 {
     /* We make the maximal subarray [start, end[ of [address, address + size[ available,
-     * such that start, end are rounded to page boundaries. 
+     * such that start, end are rounded to page boundaries.
      *
-     * We only get pages we do not partially own to avoid needless communication, and to 
-     * not mess up the protections of owned pages. 
-     * 
-     * If our node owns [ourStart, ourEnd[ (rounded to pages!), then we need to fetch 
-     * [start, end[ \cap [ourStart, ourEnd[^c = 
-     * [start, end[ \cap (]-\infty, ourStart[ \cup [ourEnd, \infty[) = 
-     * ([start, end[ \cap ]-\infty, ourStart[) \cup ([start, end[ \cap [ourEnd, \infty[) = 
-     * [start, min(end, ourStart)[ \cup [max(start, ourEnd), end[. 
+     * We only get pages we do not partially own to avoid needless communication, and to
+     * not mess up the protections of owned pages.
+     *
+     * If our node owns [ourStart, ourEnd[ (rounded to pages!), then we need to fetch
+     * [start, end[ \cap [ourStart, ourEnd[^c =
+     * [start, end[ \cap (]-\infty, ourStart[ \cup [ourEnd, \infty[) =
+     * ([start, end[ \cap ]-\infty, ourStart[) \cup ([start, end[ \cap [ourEnd, \infty[) =
+     * [start, min(end, ourStart)[ \cup [max(start, ourEnd), end[.
      *
      * This union is disjoint as min(end, ourStart) <= ourStart < ourEnd <= max(start, ourEnd).
      */
@@ -483,14 +511,14 @@ void ShrayPrefetch(void *address, size_t size)
 
     Allocation *alloc = heap.allocs + findAlloc((void *)start);
     if (findAlloc((void *)start) != findAlloc((void *)(end - 1))) {
-        DBUG_PRINT("ShrayGet [%p, %p[ is not within a single allocation.", (void *)start, 
+        DBUG_PRINT("ShrayGet [%p, %p[ is not within a single allocation.", (void *)start,
                 (void *)end);
     }
 
     uintptr_t location = (uintptr_t)alloc->location;
-    size_t bytesPerBlock = alloc->bytesPerBlock; 
+    size_t bytesPerBlock = alloc->bytesPerBlock;
     uintptr_t ourStart = (location + Shray_rank * bytesPerBlock) / ShrayPagesz * ShrayPagesz;
-    uintptr_t ourEnd = (Shray_rank == Shray_size - 1) ? 
+    uintptr_t ourEnd = (Shray_rank == Shray_size - 1) ?
         roundUp(location + alloc->size, ShrayPagesz) * ShrayPagesz  :
         location + roundUp((Shray_rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
 
@@ -503,7 +531,7 @@ void ShrayPrefetch(void *address, size_t size)
 
 /* FIXME Not thread-safe. If we want to go that route, this should at the very least
  * only be called by the memory-thread. */
-void ShrayDiscard(void *address, size_t size) 
+void ShrayDiscard(void *address, size_t size)
 {
     /* Round to maximal subset [actualStart, actualEnd[ \subseteq [address, address + size[
      * such that actualStart, actualEnd are page-aligned. */
@@ -516,7 +544,7 @@ void ShrayDiscard(void *address, size_t size)
     gasnet_wait_syncnbi_gets();
 
     MUNMAP_SAFE((void *)actualStart, actualEnd - actualStart);
-    MMAP_SAFE(address, mmap((void *)actualStart, actualEnd - actualStart, PROT_NONE, 
+    MMAP_SAFE(address, mmap((void *)actualStart, actualEnd - actualStart, PROT_NONE,
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
 
     size_t firstPageNumber = (actualStart - (uintptr_t)alloc->location) / ShrayPagesz;

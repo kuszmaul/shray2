@@ -3,7 +3,7 @@ include /usr/local/gasnet/include/mpi-conduit/mpi-seq.mak
 
 FORTRAN_C = gfortran
 SHMEM_C = /home/thomas/repos/shmemBuild/bin/oshcc
-FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude
+FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude -g
 LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread
 #LFLAGS = -lm -lopenblas -fsanitize=undefined -pthread
 FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib
@@ -18,7 +18,7 @@ GRAPH = $(patsubst examples/%.c, bin/%_graph, $(APPS))
 FORTRAN = $(patsubst examples/fortran/%.f90, bin/%_fortran, $(FORTRANAPPS))
 SHMEM = $(patsubst examples/oshmem/%.c, bin/%_shmem, $(SHMEMAPPS))
 
-all: release debug profile $(FORTRAN) $(SHMEM) 
+all: release debug profile $(FORTRAN) $(SHMEM)
 
 release: $(RELEASE)
 
@@ -37,7 +37,7 @@ bin/shray_debug.o: src/shray.c include/shray2/shray.h src/shray.h
 bin/shray_profile.o: src/shray.c include/shray2/shray.h src/shray.h
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
-#FIXME This compiler should have the same ABI as the compiler used by GASNET_CC (e.g. gcc and clang) 
+#FIXME This compiler should have the same ABI as the compiler used by GASNET_CC (e.g. gcc and clang)
 bin/bitmap.o: src/bitmap.c src/bitmap.h
 	gcc $(FLAGS) -c $< -o $@
 
@@ -59,13 +59,10 @@ bin/%_fortran: examples/fortran/%.f90
 bin/%_shmem: examples/oshmem/%.c
 	$(SHMEM_C) $(FLAGS) $< -o $@ $(LFLAGS)
 
-runMulti:
-	export BLIS_NUM_THREADS=2
-	mpirun -n 2 bin/blas_debug 4000
-
-# 2 GB per array, so 4GB total
-runHuge:
-	time mpirun -n 4 bin/2dstencil_profile 15811 100
+testMatrix:
+	export SHRAY_CACHESIZE=4096000
+	export SHRAY_CACHELINE=1
+	mpirun -n 2 bin/matrix_debug 1000 2>&1 | grep "\[node 1" > matrix.out
 
 clean:
 	$(RM) bin/* *.mod

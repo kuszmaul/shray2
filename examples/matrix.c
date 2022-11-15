@@ -18,32 +18,29 @@ void matmul(double *A, double *B, double *C, size_t n)
 	unsigned int p = ShraySize();
 	unsigned int s = ShrayRank();
 
-    /* Add A[s][t] B[t] to C. We start with t = s, and repeat the 
+    /* Add A[s][t] B[t] to C. We start with t = s, and repeat the
      * asynchronous get B[t + 1] - compute A[s][t] B[t] cycle. */
 
     ShrayPrefetch(B + n / p * n * ((s + 1) % p), n / p * n * sizeof(double));
-    /* A[s][t] is a n / p x n / p matrix, B[t] an n / p x n matrix. So 
-     * for the dgemm routine m = n / p, k = n / p, n = n. As B[t], C[t] are 
-     * contiguous, we do not have to treat them as submatrices. We treat 
+    /* A[s][t] is a n / p x n / p matrix, B[t] an n / p x n matrix. So
+     * for the dgemm routine m = n / p, k = n / p, n = n. As B[t], C[t] are
+     * contiguous, we do not have to treat them as submatrices. We treat
      * A[s][t] as a submatrix of A[s] (of size n / p x n). */
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
             n / p, n, n / p, 1.0, &A[s * n / p * n + s * n / p], n,
-            &B[s * n / p * n], n, 0.0, &C[s * n / p * n], n); 
-            
-    for (unsigned int i = 1; i < p; i++) {
-        /* The block we calculate */
-        int t = (i + s) % p;
+            &B[s * n / p * n], n, 0.0, &C[s * n / p * n], n);
+
+    for (unsigned int t = (s + 1) % p; t != s; t = (t + 1) % p) {
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                n / p, n, n / p, 1.0, &A[s * n / p * n + t * n / p], n,
+                &B[t * n / p * n], n, 1.0, &C[s * n / p * n], n);
+
+        ShrayDiscard(B + n / p * n * t, n / p * n * sizeof(double));
 
         /* Get the next block */
         if ((t + 1) % p != s) {
             ShrayPrefetch(B + n / p * n * ((t + 1) % p), n / p * n * sizeof(double));
         }
-
-        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                n / p, n, n / p, 1.0, &A[s * n / p * n + t * n / p], n,
-                &B[t * n / p * n], n, 1.0, &C[s * n / p * n], n); 
-
-        ShrayDiscard(B + n / p * n * t, n / p * n * sizeof(double));
     }
 }
 
