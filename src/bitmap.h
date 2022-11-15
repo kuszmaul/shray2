@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#define BITMAP_ENTRY_SIZE 64
+
 typedef struct {
     uint64_t *bits;
     /* Number of bits, not uint64_ts. */
@@ -36,6 +38,12 @@ void BitmapCopyOnes(Bitmap *dest, Bitmap *src);
 
 /* Returns 1 iff the index'th bit of bitmap is 1. */
 int BitmapCheck(Bitmap *bitmap, size_t index);
+
+/* Returns the number of entries in the bitmap array (uint64_ts) */
+size_t BitmapEntries(Bitmap *bitmap);
+
+/* Return the index + 1 of the most significant bit at the given bitmap entry. */
+size_t BitmapMsbEntry(Bitmap *bitmap, size_t index);
 
 /* Returns the maximal set [range.start, range.end[ of all ones containing the index'th bit. */
 Range BitmapSurrounding(Bitmap *bitmap, size_t index);

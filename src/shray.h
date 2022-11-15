@@ -1,3 +1,4 @@
+#include "bitmap.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,7 @@
 #include <gasnet_coll.h>
 #include <sys/mman.h>
 #include <sys/time.h>
-#include "bitmap.h"
+#include <shray2/shray.h>
 
 /**************************************************
  * Data structures

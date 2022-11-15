@@ -3,7 +3,6 @@
  * we distribute blockwise along the first dimension. */
 
 #include "shray.h"
-#include "../include/shray2/shray.h"
 #include "bitmap.h"
 #include <assert.h>
 
@@ -11,6 +10,7 @@
  * Global variable declarations.
  *****************************************************/
 
+/* TODO: move cache stuff to its own file */
 static Cache cache;
 static Heap heap;
 
@@ -158,40 +158,64 @@ static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
     return result;
 }
 
-/* Evicts at least size bytes from the index'th allocation.
- * FIXME What would be a suitable algorithm here? */
+/**
+ * Reset the pages used by the cache.
+ * Assumes start is page aligned and size is a multiple of ShrayPagesz
+ */
+static void resetCachePages(uintptr_t start, size_t size)
+{
+    void *tmp;
+    MUNMAP_SAFE((void*)start, size);
+    MMAP_SAFE(tmp, mmap((void*)start, size, PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+}
 
-// FIFO
-//
-// - When eviction is needed: go through the list starting at the front and delete
-// until you have enough space: O(n) where n is the size of the cache
-// - Insertion O(1)
-// - Deletion O(1)
-//
-// problem: evict is called in the signal handler, can not do memory allocations
-// solution: use a ringbuffer
-//
-// problem: need to update bookkeeping but cache contains no such information
-// solution: each cache entry contains some additional data: pointer to
-// allocation entry
-//
-// ----
-// LFU:
-// For LFU the issue is that we don't know how often a cache entry is used.
-// memory accesses are implicit, we only notice segmentation faults.
-//
-// This is also the reason why any frequency-based algorithm will not work
-// without some to way actually track access. We could allow users to provide
-// this information but that (1) increases the burden on the user and (2) is
-// hard to predict and get right.
-//
-// ----
-// LRU:
-// same issue as with LFU, we can't track proper accesses since no page fault
-// occurs and it is implicitly handled by the system
+/*
+ * Evicts at least size bytes from the index'th allocation.
+ */
 static void evict(size_t size)
 {
-    return;
+    size_t evicted = 0;
+    size_t size_pages = size / ShrayPagesz;
+    if (size % ShrayPagesz)
+        ++size_pages;
+
+    /* Method 1: just left to right eviction */
+    for (size_t i = 0; i < heap.numberOfAllocs; i++) {
+        Allocation *alloc = &heap.allocs[i];
+        if (alloc->usedMemory == 0) {
+            continue;
+        }
+
+        size_t entries = BitmapEntries(alloc->local);
+        for (size_t j = 0; j < entries;) {
+            size_t msb = BitmapMsbEntry(alloc->local, j);
+            if (msb == 0) {
+                ++j;
+                continue;
+            }
+
+            Range surrounding = BitmapSurrounding(alloc->local, j * BITMAP_ENTRY_SIZE + msb);
+            size_t total = surrounding.end - surrounding.start;
+            /* We have a larger contiguous area then we need. */
+            if (total > size) {
+                total = size;
+            }
+
+            BitmapSetZeroes(alloc->local, surrounding.start, surrounding.start + total);
+            resetCachePages(
+                    (uintptr_t)alloc->location + surrounding.start * ShrayPagesz,
+                    total * ShrayPagesz);
+            evicted += total;
+            j += total;
+            alloc->usedMemory -= total * ShrayPagesz;
+            cache.usedMemory -= total * ShrayPagesz;
+        }
+    }
+
+    if (evicted < size_pages) {
+        DBUG_PRINT("Was only able to evict %zu pages (requested %zu)",
+                evicted, size);
+    }
 }
 
 static void SegvHandler(int sig, siginfo_t *si, void *unused)
