@@ -220,22 +220,23 @@ Range BitmapSurrounding(Bitmap *bitmap, size_t index)
 {
     Range range;
 
-    range.start = index + 1 - countBitsLeft(bitmap->bits[index / 64], index % 64);
-    /* We have 1s until the start of this integer and it is not the first. */
-    if (range.start % 64 == 0 && index / 64 != 0) {
-        size_t toTheLeft = index / 64 - 1;
+    /* We slide start to the left as far as possible within the current integer. */
+    range.start = index + 1 - countBitsLeft(bitmap->bits[integer(index)], bit(index));
 
-        while (toTheLeft > 0 && bitmap->bits[toTheLeft] == 0xFFFFFFFFFFFFFFFFu) {
-            range.start -= 64;
-            toTheLeft--;
-        }
+    /* There are no more consecutive 1s in the integer to the left from us. */
+    if (index / 64 == 0 || range.start % 64 != 0) goto BitmapEnd; 
 
-        /* In this case we have taken the left-most integer into account already. */
-        if (!(index / 64 == 0 && toTheLeft == 0)) {
-            range.start -= countBitsLeft(bitmap->bits[toTheLeft], 63);
-        }
+    size_t toTheLeft = index / 64 - 1;
+
+    while (bitmap->bits[toTheLeft] == 0xFFFFFFFFFFFFFFFFu) {
+        range.start -= 64;
+        if (toTheLeft == 0) goto BitmapEnd;
+        toTheLeft--;
     }
 
+    range.start -= countBitsLeft(bitmap->bits[toTheLeft], 63);
+
+BitmapEnd:
     /* We are the last integer. */
     if (index / 64 == (bitmap->size - 1) / 64) {
         range.end = min(index + countBitsRight(bitmap->bits[index / 64], index % 64), 
@@ -243,28 +244,31 @@ Range BitmapSurrounding(Bitmap *bitmap, size_t index)
         return range;
     }
 
+    /* We slide start to the right as far as possible within the current integer. */
     range.end = index + countBitsRight(bitmap->bits[index / 64], index % 64);
 
+    /* There are no more consecutive 1s in the integer to the right from us. */
+    if (range.end % 64 != 0) return range;
+
     /* We have 1s until the end of this integer and we are not the last integer. */
-    if (range.end % 64 == 0) {
-        size_t toTheRight = index / 64 + 1;
+    size_t toTheRight = index / 64 + 1;
 
-        while (toTheRight < (bitmap->size - 1) / 64 && 
-                bitmap->bits[toTheRight] == 0xFFFFFFFFFFFFFFFFu)
-        {
-            range.end += 64;
-            toTheRight++;
-        }
+    while (toTheRight < (bitmap->size - 1) / 64 && 
+            bitmap->bits[toTheRight] == 0xFFFFFFFFFFFFFFFFu)
+    {
+        range.end += 64;
+        if (toTheRight == (bitmap->size - 1) / 64) return Range;
+        toTheRight++;
+    }
 
-        /* We are not the last integer in the bitmap. */
-        if (toTheRight < (bitmap->size - 1) / 64) {
-            range.end += countBitsRight(bitmap->bits[toTheRight], 0);
-        }
+    /* We are not the last integer in the bitmap. */
+    if (toTheRight < (bitmap->size - 1) / 64) {
+        range.end += countBitsRight(bitmap->bits[toTheRight], 0);
+    }
 
-        /* We are the last integer in the bitmap. */
-        if (toTheRight == (bitmap->size - 1) / 64) {
-            range.end += min(countBitsRight(bitmap->bits[toTheRight], 0), bitmap->size % 64);
-        }
+    /* We are the last integer in the bitmap. */
+    if (toTheRight == (bitmap->size - 1) / 64) {
+        range.end += min(countBitsRight(bitmap->bits[toTheRight], 0), bitmap->size % 64);
     }
 
     return range;
