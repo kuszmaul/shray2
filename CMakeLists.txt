@@ -15,6 +15,7 @@ option(EXAMPLES "Build the examples." OFF)
 option(SRC "Build primary libraries and executables." ON)
 option(SANITISE "Add -fsanitize=undefined flags." OFF)
 option(WERROR "Make all warnings into errors." OFF)
+option(TEST "Build tests." OFF)
 
 # disable base languages
 unset(PROJECT_LANGUAGES)
@@ -47,10 +48,15 @@ include(GNUInstallDirs)
 
 if(${SRC})
 	include(src)
-elseif(${EXAMPLES} OR ${SANITISE})
+elseif(${EXAMPLES} OR ${SANITISE} OR ${TEST})
 	message(FATAL_ERROR "At least one flag enabled that requires SRC=ON.")
 endif()
 
 if(${EXAMPLES})
 	add_subdirectory(examples)
+endif()
+
+if(${TEST})
+	enable_testing()
+	add_subdirectory(tests)
 endif()
