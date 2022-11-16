@@ -7,19 +7,22 @@ void init(double *arr, size_t n)
 {
     for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
         arr[i] = 1;
+//        printf("arr[%zu] = %lf\n", i, arr[i]);
     }
 }
 
-/* For testing only, otherwise obviously reduce locally and send your result to the 
- * other nodes. */
+/* For testing only, otherwise obviously reduce locally and send your result to the
+ * other nodes. Each node sums up the array. */
 double reduce(double *arr, size_t n)
 {
 	unsigned int p = ShraySize();
 	unsigned int s = ShrayRank();
 
     double sum = 0.0;
+    /* Prefetch the data owned by the next node, where node 0 comes after node p - 1. */
     ShrayPrefetch(arr + (s + 1) % p * n / p, n / p * sizeof(double));
 
+    /* Local reduce */
     for (size_t i = 0; i < n / p; i++) {
         sum += arr[i + s * n / p];
     }
@@ -31,9 +34,13 @@ double reduce(double *arr, size_t n)
             ShrayPrefetch(arr + (rank + 1) % p * n / p, n / p * sizeof(double));
         }
 
+        /* Reduce wrt rank 'rank' */
         for (size_t i = 0; i < n / p; i++) {
+            if (arr[i + rank * n / p] != 1.0) {
+//                printf("%d %p %lf\n", ShrayRank(), (void *)(arr + i + rank * n / p),
+//                        arr[i + rank * n / p]);
+            }
             sum += arr[i + rank * n / p];
-//            if (ShrayRank() == 1) printf("%zu %lf\n", i + rank * n / p, arr[i + rank * n / p]);
         }
 
         ShrayDiscard(arr + rank * n / p, n / p * sizeof(double));
@@ -64,7 +71,7 @@ int main(int argc, char **argv)
     if (result == n) {
         printf("Success from node %d\n", ShrayRank());
     } else {
-        printf("Failure from node %d (%lf != %lf)\n", ShrayRank(), result, 
+        printf("Failure from node %d (%lf != %lf)\n", ShrayRank(), result,
                (double)n);
     }
 

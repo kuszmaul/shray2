@@ -23,18 +23,20 @@ typedef struct {
 
 /* A single allocation in the heap. */
 typedef struct Allocation {
-    void *location; 
+    void *location;
     size_t size;
     /* The number of bytes owned by each node except the last one. */
     size_t bytesPerBlock;
     Bitmap *local;
     Bitmap *prefetched;
     size_t usedMemory;
+    /* We put all the prefetched stuff here until it is remapped to the proper position. */
+    void *shadow;
 } Allocation;
 
 typedef struct Heap {
     /* size of allocs */
-    size_t size;    
+    size_t size;
     /* Array of allocs, sorted from low to high in location. */
     Allocation *allocs;
     /* Number of actual allocations in the allocs */
@@ -56,6 +58,8 @@ typedef struct Heap {
 
 #define MPROTECT_SAFE(addr, len, prot)                                                  \
     {                                                                                   \
+        DBUG_PRINT("Protected [%p, %p[ to %s", addr, (void *)((uintptr_t)addr + len),   \
+            #prot);                                                                     \
         if (mprotect(addr, len, prot) != 0) {                                           \
             fprintf(stderr, "Line %d, node [%d]: ", __LINE__, Shray_rank);              \
             perror("mprotect failed");                                                  \
@@ -63,11 +67,15 @@ typedef struct Heap {
         }                                                                               \
     }
 
-#define MREMAP_SAFE(variable, fncall)                                                   \
+/* Moves [source, source + size[ to [dest, dest + size[ */
+#define MREMAP_MOVE(dest, source, size)                                                 \
     {                                                                                   \
-        variable = fncall;                                                              \
-        if (variable == MAP_FAILED) {                                                   \
-            fprintf(stderr, "Line %d, node [%d]: ", __LINE__, Shray_rank);              \
+        DBUG_PRINT("Moved [%p, %p[ to [%p, %p[", source,                                \
+                (void *)((uintptr_t)source + size), dest,                               \
+                (void *)((uintptr_t)dest + size));                                      \
+        dest = mremap(source, size, size, MREMAP_MAYMOVE | MREMAP_FIXED, dest);         \
+        if (dest == MAP_FAILED) {                                                       \
+            fprintf(stderr, "Line %d, [node %d]: ", __LINE__, Shray_rank);              \
             perror("mremap failed");                                                    \
             ShrayFinalize(1);                                                           \
         }                                                                               \
@@ -115,7 +123,7 @@ typedef struct Heap {
 /**************************************************
  * Debugging
  **************************************************/
-
+//-DBUG_OFF
 #ifdef DEBUG
     #define DBUG_PRINT(fmt, ...)                                                        \
         fprintf(stderr, "\t[node %d]: " fmt "\n", Shray_rank, __VA_ARGS__);

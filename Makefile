@@ -1,5 +1,6 @@
 #include /usr/local/gasnet/include/smp-conduit/smp-seq.mak
 include /usr/local/gasnet/include/mpi-conduit/mpi-seq.mak
+#include /usr/local/gasnet/include/udp-conduit/udp-seq.mak
 
 FORTRAN_C = gfortran
 SHMEM_C = /home/thomas/repos/shmemBuild/bin/oshcc
@@ -62,7 +63,7 @@ bin/%_shmem: examples/oshmem/%.c
 testMatrix:
 	export SHRAY_CACHESIZE=4096000
 	export SHRAY_CACHELINE=1
-	mpirun -n 2 bin/matrix_debug 1000 2>&1 | grep "\[node 1" > matrix.out
+	mpirun.mpich -n 4 bin/matrix_debug 1000 2>&1 | grep "\[node 1" > matrix.out
 
 clean:
 	$(RM) bin/* *.mod
