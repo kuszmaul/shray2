@@ -4,7 +4,10 @@
 
 #include "shray.h"
 #include "bitmap.h"
+#include "queue.h"
+#include "ringbuffer.h"
 #include <assert.h>
+#include <stdint.h>
 
 /*****************************************************
  * Global variable declarations.
@@ -160,70 +163,72 @@ static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
 
 /**
  * Reset the pages used by the cache.
- * Assumes start is page aligned and size is a multiple of ShrayPagesz
+ * Assumes start is page aligned.
  */
-static void resetCachePages(uintptr_t start, size_t size)
+static void evictCacheEntry(Allocation *alloc, void *start, size_t pages)
 {
-    DBUG_PRINT("CACHE: evicting %p (size %zu)", (void*)start, size);
     void *tmp;
-    MUNMAP_SAFE((void*)start, size);
-    MMAP_SAFE(tmp, mmap((void*)start, size, PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+    size_t index = ((uintptr_t)start - (uintptr_t)alloc->location) / ShrayPagesz;
+    size_t size = pages * ShrayPagesz;
+    BitmapSetZeroes(alloc->local, index, index + pages);
+
+    MUNMAP_SAFE(start, size);
+    MMAP_SAFE(tmp, mmap(start, size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+}
+
+/* Assumes both pages are page-aligned. */
+static inline int isNextPage(void *x, void *y)
+{
+    return (uintptr_t)y - (uintptr_t)x == ShrayPagesz;
 }
 
 /*
- * Evicts at least size bytes from the index'th allocation.
+ * Evicts at least size bytes from the cache.
  */
 static void evict(size_t size)
 {
+    cache_entry_t *next, *entry;
     size_t evicted = 0;
-    size_t size_pages = size / ShrayPagesz;
-    if (size % ShrayPagesz)
-        ++size_pages;
+    size_t chain = 1;
+    size_t size_pages = (size + ShrayPagesz - 1) / ShrayPagesz;
 
-    DBUG_PRINT("CACHE: going to free %zu pages", size_pages);
+    /* First try to evict automatically retrieved pages. */
+    while (!ringbuffer_empty(cache.autoCaches)) {
+        chain = 1;
+        entry = ringbuffer_front(cache.autoCaches);
+        ringbuffer_del(cache.autoCaches);
 
-    /* Method 1: just left to right eviction */
-    for (size_t i = 0; i < heap.numberOfAllocs; i++) {
-        Allocation *alloc = &heap.allocs[i];
-        if (alloc->usedMemory == 0) {
-            continue;
+        /* Check how many we can evict in one go. */
+        while (!ringbuffer_empty(cache.autoCaches)) {
+            if (chain >= size_pages) {
+                break;
+            }
+
+            next = ringbuffer_front(cache.autoCaches);
+            if (!isNextPage(entry->alloc, next->alloc)) {
+                break;
+            }
+
+            ringbuffer_del(cache.autoCaches);
+            ++chain;
         }
-        DBUG_PRINT("CACHE: searching alloc %zu (%zu mem)", i, alloc->usedMemory);
 
-        size_t entries = BitmapEntries(alloc->local);
-        for (size_t j = 0; j < entries;) {
-            size_t msb = BitmapMsbEntry(alloc->local, j);
-            if (msb == 0) {
-                ++j;
-                continue;
-            }
-            --msb;
-            DBUG_PRINT("CACHE: found msb %zu in %zu (%zx)", msb, j);
+        evictCacheEntry(entry->alloc, entry->start, chain);
+        /* Only evict as much as needed */
+        evicted += chain;
+        if (evicted >= size_pages) {
+            return;
+        }
+    }
 
-            Range surrounding = BitmapSurrounding(alloc->local, j * BITMAP_ENTRY_SIZE + msb);
-            size_t total = surrounding.end - surrounding.start;
-            /* We have a larger contiguous area then we need. */
-            if (total > size_pages) {
-                total = size_pages;
-            }
-
-            DBUG_PRINT("CACHE: [%zu, %zu], total %zu", surrounding.start, surrounding.end, total);
-
-            BitmapSetZeroes(alloc->local, surrounding.start, surrounding.start + total);
-            resetCachePages(
-                    (uintptr_t)alloc->location + surrounding.start * ShrayPagesz,
-                    total * ShrayPagesz);
-            evicted += total;
-            j += total;
-            alloc->usedMemory -= total * ShrayPagesz;
-            cache.usedMemory -= total * ShrayPagesz;
-            DBUG_PRINT("CACHE: (evicted: %zu, entry: %zu, alloc: %zu, cache: %zu)",
-                    evicted, j, alloc->usedMemory, cache.usedMemory);
-
-            if (evicted >= size_pages) {
-                DBUG_PRINT("Evicted %zu pages", evicted);
-                return;
-            }
+    /* Next, try to go through the prefetches in FIFO order to evict. */
+    while (!queue_empty(cache.prefetchCaches)) {
+        queue_entry_t q_entry = queue_dequeue(cache.prefetchCaches);
+        chain = (size + ShrayPagesz - 1) / ShrayPagesz;
+        evictCacheEntry(q_entry.alloc, q_entry.start, chain);
+        evicted += chain;
+        if (evicted >= size_pages) {
+            return;
         }
     }
 
@@ -278,6 +283,12 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
         DBUG_PRINT("%p is not being prefetched, perform blocking fetch.", address);
         if (cache.usedMemory + ShrayPagesz > cache.maximumMemory) {
             DBUG_PRINT("We free up %zu bytes of cache memory", cache.maximumMemory / 10);
+            /*
+             * TODO: Need to do a sync here as well, if the cache is full
+             * and we need to evict we might need to evict prefetched data. In
+             * that case we would need to do the same thing as in the if case
+             * above.
+             */
             evict(cache.maximumMemory / 10);
         }
 
@@ -297,6 +308,7 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
                 pageNumber, pageNumber + 1);
 
         BitmapSetOnes(alloc->local, pageNumber, pageNumber + 1);
+        ringbuffer_add(cache.autoCaches, alloc, (void*)roundedAddress);
     }
 
     return;
@@ -344,6 +356,7 @@ static void UpdatePage(uintptr_t page, int index)
         uintptr_t end = min(page + ShrayPagesz, allocEnd);
 
         DBUG_PRINT("UpdatePage: we get [%p, %p[ from %d", (void *)start, (void *)end, rank);
+        /* TODO: does this need to be added to cache? */
         gasnet_get_nbi_bulk((void *)start, rank, (void *)start, end - start);
     }
 }
@@ -399,6 +412,8 @@ static void resetCache(Allocation *alloc)
 
     BitmapReset(alloc->local);
     BitmapReset(alloc->prefetched);
+    ringbuffer_reset(cache.autoCaches);
+    queue_reset(cache.prefetchCaches);
 }
 
 /*****************************************************
@@ -449,6 +464,12 @@ void ShrayInit(int *argc, char ***argv)
     }
 
     cache.usedMemory = 0;
+    cache.autoCaches = ringbuffer_alloc(cache.maximumMemory / ShrayPagesz);
+    cache.prefetchCaches = queue_alloc(cache.maximumMemory / ShrayPagesz);
+    if (!cache.autoCaches || !cache.prefetchCaches) {
+        fprintf(stderr, "Could not allocate cache buffers\n");
+        gasnet_exit(1);
+    }
 
     registerHandler();
 }
@@ -627,6 +648,7 @@ void ShrayPrefetch(void *address, size_t size)
 
     helpPrefetch(prefetch.start1, prefetch.end1, prefetch.alloc);
     helpPrefetch(prefetch.start2, prefetch.end2, prefetch.alloc);
+    queue_queue(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1, prefetch.end2 - prefetch.start1);
 }
 
 /* FIXME Not thread-safe. If we want to go that route, this should at the very least
@@ -645,6 +667,8 @@ void ShrayDiscard(void *address, size_t size)
 
     discardBitmap(prefetch.start1, prefetch.end1, prefetch.alloc);
     discardBitmap(prefetch.start2, prefetch.end2, prefetch.alloc);
+    size_t index = queue_find(cache.prefetchCaches, prfetch.alloc, (void*)prefetch.start1);
+    queue_remove_at(cache.prefetchCaches, index);
 }
 
 void ShrayReport(void)
@@ -667,5 +691,7 @@ unsigned int ShraySize(void)
 
 void ShrayFinalize(int exit_code)
 {
+    ringbuffer_free(cache.autoCaches);
+    queue_free(cache.prefetchCaches);
     gasnet_exit(exit_code);
 }

@@ -19,6 +19,8 @@ foreach(suffix
 	set(LIB_TARGET "${PROJECT_NAME}${suffix}")
 	add_library("${LIB_TARGET}" STATIC
 		bitmap.c
+		queue.c
+		ringbuffer.c
 		shray.c)
 	target_include_directories("${LIB_TARGET}"
 		PUBLIC

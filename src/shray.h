@@ -1,4 +1,6 @@
 #include "bitmap.h"
+#include "ringbuffer.h"
+#include "queue.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,6 +22,8 @@
 typedef struct {
     size_t usedMemory;
     size_t maximumMemory;
+    ringbuffer_t *autoCaches;
+    queue_t *prefetchCaches;
 } Cache;
 
 /* A single allocation in the heap. */
