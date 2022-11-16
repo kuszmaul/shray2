@@ -164,6 +164,7 @@ static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
  */
 static void resetCachePages(uintptr_t start, size_t size)
 {
+    DBUG_PRINT("CACHE: evicting %p (size %zu)", (void*)start, size);
     void *tmp;
     MUNMAP_SAFE((void*)start, size);
     MMAP_SAFE(tmp, mmap((void*)start, size, PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
@@ -179,12 +180,15 @@ static void evict(size_t size)
     if (size % ShrayPagesz)
         ++size_pages;
 
+    DBUG_PRINT("CACHE: going to free %zu pages", size_pages);
+
     /* Method 1: just left to right eviction */
     for (size_t i = 0; i < heap.numberOfAllocs; i++) {
         Allocation *alloc = &heap.allocs[i];
         if (alloc->usedMemory == 0) {
             continue;
         }
+        DBUG_PRINT("CACHE: searching alloc %zu (%zu mem)", i, alloc->usedMemory);
 
         size_t entries = BitmapEntries(alloc->local);
         for (size_t j = 0; j < entries;) {
@@ -193,13 +197,17 @@ static void evict(size_t size)
                 ++j;
                 continue;
             }
+            --msb;
+            DBUG_PRINT("CACHE: found msb %zu in %zu (%zx)", msb, j);
 
             Range surrounding = BitmapSurrounding(alloc->local, j * BITMAP_ENTRY_SIZE + msb);
             size_t total = surrounding.end - surrounding.start;
             /* We have a larger contiguous area then we need. */
-            if (total > size) {
-                total = size;
+            if (total > size_pages) {
+                total = size_pages;
             }
+
+            DBUG_PRINT("CACHE: [%zu, %zu], total %zu", surrounding.start, surrounding.end, total);
 
             BitmapSetZeroes(alloc->local, surrounding.start, surrounding.start + total);
             resetCachePages(
@@ -209,6 +217,13 @@ static void evict(size_t size)
             j += total;
             alloc->usedMemory -= total * ShrayPagesz;
             cache.usedMemory -= total * ShrayPagesz;
+            DBUG_PRINT("CACHE: (evicted: %zu, entry: %zu, alloc: %zu, cache: %zu)",
+                    evicted, j, alloc->usedMemory, cache.usedMemory);
+
+            if (evicted >= size_pages) {
+                DBUG_PRINT("Evicted %zu pages", evicted);
+                return;
+            }
         }
     }
 

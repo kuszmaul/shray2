@@ -165,8 +165,9 @@ int BitmapCheckEntry(Bitmap *bitmap, size_t index)
 size_t BitmapMsbEntry(Bitmap *bitmap, size_t index)
 {
     // TODO: use more efficient version of this
+    size_t offset = index * 64;
     for (size_t k = 0; k < 64; ++k) {
-        if (BitmapCheck(bitmap, index * 64 + k)) {
+        if (BitmapCheck(bitmap, offset + k)) {
             return k + 1;
         }
     }
