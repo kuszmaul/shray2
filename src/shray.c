@@ -612,8 +612,6 @@ void ShraySync(void *array)
     gasnet_wait_syncnbi_gets();
     DBUG_PRINT("We are done updating pages for %p", array);
 
-    resetCache(heap.allocs + findAlloc(array));
-
     /* So no one reads from use before the communications are completed. */
     gasnetBarrier();
     BARRIERCOUNT
