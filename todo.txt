@@ -1,0 +1,19 @@
+1. The output of mpirun -n 4 bin/matrix_profile 4000
+
+is
+
+Time 1.311056, 97.631222 Gflops/s
+Shray report P(1): 67 segfaults, 6 barriers, 274432 bytes communicated.
+Shray report P(2): 67 segfaults, 6 barriers, 274432 bytes communicated.
+Shray report P(3): 67 segfaults, 6 barriers, 274432 bytes communicated.
+Shray report P(0): 3 segfaults, 6 barriers, 12288 bytes communicated.
+Success!
+Success!
+Success!
+Success!
+
+The computation is symmetric, so why does P(0) segfault less?
+
+2. nbody with Shray is much faster than Fortran or OpenShmem. That makes no sense either.
+   A month back this was not yet the case?! The Fortran or OpenShmem code was not changed
+   since then.

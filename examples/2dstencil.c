@@ -10,8 +10,8 @@
 #include <assert.h>
 #include <shray2/shray.h>
 
-#define MAX(a, b) ((a) > (b)) ? (a) : (b)
-#define MIN(a, b) ((a) > (b)) ? (b) : (a)
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define MIN(a, b) (((a) > (b)) ? (b) : (a))
 
 /* The coefficients of the five-point stencil. */
 const double a = 0.50;
@@ -47,8 +47,6 @@ void relax(size_t n, double **in, double **out)
         }
     }
 
-    printf("Done with inner part\n");
-
     /* first row */
     for (size_t j = 1; j < n - 1; j++) {
         (*out)[start * n + j] = a * (*in)[(start - 1) * n + j] +
@@ -79,7 +77,7 @@ void stencil(size_t n, double **in, double **out, int iterations)
             (*out)[j] = (*in)[j];
         }
     }
-    if (ShrayStart(n) == n - 1) {
+    if (ShrayEnd(n) == n - 1) {
         for (size_t j = 0; j < n; j++) {
             (*out)[(n - 1) * n + j] = (*in)[(n - 1) * n + j];
         }
