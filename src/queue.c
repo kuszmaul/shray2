@@ -131,7 +131,7 @@ queue_entry_t queue_remove_at(queue_t *queue, size_t index)
 
 int queue_empty(const queue_t *queue)
 {
-	return queue->free_start == NOLINK;
+	return queue->data_start == NOLINK;
 }
 
 void queue_reset(queue_t *queue)
