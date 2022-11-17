@@ -1,5 +1,8 @@
 #include "ringbuffer.h"
 #include <stdlib.h>
+#include <stdint.h>
+
+static const size_t NOENTRY = SIZE_MAX;
 
 ringbuffer_t *ringbuffer_alloc(size_t size)
 {
@@ -14,8 +17,8 @@ ringbuffer_t *ringbuffer_alloc(size_t size)
 		return NULL;
 	}
 
-	ring->start = 0;
-	ring->end = 0;
+	ring->start = NOENTRY;
+	ring->end = NOENTRY;
 	ring->size = size;
 	return ring;
 }
@@ -28,8 +31,14 @@ void ringbuffer_free(ringbuffer_t *ring)
 
 void ringbuffer_add(ringbuffer_t *ring, void *alloc, void *start)
 {
-	cache_entry_t *entry = &ring->data[ring->end++];
-	ring->end = (ring->end + 1) % ring->size;
+	if (ring->end == NOENTRY) {
+		ring->end = 0;
+		ring->start = 0;
+	} else {
+		ring->end = (ring->end + 1) % ring->size;
+	}
+
+	cache_entry_t *entry = &ring->data[ring->end];
 
 	entry->alloc = alloc;
 	entry->start = start;
@@ -42,16 +51,21 @@ cache_entry_t *ringbuffer_front(const ringbuffer_t *ring)
 
 void ringbuffer_del(ringbuffer_t *ring)
 {
-	ring->start = (ring->start + 1) % ring->size;
+	if (ring->start == ring->end) {
+		ring->start = NOENTRY;
+		ring->end = NOENTRY;
+	} else {
+		ring->start = (ring->start + 1) % ring->size;
+	}
 }
 
 int ringbuffer_empty(const ringbuffer_t *ring)
 {
-	return ring->start == ring->end;
+	return ring->start == NOENTRY;
 }
 
 void ringbuffer_reset(ringbuffer_t *ring)
 {
-	ring->start = 0;
-	ring->end = 0;
+	ring->start = NOENTRY;
+	ring->end = NOENTRY;
 }
