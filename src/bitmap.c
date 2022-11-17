@@ -152,29 +152,6 @@ int BitmapCheck(Bitmap *bitmap, size_t index)
     return ((bitmap->bits[integer(index)] & (0x8000000000000000u >> bit(index))) != (uint64_t)0);
 }
 
-size_t BitmapEntries(Bitmap *bitmap)
-{
-    return roundUp(bitmap->size, 64);
-}
-
-int BitmapCheckEntry(Bitmap *bitmap, size_t index)
-{
-    return bitmap->bits[index] > 0;
-}
-
-size_t BitmapMsbEntry(Bitmap *bitmap, size_t index)
-{
-    // TODO: use more efficient version of this
-    size_t offset = index * 64;
-    for (size_t k = 0; k < 64; ++k) {
-        if (BitmapCheck(bitmap, offset + k)) {
-            return k + 1;
-        }
-    }
-
-    return 0;
-}
-
 /* Sets [start, end[ to zero. */
 void BitmapSetZeroes(Bitmap *bitmap, size_t start, size_t end)
 {
