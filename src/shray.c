@@ -174,6 +174,7 @@ static void evictCacheEntry(Allocation *alloc, void *start, size_t pages)
 
     MUNMAP_SAFE(start, size);
     MMAP_SAFE(tmp, mmap(start, size, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+    cache.usedMemory -= pages * ShrayPagesz;
 }
 
 /* Assumes both pages are page-aligned. */
