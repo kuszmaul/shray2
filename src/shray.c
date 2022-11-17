@@ -58,6 +58,16 @@ static void *toShadow(void *addr, Allocation *alloc)
     return (void *)((uintptr_t)addr - (uintptr_t)alloc->location + (uintptr_t)alloc->shadow);
 }
 
+static uintptr_t roundUpPage(uintptr_t addr)
+{
+    return roundUp(addr, ShrayPagesz) * ShrayPagesz;
+}
+
+static uintptr_t roundDownPage(uintptr_t addr)
+{
+    return addr / ShrayPagesz * ShrayPagesz;
+}
+
 /* Simple binary search, assumes heap.allocs is sorted. Returns the index of the
  * allocation segfault belongs to. */
 static int findAlloc(void *segfault)
@@ -122,7 +132,7 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
 {
     SEGFAULTCOUNT
     void *address = si->si_addr;
-    uintptr_t roundedAddress = (uintptr_t)address / ShrayPagesz * ShrayPagesz;
+    uintptr_t roundedAddress = roundDownPage((uintptr_t)address);
 
     DBUG_PRINT("Segfault %p", address);
 
@@ -387,8 +397,8 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
         (uintptr_t)location + (Shray_rank + 1) * bytesPerBlock - 1;
 
     /* First byte, last byte rounded down to page number. */
-    uintptr_t firstPage = firstByte / ShrayPagesz * ShrayPagesz;
-    uintptr_t lastPage = lastByte / ShrayPagesz * ShrayPagesz;
+    uintptr_t firstPage = roundDownPage(firstByte);
+    uintptr_t lastPage = roundDownPage(lastByte);
 
     size_t segmentSize = lastPage - firstPage + ShrayPagesz;
 
@@ -398,7 +408,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     MPROTECT_SAFE((void *)firstPage, segmentSize, PROT_READ | PROT_WRITE);
 
-    size_t totalPages = (roundUp((uintptr_t)location + totalSize, ShrayPagesz) * ShrayPagesz -
+    size_t totalPages = (roundUpPage((uintptr_t)location + totalSize) -
         (uintptr_t)location) / ShrayPagesz;
 
     heap.allocs[index].location = location;
@@ -443,8 +453,8 @@ void ShrayRealloc(void *array)
         (uintptr_t)alloc->location + (Shray_rank + 1) * alloc->bytesPerBlock - 1;
 
     /* First byte, last byte rounded down to page number. */
-    uintptr_t firstPage = firstByte / ShrayPagesz * ShrayPagesz;
-    uintptr_t lastPage = lastByte / ShrayPagesz * ShrayPagesz;
+    uintptr_t firstPage = roundDownPage(firstByte);
+    uintptr_t lastPage = roundDownPage(lastByte);
 
     size_t segmentSize = lastPage - firstPage + ShrayPagesz;
 
@@ -464,8 +474,8 @@ void ShraySync(void *array)
     /* Synchronise in case the first or last page is co-owned with someone else. */
     uintptr_t firstByte = Shray_rank * bytesPerBlock;
     uintptr_t lastByte = (Shray_rank + 1) * bytesPerBlock - 1;
-    uintptr_t firstPage = location + firstByte / ShrayPagesz * ShrayPagesz;
-    uintptr_t lastPage = location + lastByte / ShrayPagesz * ShrayPagesz;
+    uintptr_t firstPage = roundDownPage(location + firstByte);
+    uintptr_t lastPage = roundDownPage(location + lastByte);
 
     UpdatePage(firstPage, index);
     if (firstPage != lastPage) UpdatePage(lastPage, index);
@@ -489,8 +499,8 @@ void ShrayFree(void *address)
     /* We leave potentially two pages mapped due to the alignment in ShrayMalloc, but
      * who cares. */
     MUNMAP_SAFE(heap.allocs[index].location, heap.allocs[index].size);
-//    BitmapFree(heap.allocs[index].local);
-//    BitmapFree(heap.allocs[index].prefetched);
+    BitmapFree(heap.allocs[index].local);
+    BitmapFree(heap.allocs[index].prefetched);
     heap.numberOfAllocs--;
     while ((unsigned)index < heap.numberOfAllocs) {
         heap.allocs[index] = heap.allocs[index + 1];
@@ -502,7 +512,7 @@ void ShrayFree(void *address)
  * only be called by the memory-thread. */
 void ShrayPrefetch(void *address, size_t size)
 {
-    /* We make the maximal subarray [start, end[ of [address, address + size[ available,
+    /* We make the minimal superset [start, end[ of [address, address + size[ available,
      * such that start, end are rounded to page boundaries.
      *
      * We only get pages we do not partially own to avoid needless communication, and to
@@ -516,8 +526,8 @@ void ShrayPrefetch(void *address, size_t size)
      *
      * This union is disjoint as min(end, ourStart) <= ourStart < ourEnd <= max(start, ourEnd).
      */
-    uintptr_t start = roundUp((uintptr_t)address, ShrayPagesz) * ShrayPagesz;
-    uintptr_t end = ((uintptr_t)address + size) / ShrayPagesz * ShrayPagesz;
+    uintptr_t start = roundDownPage((uintptr_t)address);
+    uintptr_t end = roundUpPage((uintptr_t)address + size);
 
     Allocation *alloc = heap.allocs + findAlloc((void *)start);
     if (findAlloc((void *)start) != findAlloc((void *)(end - 1))) {
@@ -527,10 +537,10 @@ void ShrayPrefetch(void *address, size_t size)
 
     uintptr_t location = (uintptr_t)alloc->location;
     size_t bytesPerBlock = alloc->bytesPerBlock;
-    uintptr_t ourStart = (location + Shray_rank * bytesPerBlock) / ShrayPagesz * ShrayPagesz;
+    uintptr_t ourStart = roundDownPage(location + Shray_rank * bytesPerBlock);
     uintptr_t ourEnd = (Shray_rank == Shray_size - 1) ?
-        roundUp(location + alloc->size, ShrayPagesz) * ShrayPagesz  :
-        location + roundUp((Shray_rank + 1) * bytesPerBlock, ShrayPagesz) * ShrayPagesz;
+        roundUpPage(location + alloc->size) :
+        roundUpPage(location + (Shray_rank + 1) * bytesPerBlock);
 
     DBUG_PRINT("Prefetch issued for [%p, %p[, we actually get [%p, %p[.",
             address, (void *)((uintptr_t)address + size), (void *)start, (void *)end);
@@ -545,8 +555,8 @@ void ShrayDiscard(void *address, size_t size)
 {
     /* Round to maximal subset [actualStart, actualEnd[ \subseteq [address, address + size[
      * such that actualStart, actualEnd are page-aligned. */
-    uintptr_t actualStart = roundUp((uintptr_t)address, ShrayPagesz) * ShrayPagesz;
-    uintptr_t actualEnd = ((uintptr_t)address + size) / ShrayPagesz * ShrayPagesz;
+    uintptr_t actualStart = roundUpPage((uintptr_t)address);
+    uintptr_t actualEnd = roundDownPage((uintptr_t)address + size);
 
     Allocation *alloc = heap.allocs + findAlloc(address);
 
