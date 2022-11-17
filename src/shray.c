@@ -357,7 +357,6 @@ static void UpdatePage(uintptr_t page, int index)
         uintptr_t end = min(page + ShrayPagesz, allocEnd);
 
         DBUG_PRINT("UpdatePage: we get [%p, %p[ from %d", (void *)start, (void *)end, rank);
-        /* TODO: does this need to be added to cache? */
         gasnet_get_nbi_bulk((void *)start, rank, (void *)start, end - start);
     }
 }
@@ -647,6 +646,8 @@ void ShrayPrefetch(void *address, size_t size)
 
     helpPrefetch(prefetch.start1, prefetch.end1, prefetch.alloc);
     helpPrefetch(prefetch.start2, prefetch.end2, prefetch.alloc);
+    // TODO: this might be two entries, check if that is the case and if so add
+    // 2 entries instead
     queue_queue(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1, prefetch.end2 - prefetch.start1);
 }
 
@@ -666,6 +667,7 @@ void ShrayDiscard(void *address, size_t size)
 
     discardBitmap(prefetch.start1, prefetch.end1, prefetch.alloc);
     discardBitmap(prefetch.start2, prefetch.end2, prefetch.alloc);
+    // TODO: see TODO for prefetch
     size_t index = queue_find(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1);
     queue_remove_at(cache.prefetchCaches, index);
 }
