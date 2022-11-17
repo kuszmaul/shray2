@@ -52,7 +52,6 @@ void queue_free(queue_t *queue)
 void queue_queue(queue_t *queue, void *alloc, void *start, size_t size)
 {
 	queue_entry_t *free_entry = &queue->data[queue->free_start];
-	queue_entry_t *last_entry = &queue->data[queue->data_end];
 
 	free_entry->alloc = alloc;
 	free_entry->start = start;
@@ -63,8 +62,13 @@ void queue_queue(queue_t *queue, void *alloc, void *start, size_t size)
 		next_free_entry->prev = NOLINK;
 	}
 
+	if (queue->data_end != NOLINK) {
+		queue->data[queue->data_end].next = queue->free_start;
+	}
+	if (queue->data_start == NOLINK) {
+		queue->data_start = queue->free_start;
+	}
 
-	last_entry->next = queue->free_start;
 	free_entry->prev = queue->data_end;
 
 	queue->data_end = queue->free_start;
