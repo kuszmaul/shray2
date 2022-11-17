@@ -43,6 +43,15 @@ typedef struct Heap {
     unsigned int numberOfAllocs;
 } Heap;
 
+/* We prefetch [start1, end1[ \cup [start2, end2[ which is part of allocation alloc. */
+typedef struct PrefetchStruct {
+    uintptr_t start1;
+    uintptr_t end1;
+    uintptr_t start2;
+    uintptr_t end2;
+    Allocation *alloc;
+} PrefetchStruct;
+
 /**************************************************
  * Error handling
  **************************************************/

@@ -68,6 +68,31 @@ static uintptr_t roundDownPage(uintptr_t addr)
     return addr / ShrayPagesz * ShrayPagesz;
 }
 
+/* Frees [start, end[. start, end need to be ShrayPagesz-aligned */
+static inline void freeRAM(uintptr_t start, uintptr_t end)
+{
+    if (start + ShrayPagesz >= end) return;
+
+    void *address;
+    MUNMAP_SAFE((void *)start, end - start);
+    MMAP_SAFE(address, mmap((void *)start, end - start, PROT_NONE,
+                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
+}
+
+/* Sets [start, end[ to zero in the prefetch, local bitmaps, and decreases the used
+ * memory by the appropiate amount. */
+static void discardBitmap(uintptr_t start, uintptr_t end, Allocation *alloc)
+{
+    size_t firstPageNumber = (start - (uintptr_t)alloc->location) / ShrayPagesz;
+    size_t lastPageNumber = (end - (uintptr_t)alloc->location) / ShrayPagesz;
+
+    BitmapSetZeroes(alloc->prefetched, firstPageNumber, lastPageNumber);
+    BitmapSetZeroes(alloc->local, firstPageNumber, lastPageNumber);
+
+    cache.usedMemory -= (lastPageNumber - firstPageNumber) * ShrayPagesz;
+    alloc->usedMemory -= (lastPageNumber - firstPageNumber) * ShrayPagesz;
+}
+
 /* Simple binary search, assumes heap.allocs is sorted. Returns the index of the
  * allocation segfault belongs to. */
 static int findAlloc(void *segfault)
@@ -90,6 +115,47 @@ static int findAlloc(void *segfault)
     }
 
     return middle;
+}
+
+static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
+{
+    /* We get the minimal page-aligned superset [start, end[ of [address, size[,
+     * except for the stuff we already have.
+     *
+     * If our node owns [ourStart, ourEnd[ (rounded to pages!), then we need to fetch
+     * [start, end[ \cap [ourStart, ourEnd[^c =
+     * [start, end[ \cap (]-\infty, ourStart[ \cup [ourEnd, \infty[) =
+     * ([start, end[ \cap ]-\infty, ourStart[) \cup ([start, end[ \cap [ourEnd, \infty[) =
+     * [start, min(end, ourStart)[ \cup [max(start, ourEnd), end[.
+     *
+     * This union is disjoint as min(end, ourStart) <= ourStart < ourEnd <= max(start, ourEnd).
+     */
+    uintptr_t start = roundDownPage((uintptr_t)address);
+    uintptr_t end = roundUpPage((uintptr_t)address + size);
+
+    Allocation *alloc = heap.allocs + findAlloc((void *)start);
+
+    if (findAlloc((void *)start) != findAlloc((void *)(end - ShrayPagesz))) {
+        DBUG_PRINT("ShrayGet [%p, %p[ is not within a single allocation.", (void *)start,
+                (void *)end);
+    }
+
+    uintptr_t location = (uintptr_t)alloc->location;
+    size_t bytesPerBlock = alloc->bytesPerBlock;
+    uintptr_t ourStart = roundDownPage(location + Shray_rank * bytesPerBlock);
+    uintptr_t ourEnd = (Shray_rank == Shray_size - 1) ?
+        roundUpPage(location + alloc->size) :
+        roundUpPage(location + (Shray_rank + 1) * bytesPerBlock);
+
+    PrefetchStruct result;
+
+    result.start1 = start;
+    result.end1 = min(end, ourStart);
+    result.start2 = max(start, ourEnd);
+    result.end2 = end;
+    result.alloc = alloc;
+
+    return result;
 }
 
 /* Evicts at least size bytes from the index'th allocation.
@@ -512,69 +578,30 @@ void ShrayFree(void *address)
  * only be called by the memory-thread. */
 void ShrayPrefetch(void *address, size_t size)
 {
-    /* We make the minimal superset [start, end[ of [address, address + size[ available,
-     * such that start, end are rounded to page boundaries.
-     *
-     * We only get pages we do not partially own to avoid needless communication, and to
-     * not mess up the protections of owned pages.
-     *
-     * If our node owns [ourStart, ourEnd[ (rounded to pages!), then we need to fetch
-     * [start, end[ \cap [ourStart, ourEnd[^c =
-     * [start, end[ \cap (]-\infty, ourStart[ \cup [ourEnd, \infty[) =
-     * ([start, end[ \cap ]-\infty, ourStart[) \cup ([start, end[ \cap [ourEnd, \infty[) =
-     * [start, min(end, ourStart)[ \cup [max(start, ourEnd), end[.
-     *
-     * This union is disjoint as min(end, ourStart) <= ourStart < ourEnd <= max(start, ourEnd).
-     */
-    uintptr_t start = roundDownPage((uintptr_t)address);
-    uintptr_t end = roundUpPage((uintptr_t)address + size);
+    PrefetchStruct prefetch = GetPrefetchStruct(address, size);
 
-    Allocation *alloc = heap.allocs + findAlloc((void *)start);
-    if (findAlloc((void *)start) != findAlloc((void *)(end - 1))) {
-        DBUG_PRINT("ShrayGet [%p, %p[ is not within a single allocation.", (void *)start,
-                (void *)end);
-    }
+    DBUG_PRINT("Prefetch issued for [%p, %p[.", address, (void *)((uintptr_t)address + size));
 
-    uintptr_t location = (uintptr_t)alloc->location;
-    size_t bytesPerBlock = alloc->bytesPerBlock;
-    uintptr_t ourStart = roundDownPage(location + Shray_rank * bytesPerBlock);
-    uintptr_t ourEnd = (Shray_rank == Shray_size - 1) ?
-        roundUpPage(location + alloc->size) :
-        roundUpPage(location + (Shray_rank + 1) * bytesPerBlock);
-
-    DBUG_PRINT("Prefetch issued for [%p, %p[, we actually get [%p, %p[.",
-            address, (void *)((uintptr_t)address + size), (void *)start, (void *)end);
-
-    helpPrefetch(start, min(end, ourStart), alloc);
-    helpPrefetch(max(start, ourEnd), end, alloc);
+    helpPrefetch(prefetch.start1, prefetch.end1, prefetch.alloc);
+    helpPrefetch(prefetch.start2, prefetch.end2, prefetch.alloc);
 }
 
 /* FIXME Not thread-safe. If we want to go that route, this should at the very least
  * only be called by the memory-thread. */
 void ShrayDiscard(void *address, size_t size)
 {
-    /* Round to maximal subset [actualStart, actualEnd[ \subseteq [address, address + size[
-     * such that actualStart, actualEnd are page-aligned. */
-    uintptr_t actualStart = roundUpPage((uintptr_t)address);
-    uintptr_t actualEnd = roundDownPage((uintptr_t)address + size);
-
-    Allocation *alloc = heap.allocs + findAlloc(address);
-
+    PrefetchStruct prefetch = GetPrefetchStruct(address, size);
     /* It would be strange to discard before we even have the data, but it is possible. */
     gasnet_wait_syncnbi_gets();
 
-    MUNMAP_SAFE((void *)actualStart, actualEnd - actualStart);
-    MMAP_SAFE(address, mmap((void *)actualStart, actualEnd - actualStart, PROT_NONE,
-                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
+    DBUG_PRINT("We free [%p, %p[ and [%p, %p[", (void *)prefetch.start1, (void *)prefetch.end1,
+            (void *)prefetch.start2, (void *)prefetch.end2);
 
-    size_t firstPageNumber = (actualStart - (uintptr_t)alloc->location) / ShrayPagesz;
-    size_t lastPageNumber = (actualEnd - (uintptr_t)alloc->location) / ShrayPagesz;
+    freeRAM(prefetch.start1, prefetch.end1);
+    freeRAM(prefetch.start2, prefetch.end2);
 
-    BitmapSetZeroes(alloc->prefetched, firstPageNumber, lastPageNumber);
-    BitmapSetZeroes(alloc->local, firstPageNumber, lastPageNumber);
-
-    cache.usedMemory -= (lastPageNumber - firstPageNumber) * ShrayPagesz;
-    alloc->usedMemory -= (lastPageNumber - firstPageNumber) * ShrayPagesz;
+    discardBitmap(prefetch.start1, prefetch.end1, prefetch.alloc);
+    discardBitmap(prefetch.start2, prefetch.end2, prefetch.alloc);
 }
 
 void ShrayReport(void)
