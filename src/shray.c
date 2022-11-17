@@ -670,6 +670,8 @@ void ShrayDiscard(void *address, size_t size)
     // TODO: see TODO for prefetch
     size_t index = queue_find(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1);
     queue_remove_at(cache.prefetchCaches, index);
+    // TODO: discard needs to evict the actual entry, however evictCacheEntry
+    // also calls unmap/map which conflicts with freeRAM
 }
 
 void ShrayReport(void)
