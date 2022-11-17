@@ -109,7 +109,7 @@ queue_entry_t queue_remove_at(queue_t *queue, size_t index)
 		queue->data[entry->prev].next = entry->next;
 	}
 	if (entry->next != NOLINK) {
-		queue->data[entry->next].next = entry->prev;
+		queue->data[entry->next].prev = entry->prev;
 	}
 
 	if (index == queue->data_start) {
