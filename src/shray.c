@@ -73,9 +73,9 @@ static inline void freeRAM(uintptr_t start, uintptr_t end)
 {
     if (start + ShrayPagesz >= end) return;
 
-    void *address;
+    void *dummy;
     MUNMAP_SAFE((void *)start, end - start);
-    MMAP_SAFE(address, mmap((void *)start, end - start, PROT_NONE,
+    MMAP_SAFE(dummy, mmap((void *)start, end - start, PROT_NONE,
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
 }
 
@@ -226,6 +226,12 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
                 range.start, range.end, start, (void *)((uintptr_t)start + length));
 
         MREMAP_MOVE(start, toShadow(start, alloc), length);
+        /* We immediately remap the shadow part to not leave holes in our allocation.
+         * Because of lazy allocation, this does not increase the memory footprint.
+         * Using MREMAP_DONTUNMAP would. */
+        void *dummy;
+        MMAP_SAFE(dummy, mmap(toShadow(start, alloc), length, PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
 
         BitmapSetZeroes(alloc->prefetched, range.start, range.end);
         BitmapSetZeroes(alloc->local, range.start, range.end);
@@ -244,11 +250,9 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
 
         DBUG_PRINT("Segfault is owned by node %d.", owner);
 
-        MPROTECT_SAFE((void *)roundedAddress, ShrayPagesz, PROT_WRITE);
+        MPROTECT_SAFE((void *)roundedAddress, ShrayPagesz, PROT_READ | PROT_WRITE);
 
         gasnet_get((void *)roundedAddress, owner, (void *)roundedAddress, ShrayPagesz);
-
-        MPROTECT_SAFE((void *)roundedAddress, ShrayPagesz, PROT_READ);
 
         DBUG_PRINT("We set pages [%zu, %zu[ to locally available.",
                 pageNumber, pageNumber + 1);
@@ -315,8 +319,6 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
     size_t size = alloc->size;
     uintptr_t bytesPerBlock = alloc->bytesPerBlock;
 
-    MPROTECT_SAFE(toShadow((void *)start, alloc), end - start, PROT_WRITE);
-
     unsigned int firstOwner = (start - location) / bytesPerBlock;
     /* We take the min with Shay_size because the last part of the last page is not owned by
      * anyone. */
@@ -328,6 +330,8 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 
     BitmapSetOnes(alloc->prefetched,
             (start - location) / ShrayPagesz, (end - location) / ShrayPagesz);
+
+    /* FIXME shared ownership is possible, so we may get pages redundantly. */
 
     DBUG_PRINT("Prefetch [%p, %p[ from nodes %d, ..., %d",
             (void *)start, (void *)end, firstOwner, lastOwner);
@@ -436,7 +440,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     }
 
     void *shadow;
-    MMAP_SAFE(shadow, mmap(NULL, totalSize + ShrayPagesz, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE,
+    MMAP_SAFE(shadow, mmap(NULL, totalSize + ShrayPagesz, PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE,
                 -1, 0));
     DBUG_PRINT("We allocate shadow [%p, %p[", shadow,
             (void *)((uintptr_t)shadow + totalSize + ShrayPagesz));

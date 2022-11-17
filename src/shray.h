@@ -70,7 +70,7 @@ typedef struct PrefetchStruct {
         DBUG_PRINT("Protected [%p, %p[ to %s", addr, (void *)((uintptr_t)addr + len),   \
             #prot);                                                                     \
         if (mprotect(addr, len, prot) != 0) {                                           \
-            fprintf(stderr, "Line %d, node [%d]: ", __LINE__, Shray_rank);              \
+            fprintf(stderr, "Line %d, [node %d]: ", __LINE__, Shray_rank);              \
             perror("mprotect failed");                                                  \
             ShrayFinalize(1);                                                           \
         }                                                                               \
@@ -94,7 +94,7 @@ typedef struct PrefetchStruct {
     {                                                                                   \
         variable = fncall;                                                              \
         if (variable == MAP_FAILED) {                                                   \
-            fprintf(stderr, "Line %d, node [%d]: ", __LINE__, Shray_rank);              \
+            fprintf(stderr, "Line %d, [node %d]: ", __LINE__, Shray_rank);              \
             perror("mmap failed");                                                      \
             ShrayFinalize(1);                                                           \
         }                                                                               \
@@ -113,7 +113,7 @@ typedef struct PrefetchStruct {
     {                                                                                   \
         variable = malloc(size);                                                        \
         if (variable == NULL) {                                                         \
-            fprintf(stderr, "Line %d, node [%d]: malloc failed with size %zu\n",        \
+            fprintf(stderr, "Line %d, [node %d]: malloc failed with size %zu\n",        \
                     __LINE__, Shray_rank, size);                                        \
             ShrayFinalize(1);                                                           \
         }                                                                               \
@@ -123,7 +123,7 @@ typedef struct PrefetchStruct {
     {                                                                                   \
         variable = realloc(variable, size);                                             \
         if (variable == NULL) {                                                         \
-            fprintf(stderr, "Line %d, node [%d]: realloc failed with size %zu\n",       \
+            fprintf(stderr, "Line %d, [node %d]: realloc failed with size %zu\n",       \
                     __LINE__, Shray_rank, size);                                        \
             ShrayFinalize(1);                                                           \
         }                                                                               \
