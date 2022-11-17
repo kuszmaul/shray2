@@ -2,6 +2,9 @@
 #define QUEUE_GUARD
 
 #include <stddef.h>
+#include <stdint.h>
+
+#define NOLINK SIZE_MAX
 
 typedef struct
 {

@@ -2,8 +2,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-static const size_t NOLINK = SIZE_MAX;
-
 static void queue_clear(queue_t *queue)
 {
 	queue_entry_t *entry;
