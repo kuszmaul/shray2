@@ -667,7 +667,7 @@ void ShrayDiscard(void *address, size_t size)
 
     discardBitmap(prefetch.start1, prefetch.end1, prefetch.alloc);
     discardBitmap(prefetch.start2, prefetch.end2, prefetch.alloc);
-    size_t index = queue_find(cache.prefetchCaches, prfetch.alloc, (void*)prefetch.start1);
+    size_t index = queue_find(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1);
     queue_remove_at(cache.prefetchCaches, index);
 }
 
