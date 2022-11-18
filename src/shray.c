@@ -121,6 +121,8 @@ static inline void freeRAM(uintptr_t start, uintptr_t end)
 {
     if (start + ShrayPagesz >= end) return;
 
+    DBUG_PRINT("We free [%p, %p[", (void *)start, (void *)end);
+
     void *dummy;
     MUNMAP_SAFE((void *)start, end - start);
     MMAP_SAFE(dummy, mmap((void *)start, end - start, PROT_NONE,
@@ -131,6 +133,8 @@ static inline void freeRAM(uintptr_t start, uintptr_t end)
  * memory by the appropiate amount. */
 static void discardBitmap(uintptr_t start, uintptr_t end, Allocation *alloc)
 {
+    if (start >= end) return;
+
     size_t firstPageNumber = (start - alloc->location) / ShrayPagesz;
     size_t lastPageNumber = (end - alloc->location) / ShrayPagesz;
 
@@ -138,7 +142,7 @@ static void discardBitmap(uintptr_t start, uintptr_t end, Allocation *alloc)
     BitmapSetZeroes(alloc->local, firstPageNumber, lastPageNumber);
 
     cache.usedMemory -= (lastPageNumber - firstPageNumber) * ShrayPagesz;
-//    alloc->usedMemory -= (lastPageNumber - firstPageNumber) * ShrayPagesz;
+    alloc->usedMemory -= (lastPageNumber - firstPageNumber) * ShrayPagesz;
 }
 
 /* Simple binary search, assumes heap.allocs is sorted. Returns the index of the
@@ -193,10 +197,10 @@ static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
 
     PrefetchStruct result;
 
-    result.start1 = start;
-    result.end1 = min(end, ourStart);
-    result.start2 = max(start, ourEnd);
-    result.end2 = end;
+    result.get1.start = start;
+    result.get1.end = min(end, ourStart);
+    result.get2.start = max(start, ourEnd);
+    result.get2.end = end;
     result.alloc = alloc;
 
     return result;
@@ -215,6 +219,7 @@ static void evictCacheEntry(Allocation *alloc, void *start, size_t pages)
 
     freeRAM((uintptr_t)start, size);
     cache.usedMemory -= pages * ShrayPagesz;
+    alloc->usedMemory -= pages * ShrayPagesz;
 }
 
 /* Assumes both pages are page-aligned. */
@@ -286,49 +291,62 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
     void *address = si->si_addr;
     uintptr_t roundedAddress = roundDownPage((uintptr_t)address);
 
+    DBUG_PRINT("Segfault %p", address);
+
     Allocation *alloc = heap.allocs + findAlloc((void *)roundedAddress);
 
     size_t pageNumber = (roundedAddress - alloc->location) / ShrayPagesz;
+    DBUG_PRINT("Page %zu", pageNumber);
 
-    DBUG_PRINT("Segfault %p (page %zu)", address, pageNumber);
 
     /* FIXME this waits for all prefetches, which we do not want to do as we will have a
      * prefetch 1 -> compute 0 -> prefetch 2 -> compute 1 kind of pattern in most applications,
      * so when we do compute n we wait for prefetch n, but at that point we have already
      * issued prefetch n + 1 just before. */
     if (BitmapCheck(alloc->prefetched, pageNumber)) {
-        /* This is not correct either. */
-        Range range = BitmapSurrounding(alloc->prefetched, pageNumber);
+//        Range range = BitmapSurrounding(alloc->prefetched, pageNumber);
+//
+//        DBUG_PRINT("%p is currently being prefetched, along with [%p, %p[",
+//               address, (void *)(alloc->location + range.start * ShrayPagesz),
+//               (void *)(alloc->location + range.end * ShrayPagesz));
 
-        DBUG_PRINT("%p is currently being prefetched, along with [%p, %p[",
-               address, (void *)(alloc->location + range.start * ShrayPagesz),
-               (void *)(alloc->location + range.end * ShrayPagesz));
+        /* TODO
+         * GetStruct *get = findGet(roundedAddress, cache.prefetches);
+         * gasnet_wait_syncnb_all(get->handles, get->numberOfHandles);
+         * void *start = (void *)get->start;
+         * MREMAP_MOVE(start, toShadow(get->start, alloc), get->end - get->start);
+         * MMAP_SAFE(start, mmap(toShadow(get->start, alloc), get->end - get->start, PROT_WRITE,
+         *           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+         * BitmapSetZeroes(alloc->prefetched, get.start / ShrayPagesz, get.end / ShrayPagesz);
+         * BitmapSetZeroes(alloc->local, get.start / ShrayPagesz, get.end / ShrayPagesz);
+         * remove(get, cache.prefetches);
+         *
+         * We only use alloc->prefetched bitmap to make checking
+         * whether it is prefetched O(1) instead of linear in the number of prefetches. */
 
-        gasnet_wait_syncnbi_gets();
+//        uintptr_t start = alloc->location + range.start * ShrayPagesz;
+//        void *voidStart = (void *)start;
+//        uintptr_t length = (range.end - range.start) * ShrayPagesz;
 
-        uintptr_t start = alloc->location + range.start * ShrayPagesz;
-        void *voidStart = (void *)start;
-        uintptr_t length = (range.end - range.start) * ShrayPagesz;
+//        DBUG_PRINT("We bring pages [%zu, %zu[ ([%p, %p[) into the light",
+//                range.start, range.end, (void *)start, (void *)(start + length));
 
-        DBUG_PRINT("We bring pages [%zu, %zu[ ([%p, %p[) into the light",
-                range.start, range.end, (void *)start, (void *)(start + length));
-
-        MREMAP_MOVE(voidStart, toShadow(start, alloc), length);
-        /* We immediately remap the shadow part to not leave holes in our allocation.
-         * Because of lazy allocation, this does not increase the memory footprint.
-         * Using MREMAP_DONTUNMAP would. */
-        void *dummy;
-        MMAP_SAFE(dummy, mmap(toShadow(start, alloc), length, PROT_WRITE,
-                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-
-        BitmapSetZeroes(alloc->prefetched, range.start, range.end);
-        BitmapSetZeroes(alloc->local, range.start, range.end);
+//        MREMAP_MOVE(voidStart, toShadow(start, alloc), length);
+//        /* We immediately remap the shadow part to not leave holes in our allocation.
+//         * Because of lazy allocation, this does not increase the memory footprint.
+//         * Using MREMAP_DONTUNMAP would. */
+//        void *dummy;
+//        MMAP_SAFE(dummy, mmap(toShadow(start, alloc), length, PROT_WRITE,
+//                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+//
+//        BitmapSetZeroes(alloc->prefetched, range.start, range.end);
+//        BitmapSetZeroes(alloc->local, range.start, range.end);
     } else {
         DBUG_PRINT("%p is not being prefetched, perform blocking fetch.", address);
         if (cache.usedMemory + ShrayPagesz > cache.maximumMemory) {
             DBUG_PRINT("We free up %zu bytes of cache memory", cache.maximumMemory / 10);
             /*
-             * TODO: Need to do a sync here as well, if the cache is full
+             * TODO: Need to do a wait here as well, if the cache is full
              * and we need to evict we might need to evict prefetched data. In
              * that case we would need to do the same thing as in the if case
              * above.
@@ -404,10 +422,13 @@ static void UpdatePage(uintptr_t page, int index)
     }
 }
 
-/* Gets [start, end[ asynchronously to the allocation shadow
- * start, end are page-aligned and not owned by our rank. */
-static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *alloc)
+/* Gets [get.start, get.end[ asynchronously to the allocation shadow
+ * start, end are page-aligned and not owned by our rank. Sets the handles
+ * of the get. */
+static inline void helpPrefetch(GetStruct *get, Allocation *alloc)
 {
+    uintptr_t start = get->start;
+    uintptr_t end = get->end;
     if (end <= start) return;
 
     uintptr_t location = alloc->location;
@@ -421,6 +442,8 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
     DBUG_PRINT("Prefetch [%p, %p[ from nodes %d, ..., %d",
             (void *)start, (void *)end, firstOwner, lastOwner);
 
+    MALLOC_SAFE(get->handles, (lastOwner - firstOwner + 1) * sizeof(gasnet_handle_t));
+    get->numberOfHandles = 0;
     /* As Ap_r for r = firstOwner, ..., lastOwner covers [start, end[, we can take
      * the intersection with it to get a partition [start_r, end_r[ of [start, end[.
      * This is necessary to ensure we do not get pages twice. */
@@ -431,7 +454,10 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
         if (start_r < end_r) {
             DBUG_PRINT("Get [%p, %p[ from node %d and store it in %p",
                     (void *)start_r, (void *)end_r, rank, toShadow(start_r, alloc));
-            gasnet_get_nbi_bulk(toShadow(start_r, alloc), rank, (void *)start_r, end_r - start_r);
+
+            get->handles[get->numberOfHandles] =
+                gasnet_get_nb_bulk(toShadow(start_r, alloc), rank, (void *)start_r, end_r - start_r);
+            get->numberOfHandles++;
 
             DBUG_PRINT("We set this to prefetched (pages [%zu, %zu[)",
                 (start_r - location) / ShrayPagesz, (end_r - location) / ShrayPagesz);
@@ -447,10 +473,8 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 /* Resetting the protections is done by ShrayRealloc and ShraySync */
 static void resetCache(Allocation *alloc)
 {
-//    FIXME do we need the alloc->usedMemory here? Do we even need to
-//    reset the cache ever?
-//    cache.usedMemory -= alloc->usedMemory;
-//    alloc->usedMemory = 0;
+    cache.usedMemory -= alloc->usedMemory;
+    alloc->usedMemory = 0;
 
     BitmapReset(alloc->local);
     BitmapReset(alloc->prefetched);
@@ -678,11 +702,11 @@ void ShrayPrefetch(void *address, size_t size)
 
     DBUG_PRINT("Prefetch issued for [%p, %p[.", address, (void *)((uintptr_t)address + size));
 
-    helpPrefetch(prefetch.start1, prefetch.end1, prefetch.alloc);
-    helpPrefetch(prefetch.start2, prefetch.end2, prefetch.alloc);
+    helpPrefetch(&(prefetch.get1), prefetch.alloc);
+    helpPrefetch(&(prefetch.get2), prefetch.alloc);
     // TODO: this might be two entries, check if that is the case and if so add
     // 2 entries instead
-    queue_queue(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1, prefetch.end2 - prefetch.start1);
+//    queue_queue(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1, prefetch.get2.end - prefetch.get1.start);
 }
 
 /* FIXME Not thread-safe. If we want to go that route, this should at the very least
@@ -690,25 +714,22 @@ void ShrayPrefetch(void *address, size_t size)
 void ShrayDiscard(void *address, size_t size)
 {
     PrefetchStruct prefetch = GetPrefetchStruct(address, size);
-    size_t index = queue_find(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1);
-    if (index == NOLINK) {
-        DBUG_PRINT("Ignoring discard for %p since prefetch was not found", (void*)prefetch.start1);
-        return;
-    }
+//    size_t index = queue_find(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1);
+//    if (index == NOLINK) {
+//        DBUG_PRINT("Ignoring discard for %p since prefetch was not found", (void*)prefetch.start1);
+//        return;
+//    }
 
     /* It would be strange to discard before we even have the data, but it is possible. */
     gasnet_wait_syncnbi_gets();
 
-    DBUG_PRINT("We free [%p, %p[ and [%p, %p[", (void *)prefetch.start1, (void *)prefetch.end1,
-            (void *)prefetch.start2, (void *)prefetch.end2);
+    freeRAM(prefetch.get1.start, prefetch.get1.end);
+    freeRAM(prefetch.get2.start, prefetch.get2.end);
 
-    freeRAM(prefetch.start1, prefetch.end1);
-    freeRAM(prefetch.start2, prefetch.end2);
-
-    discardBitmap(prefetch.start1, prefetch.end1, prefetch.alloc);
-    discardBitmap(prefetch.start2, prefetch.end2, prefetch.alloc);
+    discardBitmap(prefetch.get1.start, prefetch.get1.end, prefetch.alloc);
+    discardBitmap(prefetch.get2.start, prefetch.get2.end, prefetch.alloc);
     // TODO: see TODO for prefetch
-    queue_remove_at(cache.prefetchCaches, index);
+   // queue_remove_at(cache.prefetchCaches, index);
     // TODO: discard needs to evict the actual entry, however evictCacheEntry
     // also calls unmap/map which conflicts with freeRAM
 }
@@ -733,7 +754,7 @@ unsigned int ShraySize(void)
 
 void ShrayFinalize(int exit_code)
 {
-    ringbuffer_free(cache.autoCaches);
-    queue_free(cache.prefetchCaches);
+//    ringbuffer_free(cache.autoCaches);
+//    queue_free(cache.prefetchCaches);
     gasnet_exit(exit_code);
 }

@@ -25,6 +25,7 @@ typedef struct {
     size_t maximumMemory;
     ringbuffer_t *autoCaches;
     queue_t *prefetchCaches;
+    node_t *prefetches;
 } Cache;
 
 /* A single allocation in the heap. */
@@ -37,6 +38,8 @@ typedef struct Allocation {
     Bitmap *prefetched;
     /* We put all the prefetched stuff here until it is remapped to the proper position. */
     void *shadow;
+    /* We need to know this when invalidating the cache for an allocation. */
+    size_t usedMemory;
 } Allocation;
 
 typedef struct Heap {
@@ -48,16 +51,18 @@ typedef struct Heap {
     unsigned int numberOfAllocs;
 } Heap;
 
+/* Encodes the get request(s) of a contiguous range [start, end[. */
+typedef struct GetStruct {
+    uintptr_t start;
+    uintptr_t end;
+    unsigned int numberOfHandles;
+    gasnet_handle_t *handles;
+} GetStruct;
+
 /* We prefetch [start1, end1[ \cup [start2, end2[ which is part of allocation alloc. */
 typedef struct PrefetchStruct {
-    uintptr_t start1;
-    uintptr_t end1;
-    gasnet_handle_t *handles1;
-    size_t numberOfHandles1;
-    uintptr_t start2;
-    uintptr_t end2;
-    gasnet_handle_t *handles2;
-    size_t numberOfHandles2;
+    GetStruct get1;
+    GetStruct get2;
     Allocation *alloc;
 } PrefetchStruct;
 

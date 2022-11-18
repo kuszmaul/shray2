@@ -1,21 +1,30 @@
-1. The output of mpirun -n 4 bin/matrix_profile 4000
-
-is
-
-Time 1.311056, 97.631222 Gflops/s
-Shray report P(1): 67 segfaults, 6 barriers, 274432 bytes communicated.
-Shray report P(2): 67 segfaults, 6 barriers, 274432 bytes communicated.
-Shray report P(3): 67 segfaults, 6 barriers, 274432 bytes communicated.
-Shray report P(0): 3 segfaults, 6 barriers, 12288 bytes communicated.
-Success!
-Success!
-Success!
-Success!
-
-It should only segfault p - 1 times, so why does it segfault more often for P(1), P(2), P(3)?
-
-2. nbody with Shray is much faster than Fortran or OpenShmem. That makes no sense either.
+1. nbody with Shray is much faster than Fortran or OpenShmem. That makes no sense either.
    A month back this was not yet the case?! The Fortran or OpenShmem code was not changed
    since then.
 
-3. After refactoring bin/matrix_profile is slower
+2. When it does not prefetch due to a too small cache, it is faster
+
+thomas@thomas-laptop:~/work/dsm/shray2.0$ mpirun -n 4 bin/matrix_profile 8000
+Time 12.810294, 79.935714 Gflops/s
+Shray report P(1): 2 segfaults, 9 barriers, 8192 bytes communicated.
+Shray report P(2): 2 segfaults, 9 barriers, 8192 bytes communicated.
+Shray report P(3): 2 segfaults, 9 barriers, 8192 bytes communicated.
+Shray report P(0): 2 segfaults, 9 barriers, 8192 bytes communicated.
+Success!
+Success!
+Success!
+Success!
+
+thomas@thomas-laptop:~/work/dsm/shray2.0$ export SHRAY_CACHESIZE=4096000
+thomas@thomas-laptop:~/work/dsm/shray2.0$ mpirun -n 4 bin/matrix_profile 8000
+Shray report P(3): 93750 segfaults, 9 barriers, 384000000 bytes communicated.
+Shray report P(0): 93750 segfaults, 9 barriers, 384000000 bytes communicated.
+Shray report P(1): 93750 segfaults, 9 barriers, 384000000 bytes communicated.
+Shray report P(2): 93750 segfaults, 9 barriers, 384000000 bytes communicated.
+Time 10.363380, 98.809462 Gflops/s
+Success!
+Success!
+Success!
+Success!
+
+But this is probably due to the poor prefetching.
