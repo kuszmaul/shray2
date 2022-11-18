@@ -162,8 +162,9 @@ void BitmapSetZeroes(Bitmap *bitmap, size_t start, size_t end)
     size_t startIndex = integer(start);
     size_t endIndex = integer(end - 1);
     /* Has zeroes at the bits we want to set to zero. */
-    uint64_t firstZeroesMask = 0xFFFFFFFFFFFFFFFFu << firstZeroes;
-    uint64_t lastZeroesMask = 0xFFFFFFFFFFFFFFFFu >> lastZeroes;
+    uint64_t firstZeroesMask = (firstZeroes == 64) ? (uint64_t)0 :
+                                                     0xFFFFFFFFFFFFFFFFu << firstZeroes;
+    uint64_t lastZeroesMask = (lastZeroes == 64) ? (uint64_t)0 : 0xFFFFFFFFFFFFFFFFu >> lastZeroes;
 
     if (startIndex == endIndex) {
         bitmap->bits[startIndex] &= firstZeroesMask & lastZeroesMask;
@@ -190,8 +191,10 @@ void BitmapSetOnes(Bitmap *bitmap, size_t start, size_t end)
     size_t startIndex = integer(start);
     size_t endIndex = integer(end - 1);
     /* Has ones at the bits we want to set to one. */
-    uint64_t firstOnesMask = ~(0xFFFFFFFFFFFFFFFFu << firstOnes);
-    uint64_t lastOneMask = ~(0xFFFFFFFFFFFFFFFFu >> lastOnes);
+    uint64_t firstOnesMask = (firstOnes == 64) ? 0xFFFFFFFFFFFFFFFFu :
+                                                 ~(0xFFFFFFFFFFFFFFFFu << firstOnes);
+    uint64_t lastOneMask = (lastOnes == 64) ? 0xFFFFFFFFFFFFFFFFu :
+                                              ~(0xFFFFFFFFFFFFFFFFu >> lastOnes);
 
     if (startIndex == endIndex) {
         bitmap->bits[startIndex] |= firstOnesMask & lastOneMask;
@@ -223,62 +226,73 @@ void BitmapCopyOnes(Bitmap *dest, Bitmap *src)
     }
 }
 
+/* Helper function for BitmapSurrounding: returns the minimal a such that
+ * [a, index] of bitmap are all ones. */
+static size_t leftConsecutive(Bitmap *bitmap, size_t index)
+{
+    size_t a = index;
+
+    /* Minimal a within the indexth integer. */
+    a += 1 - countBitsLeft(bitmap->bits[integer(index)], bit(index));
+
+    /* We do not have to check integers to our left. */
+    if (bit(a) != 0 || integer(index) == 0) return a;
+
+    /* Count the integers consisting of only 1s to the left. */
+    size_t toTheLeft = integer(index) - 1;
+    while (bitmap->bits[toTheLeft] == 0xFFFFFFFFFFFFFFFFu) {
+        a -= 64;
+        if (toTheLeft == 0) return a;
+        toTheLeft--;
+    }
+
+    /* Count the bits in the last integer. */
+    a -= countBitsLeft(bitmap->bits[toTheLeft], 63);
+
+    return a;
+}
+
+/* Helper function for BitmapSurrounding: returns the maximal a such that
+ * [index, b[ of bitmap are all ones. */
+static size_t rightConsecutive(Bitmap *bitmap, size_t index)
+{
+    /* Maximal b within the indexth integer if we are the last integer with some dummies. */
+    if (integer(index) == integer(bitmap->size - 1)) {
+        return min(index + countBitsRight(bitmap->bits[integer(index)], bit(index)), bitmap->size);
+    }
+
+    /* Maximal b within the indexth integer if we are not the last integer. */
+    size_t b = index + countBitsRight(bitmap->bits[integer(index)], bit(index));
+
+    /* The streak ends at the indexth integer. */
+    if (bit(b) != 0) return b;
+
+    /* Count bits consisting of only 1s to the right. */
+    size_t toTheRight = integer(index) + 1;
+    while (bitmap->bits[toTheRight] == 0xFFFFFFFFFFFFFFFFu) {
+        b += 64;
+        if (toTheRight == integer(bitmap->size - 1)) break;
+        toTheRight++;
+    }
+
+    /* Count the bits in the last integer. */
+    if (toTheRight == integer(bitmap->size - 1)) {
+        b += max(countBitsRight(bitmap->bits[toTheRight], 0), bit(bitmap->size));
+    } else {
+        b += countBitsRight(bitmap->bits[toTheRight], 0);
+    }
+
+    return b;
+}
+
 /* Returns maximal set [start, end[ containing index such that bitmap[i] = 1
- * for i in [start, end[. */
+ * for i in [start, end[. Assumes bitmap[index] = 1! */
 Range BitmapSurrounding(Bitmap *bitmap, size_t index)
 {
     Range range;
 
-    /* We slide start to the left as far as possible within the current integer. */
-    range.start = index + 1 - countBitsLeft(bitmap->bits[integer(index)], bit(index));
-
-    /* There are no more consecutive 1s in the integer to the left from us. */
-    if (index / 64 == 0 || range.start % 64 != 0) goto BitmapEnd;
-
-    size_t toTheLeft = index / 64 - 1;
-
-    while (bitmap->bits[toTheLeft] == 0xFFFFFFFFFFFFFFFFu) {
-        range.start -= 64;
-        if (toTheLeft == 0) goto BitmapEnd;
-        toTheLeft--;
-    }
-
-    range.start -= countBitsLeft(bitmap->bits[toTheLeft], 63);
-
-BitmapEnd:
-    /* We are the last integer. */
-    if (index / 64 == (bitmap->size - 1) / 64) {
-        range.end = min(index + countBitsRight(bitmap->bits[index / 64], index % 64),
-                bitmap->size);
-        return range;
-    }
-
-    /* We slide start to the right as far as possible within the current integer. */
-    range.end = index + countBitsRight(bitmap->bits[index / 64], index % 64);
-
-    /* There are no more consecutive 1s in the integer to the right from us. */
-    if (range.end % 64 != 0) return range;
-
-    /* We have 1s until the end of this integer and we are not the last integer. */
-    size_t toTheRight = index / 64 + 1;
-
-    while (toTheRight < (bitmap->size - 1) / 64 &&
-            bitmap->bits[toTheRight] == 0xFFFFFFFFFFFFFFFFu)
-    {
-        range.end += 64;
-        if (toTheRight == (bitmap->size - 1) / 64) return range;
-        toTheRight++;
-    }
-
-    /* We are not the last integer in the bitmap. */
-    if (toTheRight < (bitmap->size - 1) / 64) {
-        range.end += countBitsRight(bitmap->bits[toTheRight], 0);
-    }
-
-    /* We are the last integer in the bitmap. */
-    if (toTheRight == (bitmap->size - 1) / 64) {
-        range.end += min(countBitsRight(bitmap->bits[toTheRight], 0), bitmap->size % 64);
-    }
+    range.start = leftConsecutive(bitmap, index);
+    range.end = rightConsecutive(bitmap, index);
 
     return range;
 }

@@ -130,8 +130,26 @@ int testReduce(void)
 {
     Bitmap *bitmap = BitmapCreate(20);
     BitmapSetOnes(bitmap, 0, 9);
+    printf("Should have ones [0, 9[\n");
+    BitmapPrint(bitmap);
 
     int success = BitmapCheck(bitmap, 0);
+
+    BitmapFree(bitmap);
+
+    return success;
+}
+
+int testReduce2(void)
+{
+    Bitmap *bitmap = BitmapCreate(20);
+    BitmapSetOnes(bitmap, 10, 20);
+    printf("Should have ones [10, 20[\n");
+    BitmapPrint(bitmap);
+
+    Range range = BitmapSurrounding(bitmap, 10);
+
+    int success = (range.start == 10) && (range.end == 20);
 
     BitmapFree(bitmap);
 
@@ -147,6 +165,7 @@ int main(void)
     TEST(testCount());
     TEST(testStencil());
     TEST(testReduce());
+    TEST(testReduce2());
 
     testSetting();
 

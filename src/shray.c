@@ -286,17 +286,18 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
     void *address = si->si_addr;
     uintptr_t roundedAddress = roundDownPage((uintptr_t)address);
 
-    DBUG_PRINT("Segfault %p", address);
-
     Allocation *alloc = heap.allocs + findAlloc((void *)roundedAddress);
 
     size_t pageNumber = (roundedAddress - alloc->location) / ShrayPagesz;
+
+    DBUG_PRINT("Segfault %p (page %zu)", address, pageNumber);
 
     /* FIXME this waits for all prefetches, which we do not want to do as we will have a
      * prefetch 1 -> compute 0 -> prefetch 2 -> compute 1 kind of pattern in most applications,
      * so when we do compute n we wait for prefetch n, but at that point we have already
      * issued prefetch n + 1 just before. */
     if (BitmapCheck(alloc->prefetched, pageNumber)) {
+        /* This is not correct either. */
         Range range = BitmapSurrounding(alloc->prefetched, pageNumber);
 
         DBUG_PRINT("%p is currently being prefetched, along with [%p, %p[",
@@ -427,21 +428,17 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
         uintptr_t start_r = max(start, startPartition(alloc, rank));
         uintptr_t end_r = min(end, endPartition(alloc, rank));
 
-        DBUG_PRINT("We prefetch [%p, %p[ from node %d and store it in %p",
-                (void *)start_r, (void *)end_r, rank, toShadow(start_r, alloc));
-
         if (start_r < end_r) {
             DBUG_PRINT("Get [%p, %p[ from node %d and store it in %p",
                     (void *)start_r, (void *)end_r, rank, toShadow(start_r, alloc));
             gasnet_get_nbi_bulk(toShadow(start_r, alloc), rank, (void *)start_r, end_r - start_r);
 
             DBUG_PRINT("We set this to prefetched (pages [%zu, %zu[)",
-                (start_r - location) / ShrayPagesz, (end - location) / ShrayPagesz);
-            /* FIXME this seems not to happen when getting from node 0 */
+                (start_r - location) / ShrayPagesz, (end_r - location) / ShrayPagesz);
+
             BitmapSetOnes(alloc->prefetched, (start_r - location) / ShrayPagesz,
                 (end_r - location) / ShrayPagesz);
-            DBUG_PRINT("Prefetches[%d] = ", 0);
-            BitmapPrint(alloc->prefetched);
+
             // TODO add to queue or ringbuffer
         }
     }
@@ -584,8 +581,8 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     MPROTECT_SAFE((void *)startRead(alloc, Shray_rank), segmentLength, PROT_READ | PROT_WRITE);
 
-    alloc->local = BitmapCreate(segmentLength / ShrayPagesz);
-    alloc->prefetched = BitmapCreate(segmentLength / ShrayPagesz);
+    alloc->local = BitmapCreate(roundUp(totalSize, ShrayPagesz));
+    alloc->prefetched = BitmapCreate(roundUp(totalSize, ShrayPagesz));
 
     gasnetBarrier();
     BARRIERCOUNT;
