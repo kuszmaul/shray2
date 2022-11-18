@@ -430,16 +430,18 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
         DBUG_PRINT("We prefetch [%p, %p[ from node %d and store it in %p",
                 (void *)start_r, (void *)end_r, rank, toShadow(start_r, alloc));
 
-        DBUG_PRINT("We set this to prefetched (pages [%zu, %zu[)",
-                (start_r - location) / ShrayPagesz, (end - location) / ShrayPagesz);
-
-        BitmapSetOnes(alloc->prefetched, (start_r - location) / ShrayPagesz,
-                (end_r - location) / ShrayPagesz);
-
         if (start_r < end_r) {
             DBUG_PRINT("Get [%p, %p[ from node %d and store it in %p",
                     (void *)start_r, (void *)end_r, rank, toShadow(start_r, alloc));
             gasnet_get_nbi_bulk(toShadow(start_r, alloc), rank, (void *)start_r, end_r - start_r);
+
+            DBUG_PRINT("We set this to prefetched (pages [%zu, %zu[)",
+                (start_r - location) / ShrayPagesz, (end - location) / ShrayPagesz);
+            /* FIXME this seems not to happen when getting from node 0 */
+            BitmapSetOnes(alloc->prefetched, (start_r - location) / ShrayPagesz,
+                (end_r - location) / ShrayPagesz);
+            DBUG_PRINT("Prefetches[%d] = ", 0);
+            BitmapPrint(alloc->prefetched);
             // TODO add to queue or ringbuffer
         }
     }
@@ -571,7 +573,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     alloc->bytesPerBlock = bytesPerBlock;
     alloc->shadow = shadow;
 
-    size_t totalPages = endRead(alloc, Shray_rank) - startRead(alloc, Shray_rank);
+    size_t segmentLength = endRead(alloc, Shray_rank) - startRead(alloc, Shray_rank);
 
     DBUG_PRINT("Made a DSM allocation [%p, %p[, of which \n\t\tAw = [%p, %p[, "
             "\n\t\tAr = [%p, %p[,\n\t\tAp = [%p, %p[.",
@@ -580,10 +582,10 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
             (void *)startRead(alloc, Shray_rank), (void *)endRead(alloc, Shray_rank),
             (void *)startPartition(alloc, Shray_rank), (void *)endPartition(alloc, Shray_rank));
 
-    MPROTECT_SAFE((void *)startRead(alloc, Shray_rank), totalPages, PROT_READ | PROT_WRITE);
+    MPROTECT_SAFE((void *)startRead(alloc, Shray_rank), segmentLength, PROT_READ | PROT_WRITE);
 
-    alloc->local = BitmapCreate(totalPages);
-    alloc->prefetched = BitmapCreate(totalPages);
+    alloc->local = BitmapCreate(segmentLength / ShrayPagesz);
+    alloc->prefetched = BitmapCreate(segmentLength / ShrayPagesz);
 
     gasnetBarrier();
     BARRIERCOUNT;

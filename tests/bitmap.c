@@ -36,27 +36,35 @@ int testSurrounding(void)
     bitmap->bits[2] = 0xFFFFFFFFFFFFFFFFu;
 
     /* Should be [4, 61[ for 3 < index < 61, and [64, 190[ index > 63. */
-    Range range1 = BitmapSurrounding(bitmap, 17); 
-    Range range2 = BitmapSurrounding(bitmap, 100); 
-    Range range3 = BitmapSurrounding(bitmap, 188); 
+    Range range1 = BitmapSurrounding(bitmap, 17);
+    Range range2 = BitmapSurrounding(bitmap, 100);
+    Range range3 = BitmapSurrounding(bitmap, 188);
+
+    bitmap->bits[0] = 0x8000000000000000u;
+    bitmap->bits[1] = 0xFFFFFFFFFFFFFFFFu;
+    bitmap->bits[2] = 0xFFFFFFFFFFFFFFFFu;
+
+    Range range4 = BitmapSurrounding(bitmap, 0);
 
     BitmapFree(bitmap);
 
-    return (range1.start == 4 && range1.end == 61 && 
-            range2.start == 64 && range2.end == 190 && 
-            range3.start == 64 && range3.end == 190); 
+    return (range1.start == 4 && range1.end == 61 &&
+            range2.start == 64 && range2.end == 190 &&
+            range3.start == 64 && range3.end == 190 &&
+            range4.start == 0 && range4.end == 1);
 }
 
 int testCheck(void)
 {
-    /* Only has a one on position 70 */
-    Bitmap *bitmap = BitmapCreate(110); 
-    bitmap->bits[0] = 0; bitmap->bits[1] = 0x0200000000000000u;
+    /* Only has a one on position 70 and 0 */
+    Bitmap *bitmap = BitmapCreate(110);
+    bitmap->bits[0] = 0x8000000000000000u; bitmap->bits[1] = 0x0200000000000000u;
 
-    printf("Only the 71th bit is one right?\n");
+    printf("Only the first and 71th bit are one right?\n");
     BitmapPrint(bitmap);
 
-    int result = (BitmapCheck(bitmap, 70) && !BitmapCheck(bitmap, 69) && !BitmapCheck(bitmap, 71)); 
+    int result = (BitmapCheck(bitmap, 0) && BitmapCheck(bitmap, 70) &&
+            !BitmapCheck(bitmap, 69) && !BitmapCheck(bitmap, 71));
 
     BitmapFree(bitmap);
 
@@ -67,8 +75,8 @@ void testSetting(void)
 {
     /* The last two bits are dummies. */
     Bitmap *bitmap = BitmapCreate(190);
-    bitmap->bits[0] = 0xFFFFFFFFFFFFFFFFu; 
-    bitmap->bits[1] = 0xFFFFFFFFFFFFFFFFu; 
+    bitmap->bits[0] = 0xFFFFFFFFFFFFFFFFu;
+    bitmap->bits[1] = 0xFFFFFFFFFFFFFFFFu;
     bitmap->bits[2] = 0xFFFFFFFFFFFFFFFFu;
 
     printf("190 1s\n");
@@ -118,6 +126,18 @@ int testStencil(void)
     return success;
 }
 
+int testReduce(void)
+{
+    Bitmap *bitmap = BitmapCreate(20);
+    BitmapSetOnes(bitmap, 0, 9);
+
+    int success = BitmapCheck(bitmap, 0);
+
+    BitmapFree(bitmap);
+
+    return success;
+}
+
 int main(void)
 {
     testPrint();
@@ -126,6 +146,7 @@ int main(void)
     TEST(testCheck());
     TEST(testCount());
     TEST(testStencil());
+    TEST(testReduce());
 
     testSetting();
 

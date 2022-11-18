@@ -5,7 +5,7 @@
 
 /*******************************************
  * Error handling macros
- *******************************************/ 
+ *******************************************/
 
 #define MALLOC_SAFE(variable, size)                                                     \
     {                                                                                   \
@@ -38,7 +38,7 @@
 
 /*******************************************
  * Internal helper functions
- *******************************************/ 
+ *******************************************/
 
 static inline size_t max(size_t x, size_t y)
 {
@@ -58,10 +58,10 @@ static inline uintptr_t roundUp(uintptr_t a, uintptr_t b)
 
 #ifdef __GNUC__
 #include "immintrin.h"
-static inline int countBitsLeft(uint64_t integer, int bit) 
+static inline int countBitsLeft(uint64_t integer, int bit)
 {
     /* Now we want to know how many consecutive trailing bits are one. */
-    integer >>= 63 - bit; 
+    integer >>= 63 - bit;
 
     /* Now we want to know how many trailing bits are 0. */
     integer = ~integer;
@@ -69,7 +69,7 @@ static inline int countBitsLeft(uint64_t integer, int bit)
     return __builtin_ctzl(integer);
 }
 
-static inline int countBitsRight(uint64_t integer, int bit) 
+static inline int countBitsRight(uint64_t integer, int bit)
 {
     /* Now we want to know how many consecutive leading bits are one. */
     integer <<= bit;
@@ -82,7 +82,7 @@ static inline int countBitsRight(uint64_t integer, int bit)
 
 #else
 
-static inline int countBitsRight(uint64_t integer, int bit) 
+static inline int countBitsRight(uint64_t integer, int bit)
 {
     int result = 0;
     uint64_t mask = 0x8000000000000000u >> bit;
@@ -95,7 +95,7 @@ static inline int countBitsRight(uint64_t integer, int bit)
     return result;
 }
 
-static inline int countBitsLeft(uint64_t integer, int bit) 
+static inline int countBitsLeft(uint64_t integer, int bit)
 {
     int result = 0;
     uint64_t mask = 0x8000000000000000u >> bit;
@@ -110,7 +110,7 @@ static inline int countBitsLeft(uint64_t integer, int bit)
 
 #endif /* __GNUC__ */
 
-/* Returns n such that bitmap->bits[n] contains the index'th bit of the bitmap. */ 
+/* Returns n such that bitmap->bits[n] contains the index'th bit of the bitmap. */
 inline static size_t integer(size_t index)
 {
     return index / 64;
@@ -124,14 +124,14 @@ inline static int bit(size_t index)
 
 /*******************************************
  * Bitmap functionality
- *******************************************/ 
+ *******************************************/
 
 Bitmap *BitmapCreate(size_t size)
 {
     Bitmap *bitmap;
     MALLOC_SAFE(bitmap, sizeof(Bitmap));
 
-    /* We use mmap because it initializes to zero, and allocates lazily on Linux. This 
+    /* We use mmap because it initializes to zero, and allocates lazily on Linux. This
      * saves memory in case a lot of the bitmap stays zero. */
     MMAP_SAFE(bitmap->bits, mmap(NULL, roundUp(size, 64) * sizeof(uint64_t), PROT_READ | PROT_WRITE,
                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
@@ -155,30 +155,28 @@ int BitmapCheck(Bitmap *bitmap, size_t index)
 /* Sets [start, end[ to zero. */
 void BitmapSetZeroes(Bitmap *bitmap, size_t start, size_t end)
 {
-    /* Number of bits to be set to zero in the first / last uint64_t. */
+    /* Number of bits to be set to zero in the first / last uint64_t, if they
+     * are different uint64_ts. */
     int firstZeroes = 64 - bit(start);
-    int lastZeroes = bit(end);
-    size_t startIndex = start / 64;
-    size_t endIndex = (end - 1) / 64;
-    uint64_t firstZeroesBits = 0xFFFFFFFFFFFFFFFFu - (((uint64_t)1 << firstZeroes) - 1);
-    uint64_t lastZeroesBits = ((uint64_t)1 << (64 - lastZeroes)) - 1;
+    int lastZeroes = 1 + bit(end - 1);
+    size_t startIndex = integer(start);
+    size_t endIndex = integer(end - 1);
+    /* Has zeroes at the bits we want to set to zero. */
+    uint64_t firstZeroesMask = 0xFFFFFFFFFFFFFFFFu << firstZeroes;
+    uint64_t lastZeroesMask = 0xFFFFFFFFFFFFFFFFu >> lastZeroes;
 
     if (startIndex == endIndex) {
-        bitmap->bits[startIndex] &= firstZeroesBits & lastZeroesBits;
+        bitmap->bits[startIndex] &= firstZeroesMask & lastZeroesMask;
         return;
     }
 
-    if (firstZeroes != 64) {
-        bitmap->bits[start / 64] &= firstZeroesBits;
-    }
+    bitmap->bits[integer(start)] &= firstZeroesMask;
 
-    if (lastZeroes != 0) {
-        bitmap->bits[(end - 1) / 64] &= lastZeroesBits;
-    }
+    bitmap->bits[integer(end - 1)] &= lastZeroesMask;
 
-    /* Sets the rest of the bits to 0, one integer at a time. Did not use memset as it uses 
+    /* Sets the rest of the bits to 0, one integer at a time. Did not use memset as it uses
      * char, whose size and representation is implementation defined */
-    for (long i = start / 64 + 1; i < (long)(end - 1) / 64; i++) {
+    for (long i = integer(start) + 1; i < (long)integer(end - 1); i++) {
         bitmap->bits[i] = 0;
     }
 }
@@ -187,29 +185,26 @@ void BitmapSetZeroes(Bitmap *bitmap, size_t start, size_t end)
 void BitmapSetOnes(Bitmap *bitmap, size_t start, size_t end)
 {
     /* Number of bits to be set to one in the first / last uint64_t. */
-    int firstOnes = 64 - start % 64;
-    int lastOnes = end % 64;
-    size_t startIndex = start / 64;
-    size_t endIndex = (end - 1) / 64;
-    uint64_t firstOneBits = ((uint64_t)1 << firstOnes) - 1;
-    uint64_t lastOneBits = 0xFFFFFFFFFFFFFFFFu -  (((uint64_t)1 << (64 - lastOnes)) - 1);
+    int firstOnes = 64 - bit(start);
+    int lastOnes = 1 + bit(end - 1);
+    size_t startIndex = integer(start);
+    size_t endIndex = integer(end - 1);
+    /* Has ones at the bits we want to set to one. */
+    uint64_t firstOnesMask = ~(0xFFFFFFFFFFFFFFFFu << firstOnes);
+    uint64_t lastOneMask = ~(0xFFFFFFFFFFFFFFFFu >> lastOnes);
 
     if (startIndex == endIndex) {
-        bitmap->bits[startIndex] |= firstOneBits & lastOneBits;
+        bitmap->bits[startIndex] |= firstOnesMask & lastOneMask;
         return;
     }
 
-    if (firstOnes != 64) {
-        bitmap->bits[startIndex] |= firstOneBits;
-    }
+    bitmap->bits[startIndex] |= firstOnesMask;
 
-    if (lastOnes != 0) {
-        bitmap->bits[endIndex] |= lastOneBits;
-    }
+    bitmap->bits[endIndex] |= lastOneMask;
 
-    /* Sets the rest of the bits to 1, one integer at a time. Did not use memset as it uses 
+    /* Sets the rest of the bits to 1, one integer at a time. Did not use memset as it uses
      * char, whose size and representation is implementation defined */
-    for (long i = start / 64 + 1; i < (long)(end - 1) / 64; i++) {
+    for (long i = integer(start) + 1; i < (long)integer(end - 1); i++) {
         bitmap->bits[i] = 0xFFFFFFFFFFFFFFFFu;
     }
 }
@@ -217,7 +212,7 @@ void BitmapSetOnes(Bitmap *bitmap, size_t start, size_t end)
 void BitmapReset(Bitmap *bitmap)
 {
     MUNMAP_SAFE(bitmap->bits, roundUp(bitmap->size, 64) * sizeof(uint64_t));
-    MMAP_SAFE(bitmap->bits, mmap(NULL, roundUp(bitmap->size, 64) * sizeof(uint64_t), 
+    MMAP_SAFE(bitmap->bits, mmap(NULL, roundUp(bitmap->size, 64) * sizeof(uint64_t),
                 PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
 }
 
@@ -228,7 +223,7 @@ void BitmapCopyOnes(Bitmap *dest, Bitmap *src)
     }
 }
 
-/* Returns maximal set [start, end[ containing index such that bitmap[i] = 1 
+/* Returns maximal set [start, end[ containing index such that bitmap[i] = 1
  * for i in [start, end[. */
 Range BitmapSurrounding(Bitmap *bitmap, size_t index)
 {
@@ -238,7 +233,7 @@ Range BitmapSurrounding(Bitmap *bitmap, size_t index)
     range.start = index + 1 - countBitsLeft(bitmap->bits[integer(index)], bit(index));
 
     /* There are no more consecutive 1s in the integer to the left from us. */
-    if (index / 64 == 0 || range.start % 64 != 0) goto BitmapEnd; 
+    if (index / 64 == 0 || range.start % 64 != 0) goto BitmapEnd;
 
     size_t toTheLeft = index / 64 - 1;
 
@@ -253,7 +248,7 @@ Range BitmapSurrounding(Bitmap *bitmap, size_t index)
 BitmapEnd:
     /* We are the last integer. */
     if (index / 64 == (bitmap->size - 1) / 64) {
-        range.end = min(index + countBitsRight(bitmap->bits[index / 64], index % 64), 
+        range.end = min(index + countBitsRight(bitmap->bits[index / 64], index % 64),
                 bitmap->size);
         return range;
     }
@@ -267,7 +262,7 @@ BitmapEnd:
     /* We have 1s until the end of this integer and we are not the last integer. */
     size_t toTheRight = index / 64 + 1;
 
-    while (toTheRight < (bitmap->size - 1) / 64 && 
+    while (toTheRight < (bitmap->size - 1) / 64 &&
             bitmap->bits[toTheRight] == 0xFFFFFFFFFFFFFFFFu)
     {
         range.end += 64;
@@ -292,12 +287,12 @@ void BitmapPrint(Bitmap *bitmap)
 {
     for (size_t i = 0; i < roundUp(bitmap->size, 64); i++) {
         uint64_t integer = bitmap->bits[i];
-    
+
         for (size_t bit = 0; bit < 64; bit++) {
                 printf("%u", (integer & 0x8000000000000000u) ? 1 : 0);
                 integer <<= 1;
         }
     }
-    
+
     printf("\n");
 }
