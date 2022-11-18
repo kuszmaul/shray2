@@ -669,6 +669,12 @@ void ShrayFree(void *address)
  * only be called by the memory-thread. */
 void ShrayPrefetch(void *address, size_t size)
 {
+    if (size > cache.maximumMemory) {
+        DBUG_PRINT("Can not prefetch %zu bytes since cache is only %zu. Ignoring prefetch",
+                size, cache.maximumMemory);
+        return;
+    }
+
     PrefetchStruct prefetch = GetPrefetchStruct(address, size);
 
     DBUG_PRINT("Prefetch issued for [%p, %p[.", address, (void *)((uintptr_t)address + size));
@@ -685,6 +691,12 @@ void ShrayPrefetch(void *address, size_t size)
 void ShrayDiscard(void *address, size_t size)
 {
     PrefetchStruct prefetch = GetPrefetchStruct(address, size);
+    size_t index = queue_find(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1);
+    if (index == NOLINK) {
+        DBUG_PRINT("Ignoring discard for %p since prefetch was not found", (void*)prefetch.start1);
+        return;
+    }
+
     /* It would be strange to discard before we even have the data, but it is possible. */
     gasnet_wait_syncnbi_gets();
 
@@ -697,8 +709,9 @@ void ShrayDiscard(void *address, size_t size)
     discardBitmap(prefetch.start1, prefetch.end1, prefetch.alloc);
     discardBitmap(prefetch.start2, prefetch.end2, prefetch.alloc);
     // TODO: see TODO for prefetch
-    size_t index = queue_find(cache.prefetchCaches, prefetch.alloc, (void*)prefetch.start1);
     queue_remove_at(cache.prefetchCaches, index);
+    // TODO: discard needs to evict the actual entry, however evictCacheEntry
+    // also calls unmap/map which conflicts with freeRAM
 }
 
 void ShrayReport(void)

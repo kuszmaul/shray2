@@ -2,8 +2,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-static const size_t NOLINK = SIZE_MAX;
-
 static void queue_clear(queue_t *queue)
 {
 	queue_entry_t *entry;
@@ -58,8 +56,7 @@ void queue_queue(queue_t *queue, void *alloc, void *start, size_t size)
 	free_entry->size = size;
 
 	if (free_entry->next != NOLINK) {
-		queue_entry_t *next_free_entry = &queue->data[free_entry->next];
-		next_free_entry->prev = NOLINK;
+		queue->data[free_entry->next].prev = NOLINK;
 	}
 
 	if (queue->data_end != NOLINK) {
@@ -73,6 +70,10 @@ void queue_queue(queue_t *queue, void *alloc, void *start, size_t size)
 
 	queue->data_end = queue->free_start;
 	queue->free_start = free_entry->next;
+
+	if (queue->free_start == NOLINK) {
+		queue->free_end = NOLINK;
+	}
 
 	free_entry->next = NOLINK;
 }
@@ -106,7 +107,7 @@ queue_entry_t queue_remove_at(queue_t *queue, size_t index)
 		queue->data[entry->prev].next = entry->next;
 	}
 	if (entry->next != NOLINK) {
-		queue->data[entry->next].next = entry->prev;
+		queue->data[entry->next].prev = entry->prev;
 	}
 
 	if (index == queue->data_start) {
@@ -130,7 +131,7 @@ queue_entry_t queue_remove_at(queue_t *queue, size_t index)
 
 int queue_empty(const queue_t *queue)
 {
-	return queue->free_start == NOLINK;
+	return queue->data_start == NOLINK;
 }
 
 void queue_reset(queue_t *queue)
