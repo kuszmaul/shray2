@@ -28,13 +28,12 @@ typedef struct {
 
 /* A single allocation in the heap. */
 typedef struct Allocation {
-    void *location;
+    uintptr_t location;
     size_t size;
     /* The number of bytes owned by each node except the last one. */
     size_t bytesPerBlock;
     Bitmap *local;
     Bitmap *prefetched;
-    size_t usedMemory;
     /* We put all the prefetched stuff here until it is remapped to the proper position. */
     void *shadow;
 } Allocation;
@@ -52,8 +51,12 @@ typedef struct Heap {
 typedef struct PrefetchStruct {
     uintptr_t start1;
     uintptr_t end1;
+    gasnet_handle_t *handles1;
+    size_t numberOfHandles1;
     uintptr_t start2;
     uintptr_t end2;
+    gasnet_handle_t *handles2;
+    size_t numberOfHandles2;
     Allocation *alloc;
 } PrefetchStruct;
 

@@ -68,6 +68,8 @@ int main(int argc, char **argv)
     double result = reduce(arr, n);
     ShrayFree(arr);
 
+    ShrayReport();
+
     if (result == n) {
         printf("Success from node %d\n", ShrayRank());
     } else {

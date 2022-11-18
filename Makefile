@@ -39,19 +39,19 @@ bin/shray_profile.o: src/shray.c include/shray2/shray.h src/shray.h
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
 #FIXME This compiler should have the same ABI as the compiler used by GASNET_CC (e.g. gcc and clang)
-bin/bitmap.o: src/bitmap.c src/bitmap.h
+bin/%.o: src/%.c src/%.h
 	gcc $(FLAGS) -c $< -o $@
 
 %.o: examples/%.c
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
-bin/%: %.o bin/shray.o bin/bitmap.o
+bin/%: %.o bin/shray.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
 
-bin/%_debug: %.o bin/shray_debug.o bin/bitmap.o
+bin/%_debug: %.o bin/shray_debug.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
 
-bin/%_profile: %.o bin/shray_profile.o bin/bitmap.o
+bin/%_profile: %.o bin/shray_profile.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
 
 bin/%_fortran: examples/fortran/%.f90

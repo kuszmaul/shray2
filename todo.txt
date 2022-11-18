@@ -12,8 +12,10 @@ Success!
 Success!
 Success!
 
-The computation is symmetric, so why does P(0) segfault less?
+It should only segfault p - 1 times, so why does it segfault more often for P(1), P(2), P(3)?
 
 2. nbody with Shray is much faster than Fortran or OpenShmem. That makes no sense either.
    A month back this was not yet the case?! The Fortran or OpenShmem code was not changed
    since then.
+
+3. After refactoring bin/matrix_profile is slower
