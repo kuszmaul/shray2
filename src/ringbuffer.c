@@ -36,6 +36,9 @@ void ringbuffer_add(ringbuffer_t *ring, void *alloc, void *start)
 		ring->start = 0;
 	} else {
 		ring->end = (ring->end + 1) % ring->size;
+		if (ring->end == ring->start) {
+			ring->start = (ring->start + 1) % ring->size;
+		}
 	}
 
 	cache_entry_t *entry = &ring->data[ring->end];
