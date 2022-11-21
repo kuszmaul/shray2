@@ -281,7 +281,7 @@ static void evict(size_t size)
 
     if (evicted < size_pages) {
         DBUG_PRINT("Was only able to evict %zu pages (requested %zu)",
-                evicted, size);
+                evicted, size_pages);
     }
 }
 
