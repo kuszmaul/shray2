@@ -4,7 +4,7 @@ include /usr/local/gasnet/include/mpi-conduit/mpi-seq.mak
 
 FORTRAN_C = gfortran
 SHMEM_C = /home/thomas/repos/shmemBuild/bin/oshcc
-FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude -g
+FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude -g -fsanitize=undefined
 LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread
 #LFLAGS = -lm -lopenblas -fsanitize=undefined -pthread
 FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib
@@ -41,6 +41,9 @@ bin/shray_profile.o: src/shray.c include/shray2/shray.h src/shray.h
 #FIXME This compiler should have the same ABI as the compiler used by GASNET_CC (e.g. gcc and clang)
 bin/%.o: src/%.c src/%.h
 	gcc $(FLAGS) -c $< -o $@
+
+bin/queue.o: src/queue.c src/queue.h
+	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
 %.o: examples/%.c
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@

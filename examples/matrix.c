@@ -21,13 +21,11 @@ void matmul(double *A, double *B, double *C, size_t n)
     /* Add A[s][t] B[t] to C. We start with t = s, and repeat the
      * asynchronous get B[t + 1] - compute A[s][t] B[t] cycle. */
 
-//    printf("Rank %d: we prefetch block %d.\n", s, (s + 1) % p);
     ShrayPrefetch(B + n / p * n * ((s + 1) % p), n / p * n * sizeof(double));
     /* A[s][t] is a n / p x n / p matrix, B[t] an n / p x n matrix. So
      * for the dgemm routine m = n / p, k = n / p, n = n. As B[t], C[t] are
      * contiguous, we do not have to treat them as submatrices. We treat
      * A[s][t] as a submatrix of A[s] (of size n / p x n). */
-//    printf("Rank %d: we compute block %d.\n", s, s);
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
             n / p, n, n / p, 1.0, &A[s * n / p * n + s * n / p], n,
             &B[s * n / p * n], n, 0.0, &C[s * n / p * n], n);
@@ -35,16 +33,13 @@ void matmul(double *A, double *B, double *C, size_t n)
     for (unsigned int t = (s + 1) % p; t != s; t = (t + 1) % p) {
         /* Get the next block */
         if ((t + 1) % p != s) {
-//            printf("Rank %d: we prefetch block %d.\n", s, ((t + 1) % p));
             ShrayPrefetch(B + n / p * n * ((t + 1) % p), n / p * n * sizeof(double));
         }
 
-//        printf("Rank %d: we compute block %d.\n", s, t);
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                 n / p, n, n / p, 1.0, &A[s * n / p * n + t * n / p], n,
                 &B[t * n / p * n], n, 1.0, &C[s * n / p * n], n);
 
-//        printf("Rank %d: we discard block %d.\n", s, t);
         ShrayDiscard(B + n / p * n * t, n / p * n * sizeof(double));
     }
 }

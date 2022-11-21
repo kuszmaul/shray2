@@ -47,13 +47,14 @@ void queue_free(queue_t *queue)
 	free(queue);
 }
 
-void queue_queue(queue_t *queue, void *alloc, void *start, size_t size)
+void queue_queue(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, gasnet_handle_t handle)
 {
 	queue_entry_t *free_entry = &queue->data[queue->free_start];
 
 	free_entry->alloc = alloc;
 	free_entry->start = start;
-	free_entry->size = size;
+	free_entry->end = end;
+	free_entry->handle = handle;
 
 	if (free_entry->next != NOLINK) {
 		queue->data[free_entry->next].prev = NOLINK;
@@ -78,19 +79,19 @@ void queue_queue(queue_t *queue, void *alloc, void *start, size_t size)
 	free_entry->next = NOLINK;
 }
 
-size_t queue_find(const queue_t *queue, void *alloc, void *start)
+queue_entry_t *queue_find(const queue_t *queue, uintptr_t address)
 {
 	size_t next_index = queue->data_start;
 	while (next_index != NOLINK) {
 		queue_entry_t *entry = &queue->data[next_index];
-		if (entry->alloc == alloc && entry->start == start) {
-			return next_index;
+		if (entry->start <= address && address < entry->end) {
+			return entry;
 		}
 
 		next_index = entry->next;
 	}
 
-	return NOLINK;
+	return NULL;
 }
 
 queue_entry_t queue_dequeue(queue_t *queue)

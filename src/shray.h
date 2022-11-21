@@ -25,7 +25,6 @@ typedef struct {
     size_t maximumMemory;
     ringbuffer_t *autoCaches;
     queue_t *prefetchCaches;
-    node_t *prefetches;
 } Cache;
 
 /* A single allocation in the heap. */
@@ -51,18 +50,12 @@ typedef struct Heap {
     unsigned int numberOfAllocs;
 } Heap;
 
-/* Encodes the get request(s) of a contiguous range [start, end[. */
-typedef struct GetStruct {
-    uintptr_t start;
-    uintptr_t end;
-    unsigned int numberOfHandles;
-    gasnet_handle_t *handles;
-} GetStruct;
-
 /* We prefetch [start1, end1[ \cup [start2, end2[ which is part of allocation alloc. */
 typedef struct PrefetchStruct {
-    GetStruct get1;
-    GetStruct get2;
+    uintptr_t start1;
+    uintptr_t end1;
+    uintptr_t start2;
+    uintptr_t end2;
     Allocation *alloc;
 } PrefetchStruct;
 
