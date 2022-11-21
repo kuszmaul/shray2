@@ -209,7 +209,6 @@ static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
  */
 static void evictCacheEntry(Allocation *alloc, uintptr_t start, size_t pages)
 {
-    void *tmp;
     size_t index = (start - alloc->location) / ShrayPagesz;
     size_t size = pages * ShrayPagesz;
     BitmapSetZeroes(alloc->local, index, index + pages);

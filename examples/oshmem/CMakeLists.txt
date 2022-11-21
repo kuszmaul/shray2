@@ -1,7 +1,7 @@
 include(language_standard)
 
 # TODO: a bit of a hack, should fix this properly
-set(CMAKE_C_COMPILER oshcc)
+set(CMAKE_C_COMPILER /home/thomas/repos/shmemBuild/bin/oshcc)
 
 # example binaries
 foreach(file

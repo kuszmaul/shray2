@@ -10,6 +10,6 @@ cmake \
 	-DSANITISE=ON \
 	-S . \
 	-B "$builddir"
-cmake --build "$builddir"
+cmake --build "$builddir" -j
 
 # -DGASNet_ROOT_DIR="/home/ximin/tmp/gasnet/install_segmenteverything_nophsm" \

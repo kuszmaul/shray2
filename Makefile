@@ -7,7 +7,7 @@ SHMEM_C = /home/thomas/repos/shmemBuild/bin/oshcc
 FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude -g -fsanitize=undefined
 LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread
 #LFLAGS = -lm -lopenblas -fsanitize=undefined -pthread
-FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib
+FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib -g
 FORTRAN_LFLAGS = -lcaf_openmpi
 APPS = $(wildcard examples/*.c)
 FORTRANAPPS = $(wildcard examples/fortran/*.f90)
