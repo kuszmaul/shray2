@@ -35,8 +35,6 @@ void queue_free(queue_t *queue);
 void queue_queue(queue_t *queue, void *alloc, uintptr_t start,
         uintptr_t end, gasnet_handle_t handle);
 
-/* TODO maybe return a queue_entry_t *, for the first get that has 'start' (rename to
- * address), in its range? */
 queue_entry_t *queue_find(const queue_t *queue, uintptr_t address);
 
 queue_entry_t queue_dequeue(queue_t *queue);
