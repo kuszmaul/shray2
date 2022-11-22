@@ -35,7 +35,7 @@ int rand_n_prob(size_t n, size_t local_start, size_t local_end, int localProp)
 
     size_t result;
 
-    if (local) {
+    if (local || n_pes == 1) {
         result = (size_t)(rand() % (n / n_pes) + local_start);
     } else {
         size_t randomInt = (size_t)(rand() % (n - (n / n_pes)));
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
     ShraySync(output);
     );
 
-    printf("This took %lfs.\n", duration);
+    if (ShrayOutput) printf("%lf\n", duration);
 
     ShrayReport();
 

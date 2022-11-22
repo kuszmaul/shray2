@@ -11,6 +11,7 @@ set(PROJECT_FLAGS
 	-mtune=native
 	-ffast-math
 	-fno-math-errno
+    -O3
 	)
 
 # set warning flags for debug

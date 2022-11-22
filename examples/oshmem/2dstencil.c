@@ -1,14 +1,25 @@
-/* A five-point stencil. Not optimised, so heavily memory-bound. 
- * MKL contain an optimised version, but it is not possible to 
- * specify the number of iterations, it just continues until 
+/* A five-point stencil. Not optimised, so heavily memory-bound.
+ * MKL contain an optimised version, but it is not possible to
+ * specify the number of iterations, it just continues until
  * convergence. */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <sys/time.h>
 #include <string.h>
 #include <assert.h>
 #include <shmem.h>
+
+#define TIME(duration, fncalls)                                        \
+    {                                                                  \
+        struct timeval tv1, tv2;                                       \
+        gettimeofday(&tv1, NULL);                                      \
+        fncalls                                                        \
+        gettimeofday(&tv2, NULL);                                      \
+        duration = (double) (tv2.tv_usec - tv1.tv_usec) / 1000000 +    \
+         (double) (tv2.tv_sec - tv1.tv_sec);                           \
+    }
 
 /* The coefficients of the five-point stencil. */
 const double a = 0.50;
@@ -33,10 +44,10 @@ void relax(size_t n, double **in, double **out, double *firstBuffer, double *las
     /* Local part */
     for (size_t i = 1; i < n / p - 1; i++) {
         for (size_t j = 1; j < n - 1; j++) {
-            (*out)[i * n + j] = a * (*in)[(i - 1) * n + j] + 
-                             b * (*in)[i * n + j - 1] + 
-                             c * (*in)[i * n + j] + 
-                             d * (*in)[i * n + j + 1] + 
+            (*out)[i * n + j] = a * (*in)[(i - 1) * n + j] +
+                             b * (*in)[i * n + j - 1] +
+                             c * (*in)[i * n + j] +
+                             d * (*in)[i * n + j + 1] +
                              e * (*in)[(i + 1) * n + j];
         }
     }
@@ -45,10 +56,10 @@ void relax(size_t n, double **in, double **out, double *firstBuffer, double *las
         /* Last row */
         shmem_get(lastBuffer, (*in), n, shmem_my_pe() + 1);
         for (size_t j = 1; j < n - 1; j++) {
-           (*out)[(n / p - 1) * n + j] = a * (*in)[(n / p - 2) * n + j] + 
-                            b * (*in)[(n / p - 1) * n + j - 1] + 
-                            c * (*in)[(n / p - 1) * n + j] + 
-                            d * (*in)[(n / p - 1) * n + j + 1] + 
+           (*out)[(n / p - 1) * n + j] = a * (*in)[(n / p - 2) * n + j] +
+                            b * (*in)[(n / p - 1) * n + j - 1] +
+                            c * (*in)[(n / p - 1) * n + j] +
+                            d * (*in)[(n / p - 1) * n + j + 1] +
                             e * lastBuffer[j];
         }
     }
@@ -57,10 +68,10 @@ void relax(size_t n, double **in, double **out, double *firstBuffer, double *las
         /* First row */
         shmem_get(firstBuffer, *in + n * (n / p - 1), n, shmem_my_pe() - 1);
         for (size_t j = 1; j < n - 1; j++) {
-           (*out)[j] = a * firstBuffer[j] + 
-                            b * (*in)[j - 1] + 
-                            c * (*in)[j] + 
-                            d * (*in)[j + 1] + 
+           (*out)[j] = a * firstBuffer[j] +
+                            b * (*in)[j - 1] +
+                            c * (*in)[j] +
+                            d * (*in)[j + 1] +
                             e * (*in)[n + j];
         }
     }
@@ -90,13 +101,13 @@ void stencil(size_t n, double **in, double **out, int iterations)
         (*out)[i * n] = (*in)[i * n];
         (*out)[i * n + n / p - 1] = (*in)[i * n + n / p - 1];
     }
- 
+
     /* Inner part */
     for (int t = 1; t < iterations; t++) {
         relax(n, in, out, firstBuffer, lastBuffer);
         shmem_barrier_all();
 
-        /* Switch buffers. This is allowed because every processor is done writing to 
+        /* Switch buffers. This is allowed because every processor is done writing to
          * out at this point, hence does not need to read from in anymore. */
         double *temp = *in;
         *in = *out;
@@ -129,7 +140,14 @@ int main(int argc, char **argv)
     init(n, in);
     shmem_barrier_all();
 
+    double duration;
+    TIME(duration,
     stencil(n, &in, &out, iterations);
+    shmem_barrier_all(););
+
+    if (shmem_my_pe() == 0) {
+        printf("%lf\n", 9.0 * (n - 2) * (n - 2) * iterations / 1000000000.0 / duration);
+    }
 
     shmem_free(in);
     shmem_free(out);

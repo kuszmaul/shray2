@@ -1,6 +1,8 @@
 module randomModule
 contains
 
+! With probability local_prob% gives a number in [local_start, local_end[, with
+! probability (100 - local_prob)% gives a number in [0, n[.
 function rand_n_prob(n, local_start, local_end, local_prob) result(j)
     implicit none
     integer, intent(in) :: n, local_start, local_end, local_prob
@@ -13,10 +15,10 @@ function rand_n_prob(n, local_start, local_end, local_prob) result(j)
 
     if (r .le. local_prob / 100) then
         call random_number(r)
-        j = local_start + floor(r * (local_end - local_start)) + 1
+        j = local_start + floor(r * (local_end - local_start))
     else
         call random_number(r)
-        randomInt = floor(r * (n - local_end + local_start)) + 1
+        randomInt = floor(r * (n - local_end + local_start))
         if (randomInt .ge. local_start) then
             j = randomInt + local_end - local_start
         else
@@ -34,7 +36,7 @@ subroutine random_fill(n, p, local_prob, input, output)
     s = this_image()
 
     do i = 1, n / p
-        j = rand_n_prob(n, s * n / p + 1, (s + 1) * n / p + 1, local_prob)
+        j = rand_n_prob(n, s * n / p, (s + 1) * n / p, local_prob)
         output(i) = input(mod(j, n / p) + 1)[j / (n / p) + 1]
     enddo
 end subroutine
@@ -59,8 +61,9 @@ program main
     p = num_images()
     s = this_image()
 
-    local_start = s * n / p + 1
-    local_end = (s + 1) * n / p + 1
+    ! start inclusive, end exclusive
+    local_start = s * n / p
+    local_end = (s + 1) * n / p
 
     if (modulo(n, p) /= 0) then
         write (*, *) 'Please make sure n divides p'
@@ -79,7 +82,9 @@ program main
     sync all
     call system_clock(cpu_count2, count_rate, count_max)
 
-    write (*, *) 'This took ', real(cpu_count2 - cpu_count) / count_rate
+    if (s .eq. 1) then
+        write (*, *) real(cpu_count2 - cpu_count) / count_rate
+    end if
 
     deallocate(input)
     deallocate(output)

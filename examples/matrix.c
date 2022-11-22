@@ -88,15 +88,15 @@ int main(int argc, char **argv)
     TIME(duration, matmul(A, B, C, n); ShraySync(C););
 
     if (ShrayOutput) {
-        printf("Time %lf, %lf Gflops/s\n", duration, 2.0 * n * n * n / 1000000000 / duration);
+        printf("%lf\n", 2.0 * n * n * n / 1000000000 / duration);
     }
 
     ShrayReport();
 
     if (check(C, n, 0.01)) {
-        printf("Success!\n");
+        fprintf(stderr, "Success!\n");
     } else {
-        printf("Failure!\n");
+        fprintf(stderr, "Failure!\n");
     }
 
     ShrayFree(A);

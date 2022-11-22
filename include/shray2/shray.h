@@ -172,9 +172,9 @@ void ShrayPrefetch(void *address, size_t size);
  *
  * @fn void ShrayDiscard(void *address, size_t size);
  *
- *   @brief Hint to free prefetched memory [address, address + size[. 
+ *   @brief Hint to free prefetched memory [address, address + size[.
  *
- *   @param address  start of memory we free. 
+ *   @param address  start of memory we free.
  *          size     number of bytes starting from address to free.
  *
  ******************************************************************************/

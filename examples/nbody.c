@@ -76,7 +76,7 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
                             accelerate(positions[i], positions[j], masses[j]).y;
                         accel[i].z +=
                             accelerate(positions[i], positions[j], masses[j]).z;
-                        flopCount += 16 * 3;
+//                        flopCount += 16 * 3;
                     }
                 }
             }
@@ -86,7 +86,7 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
             ShrayDiscard(&positions[Jstart], n / p * sizeof(Point));
             ShrayDiscard(&masses[Jstart], n / p * sizeof(double));
         }
-        
+
         if (t != p - 1) {
             ShrayPrefetch(&positions[(s + t + 1) % p * n / p], n / p * sizeof(Point));
             ShrayPrefetch(&masses[(s + t + 1) % p * n / p], n / p * sizeof(double));
@@ -143,12 +143,11 @@ int main(int argc, char **argv)
         advance(positions, velocities, masses, accel, 0.1, n);
     });
 
-    printf("Expected flops %zu, actual flops %zu\n", 
-            16 * 3 * n * n * iterations, flopCount * ShraySize());
+//    printf("Expected flops %zu, actual flops %zu\n",
+//            16 * 3 * n * n * iterations, flopCount * ShraySize());
 
     if (ShrayOutput) {
-        printf("Time: %lfs, %lf Gflops/s\n", duration, 
-                16.0 * n * n * iterations / 1000000000 / duration);
+        printf("%lf\n", 16.0 * n * n * iterations / 1000000000 / duration);
     }
 
     ShrayFree(positions);

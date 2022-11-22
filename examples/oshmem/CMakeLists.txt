@@ -9,7 +9,7 @@ foreach(file
 		matrix
 		nbody
 		random
-		stencil)
+		2dstencil)
 	set(EXAMPLE_TARGET "${file}_oshmem")
 
 	add_executable("${EXAMPLE_TARGET}"

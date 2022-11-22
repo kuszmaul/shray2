@@ -98,7 +98,7 @@ int main(int argc, char **argv)
     random_fill(n, local_prob, input, output);
     shmem_barrier_all();)
 
-    printf("This took %lfs.\n", duration);
+    printf("%lf\n", duration);
 
     shmem_free(input);
     shmem_free(output);
