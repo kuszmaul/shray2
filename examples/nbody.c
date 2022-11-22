@@ -147,7 +147,7 @@ int main(int argc, char **argv)
 //            16 * 3 * n * n * iterations, flopCount * ShraySize());
 
     if (ShrayOutput) {
-        printf("%lf\n", 16.0 * n * n * iterations / 1000000000 / duration);
+        printf("%lf\n", 3.0 * 16.0 * n * n * iterations / 1000000000 / duration);
     }
 
     ShrayFree(positions);

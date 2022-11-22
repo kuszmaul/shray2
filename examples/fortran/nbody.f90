@@ -126,7 +126,7 @@ program main
     call system_clock(cpu_count2, count_rate, count_max)
 
     if (this_image() .eq. 1) then
-        write (*, *) 16.0 * n * n * iterations / 1000000000.0 / &
+        write (*, *) 3.0 * 16.0 * n * n * iterations / 1000000000.0 / &
             (real(cpu_count2 - cpu_count) / count_rate)
     end if
 end program main

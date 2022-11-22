@@ -55,6 +55,7 @@ void queue_queue(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, ga
 	free_entry->start = start;
 	free_entry->end = end;
 	free_entry->handle = handle;
+	free_entry->gottem = 0;
 
 	if (free_entry->next != NOLINK) {
 		queue->data[free_entry->next].prev = NOLINK;

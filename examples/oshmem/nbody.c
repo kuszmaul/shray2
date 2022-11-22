@@ -90,7 +90,7 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
                 accel[i].x += accelerate(positions[i], pos_local[j], mass_local[j]).x;
                 accel[i].y += accelerate(positions[i], pos_local[j], mass_local[j]).y;
                 accel[i].z += accelerate(positions[i], pos_local[j], mass_local[j]).z;
-                flopCounter += 16 * 3;
+//                flopCounter += 16 * 3;
             }
         }
             }
@@ -147,11 +147,10 @@ int main(int argc, char **argv)
         advance(positions, velocities, masses, accel, 0.1, n);
     });
 
-    printf("Actual flops: %zu, expected flops: %zu\n", flopCounter * shmem_n_pes(), 
-            16 * 3 * n * n * iterations);
+//    printf("Actual flops: %zu, expected flops: %zu\n", flopCounter * shmem_n_pes(),
+//            16 * 3 * n * n * iterations);
     if (shmem_my_pe() == 0) {
-        printf("Time: %lfs, %lf Gflops/s\n", duration, 
-                3 * 16 * n * n * iterations / 1000000000 / duration);
+        printf("%lf\n", 3.0 * 16 * n * n * iterations / 1000000000 / duration);
     }
 
     shmem_free(positions);

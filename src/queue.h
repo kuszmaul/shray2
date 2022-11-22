@@ -13,6 +13,8 @@ typedef struct
 	uintptr_t start;
 	uintptr_t end;
     gasnet_handle_t handle;
+    /* True iff gasnet_wait_syncnb(handle) has been called. */
+    int gottem;
 	size_t prev;
 	size_t next;
 } queue_entry_t;
