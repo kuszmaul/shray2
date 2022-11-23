@@ -199,6 +199,7 @@ static void evictCacheEntry(Allocation *alloc, uintptr_t start, size_t pages)
     size_t index = (start - alloc->location) / ShrayPagesz;
     size_t size = pages * ShrayPagesz;
     BitmapSetZeroes(alloc->local, index, index + pages);
+    BitmapSetZeroes(alloc->prefetched, index, index + pages);
 
     DBUG_PRINT("evictCacheEntry: we free page %zu", index);
     freeRAM(start, start + size);
@@ -666,6 +667,7 @@ void ShrayPrefetch(void *address, size_t size)
     if (size > cache.maximumMemory) {
         fprintf(stderr, "WARNING Can not prefetch %zu bytes since cache is only %zu."
                 "Ignoring prefetch", size, cache.maximumMemory); return;
+        return;
     }
 
     PrefetchStruct prefetch = GetPrefetchStruct(address, size);
@@ -707,7 +709,10 @@ static void DiscardGet(queue_entry_t *get, size_t index)
         gasnet_wait_syncnb(get->handle);
         uintptr_t start = (uintptr_t)toShadow(get->start, alloc);
         uintptr_t end = start + get->end - get->start;
-        freeRAM(start, end);
+        void *dummy;
+        MUNMAP_SAFE((void *)start, end - start);
+        MMAP_SAFE(dummy, mmap((void *)start, end - start, PROT_READ | PROT_WRITE,
+                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
     }
 
     queue_remove_at(cache.prefetchCaches, index);

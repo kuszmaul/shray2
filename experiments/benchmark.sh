@@ -13,6 +13,8 @@ hash time
 hash find
 #hash ga-config
 
+export SHRAY_CACHELINE=1
+
 if [ "$#" -lt 2 ]; then
 	printf "Usage: BINDIR OUTPUTDIR\n" >&2
 	exit 1
@@ -75,10 +77,80 @@ oshmemtest()
 # $1: executable
 # $2: number of processors
 # remainder: arguments to the program
-shraytest()
+shraytestMatrix()
 {
 	nproc="$1"
 	example="$2"
+    # 3 matrices of n x n doubles (8 bytes per double)
+    export SHRAY_CACHESIZE=$(($3*$3*3*8/$1))
+	shift
+	shift
+
+	printf 'Running %s (%s proc, shray) with arguments: %s\n' \
+		"$example" \
+		"$nproc" \
+		"$*"
+
+	resultdir="$datadir/$example/$*/shray"
+	mkdir -p "$resultdir"
+
+	outfile="$resultdir/$nproc.out"
+	timefile="$resultdir/$nproc.time"
+
+    mpirun -n "$nproc" ${bindir}/${example}_profile "$@" > "$timefile" 2> "$outfile"
+}
+
+shraytestBodies()
+{
+	nproc="$1"
+	example="$2"
+    # 3 arrays of n Points, 1 array of n doubles. So n * (3 * 3 * 8 + 8) = 80 * n
+    export SHRAY_CACHESIZE=$((80*$3/$1))
+	shift
+	shift
+
+	printf 'Running %s (%s proc, shray) with arguments: %s\n' \
+		"$example" \
+		"$nproc" \
+		"$*"
+
+	resultdir="$datadir/$example/$*/shray"
+	mkdir -p "$resultdir"
+
+	outfile="$resultdir/$nproc.out"
+	timefile="$resultdir/$nproc.time"
+
+    mpirun -n "$nproc" ${bindir}/${example}_profile "$@" > "$timefile" 2> "$outfile"
+}
+
+shraytestStencil()
+{
+	nproc="$1"
+	example="$2"
+    # 2 arrays of n x n doubles
+    export SHRAY_CACHESIZE=$(($3*$3*8/$1))
+	shift
+	shift
+
+	printf 'Running %s (%s proc, shray) with arguments: %s\n' \
+		"$example" \
+		"$nproc" \
+		"$*"
+
+	resultdir="$datadir/$example/$*/shray"
+	mkdir -p "$resultdir"
+
+	outfile="$resultdir/$nproc.out"
+	timefile="$resultdir/$nproc.time"
+
+    mpirun -n "$nproc" ${bindir}/${example}_profile "$@" > "$timefile" 2> "$outfile"
+}
+
+shraytestRandom()
+{
+	nproc="$1"
+	example="$2"
+    export SHRAY_CACHESIZE=4096
 	shift
 	shift
 
@@ -165,18 +237,17 @@ mkdir -p "$datadir"
 }>"$datadir/system.txt"
 
 # Run all tests.
-# TODO: Set proper parameters.
 for nproc in 2 4; do
-	for test in fortrantest oshmemtest shraytest; do
-		# Random access.
-		for size in 4000000 8000000; do
-			for probability in 50 90 95; do
-				if ! "$test" "$nproc" random "$size" "$probability"; then
-					printf '    FAILED\n' >&2
-				fi
-			done
+	for test in fortrantest oshmemtest shraytestMatrix; do
+		# Matrix.
+		for size in 2000 4000 8000; do
+			if ! "$test" "$nproc" matrix "$size"; then
+				printf '    FAILED\n' >&2
+			fi
 		done
+    done
 
+	for test in fortrantest oshmemtest shraytestBodies; do
 		# N-body.
 		for bodies in 1000 2000; do
 			for iterations in 1 2 5; do
@@ -185,7 +256,9 @@ for nproc in 2 4; do
 				fi
 			done
 		done
+    done
 
+	for test in fortrantest oshmemtest shraytestStencil; do
 		# Stencil.
 		for n in 1000 2000 5000; do
 			for iterations in 1 2 5; do
@@ -194,12 +267,18 @@ for nproc in 2 4; do
 				fi
 			done
 		done
+    done
 
-		# Matrix.
-		for size in 2000 4000 8000; do
-			if ! "$test" "$nproc" matrix "$size"; then
-				printf '    FAILED\n' >&2
-			fi
+	for test in fortrantest oshmemtest shraytestRandom; do
+		# Random access.
+		for size in 10000000; do
+            for n in 100000; do
+		    	for probability in 10 90 99; do
+		    		if ! "$test" "$nproc" random "$size" "$n" "$probability"; then
+		    			printf '    FAILED\n' >&2
+		    		fi
+                done
+			done
 		done
 	done
 done
