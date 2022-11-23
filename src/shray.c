@@ -373,6 +373,10 @@ static void handlePageFault(void *address)
 static void handleWorkerFault(void *address)
 {
     shray_worker_t *worker = pthread_getspecific(key);
+    if (!worker) {
+        fprintf(stderr, "SEGFAULT occurred for a non-shray managed thread\n");
+        ShrayFinalize(1);
+    }
 
     DBUG_PRINT("Segfault in worker %zu", worker->thread_index);
     sigset_t mask;
