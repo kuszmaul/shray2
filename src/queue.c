@@ -120,6 +120,10 @@ queue_entry_t queue_remove_at(queue_t *queue, size_t index)
 	}
 
 	/* Update the free list. */
+	if (queue->free_end != NOLINK) {
+		queue->data[queue->free_end].next = index;
+	}
+
 	entry->prev = queue->free_end;
 	entry->next = NOLINK;
 
