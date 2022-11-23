@@ -3,9 +3,9 @@ contains
 
 ! With probability local_prob% gives a number in [local_start, local_end[, with
 ! probability (100 - local_prob)% gives a number in [0, n[.
-function rand_n_prob(n, local_start, local_end, local_prob) result(j)
+function rand_n_prob(local_start, local_end, local_prob, input_size) result(j)
     implicit none
-    integer, intent(in) :: n, local_start, local_end, local_prob
+    integer, intent(in) :: local_start, local_end, local_prob, input_size
     integer :: randomInt
     integer :: j
 
@@ -18,7 +18,7 @@ function rand_n_prob(n, local_start, local_end, local_prob) result(j)
         j = local_start + floor(r * (local_end - local_start))
     else
         call random_number(r)
-        randomInt = floor(r * (n - local_end + local_start))
+        randomInt = floor(r * (input_size - local_end + local_start))
         if (randomInt .ge. local_start) then
             j = randomInt + local_end - local_start
         else
@@ -27,57 +27,64 @@ function rand_n_prob(n, local_start, local_end, local_prob) result(j)
     endif
 end function
 
-subroutine random_fill(n, p, local_prob, input, output)
+function random_fill(n, p, local_prob, input, input_size) result(res)
     implicit none
-    integer, intent(in) :: n, local_prob, p
-    real(KIND=8) :: input(n / p)[*], output(n / p)[*]
+    integer, intent(in) :: n, local_prob, p, input_size
+    real(KIND=8) :: input(n / p)[*]
+    real(KIND=8) :: res
     integer :: j, s, i
+
+    res = 0.0
 
     s = this_image()
 
-    do i = 1, n / p
-        j = rand_n_prob(n, s * n / p, (s + 1) * n / p, local_prob)
-        output(i) = input(mod(j, n / p) + 1)[j / (n / p) + 1]
+    do i = 1, n
+        j = rand_n_prob(s * input_size / p, (s + 1) * input_size / p, local_prob, input_size)
+        res = res + input(mod(j, input_size / p) + 1)[j / (input_size / p) + 1]
     enddo
-end subroutine
+end function
 end module
 
 program main
     use randomModule
+    use iso_fortran_env, only : stderr=>ERROR_UNIT
     implicit none
 
-    integer :: n, local_start, local_end, local_prob, p, s
-    real(KIND=8), dimension(:), codimension[:], allocatable :: input, output
+    integer :: n, local_start, local_end, local_prob, p, s, input_size
+    real(KIND=8), dimension(:), codimension[:], allocatable :: input
+    real(KIND=8) :: res
     integer :: cpu_count, cpu_count2, count_rate, count_max
     character(len=12), dimension(:), allocatable :: args
 
-    allocate(args(2))
+    allocate(args(3))
     call get_command_argument(1, args(1))
-    read (unit=args(1), fmt=*) n
+    read (unit=args(1), fmt=*) input_size
 
     call get_command_argument(2, args(2))
-    read (unit=args(2), fmt=*) local_prob
+    read (unit=args(2), fmt=*) n
+
+    call get_command_argument(3, args(3))
+    read (unit=args(3), fmt=*) local_prob
 
     p = num_images()
     s = this_image()
 
     ! start inclusive, end exclusive
-    local_start = s * n / p
-    local_end = (s + 1) * n / p
+    local_start = s * input_size / p
+    local_end = (s + 1) * input_size / p
 
-    if (modulo(n, p) /= 0) then
-        write (*, *) 'Please make sure n divides p'
+    if (modulo(input_size, p) /= 0) then
+        write (*, *) 'Please make sure p divides input_size'
     end if
 
-    allocate(input(n / p)[*])
-    allocate(output(n / p)[*])
+    allocate(input(input_size / p)[*])
 
     input = 1
 
     sync all
 
     call system_clock(cpu_count, count_rate, count_max)
-    call random_fill(n, p, local_prob, input, output)
+    res = random_fill(n, p, local_prob, input, input_size)
 
     sync all
     call system_clock(cpu_count2, count_rate, count_max)
@@ -86,6 +93,12 @@ program main
         write (*, *) real(cpu_count2 - cpu_count) / count_rate
     end if
 
+
+    if (res .eq. n) then
+        write (0, *) "Success!"
+    else
+        write (0, *) "Failure!"
+    end if
+
     deallocate(input)
-    deallocate(output)
 end program main

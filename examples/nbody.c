@@ -70,13 +70,10 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
             for (size_t J = Jstart; J < Jstart + n / p; J += block) {
                 for (size_t i = Ib; i < min(Ib + block, end); i++) {
                     for (size_t j = J; j < min(J + block, Jstart + n / p); j++) {
-                        accel[i].x +=
-                            accelerate(positions[i], positions[j], masses[j]).x;
-                        accel[i].y +=
-                            accelerate(positions[i], positions[j], masses[j]).y;
-                        accel[i].z +=
-                            accelerate(positions[i], positions[j], masses[j]).z;
-//                        flopCount += 16 * 3;
+                        Point acceleration = accelerate(positions[i], positions[j], masses[j]);
+                        accel[i].x += acceleration.x;
+                        accel[i].y += acceleration.y;
+                        accel[i].z += acceleration.z;
                     }
                 }
             }

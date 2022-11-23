@@ -119,7 +119,7 @@ static inline uintptr_t endPartition(Allocation *alloc, unsigned int rank)
 /* Frees [start, end[. start, end need to be ShrayPagesz-aligned */
 static inline void freeRAM(uintptr_t start, uintptr_t end)
 {
-    if (start + ShrayPagesz >= end) return;
+    if (start >= end) return;
 
     DBUG_PRINT("We free [%p, %p[", (void *)start, (void *)end);
 
@@ -200,7 +200,8 @@ static void evictCacheEntry(Allocation *alloc, uintptr_t start, size_t pages)
     size_t size = pages * ShrayPagesz;
     BitmapSetZeroes(alloc->local, index, index + pages);
 
-    freeRAM(start, size);
+    DBUG_PRINT("evictCacheEntry: we free page %zu", index);
+    freeRAM(start, start + size);
     cache.usedMemory -= pages * ShrayPagesz;
     alloc->usedMemory -= pages * ShrayPagesz;
 }
