@@ -419,19 +419,37 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
     }
 }
 
-/* Resetting the protections is done by ShrayRealloc and ShraySync
+/* Resetting the protections is done by ShrayRealloc
  * TODO is it necessary to reset everything? */
 static void resetCache()
 {
     cache.usedMemory = 0;
 
+    /* Finish the prefetches */
+    size_t next_index = cache.prefetchCaches->data_start;
+	while (next_index != NOLINK) {
+		queue_entry_t *entry = &cache.prefetchCaches->data[next_index];
+
+        if (!entry->gottem) gasnet_wait_syncnb(entry->handle);
+
+		next_index = entry->next;
+	}
+
+    /* Reset the protections and bitmaps. */
     for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
         Allocation *alloc = heap.allocs + i;
         alloc->usedMemory = 0;
 
         BitmapReset(alloc->local);
         BitmapReset(alloc->prefetched);
+        freeRAM(alloc->location, alloc->location + alloc->size);
+
+        size_t segmentLength = endRead(alloc, Shray_rank) - startRead(alloc, Shray_rank);
+
+        MPROTECT_SAFE((void *)startRead(alloc, Shray_rank), segmentLength, PROT_READ | PROT_WRITE);
     }
+
+    /* Free the cache data structures. */
     ringbuffer_reset(cache.autoCaches);
     queue_reset(cache.prefetchCaches);
 }
