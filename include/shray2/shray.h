@@ -172,14 +172,24 @@ void ShrayPrefetch(void *address, size_t size);
  *
  * @fn void ShrayDiscard(void *address, size_t size);
  *
- *   @brief Hint to free prefetched memory [address, address + size[. 
+ *   @brief Hint to free prefetched memory [address, address + size[.
  *
- *   @param address  start of memory we free. 
+ *   @param address  start of memory we free.
  *          size     number of bytes starting from address to free.
  *
  ******************************************************************************/
 
 void ShrayDiscard(void *address, size_t size);
+
+typedef struct {
+    void *args;
+    size_t start;
+    size_t end;
+} worker_info_t;
+
+typedef void (*shray_fn)(worker_info_t *info);
+
+void ShrayRunWorker(shray_fn fn, size_t n, void *args);
 
 /* The elipses are a function call block. Example usage:
  *

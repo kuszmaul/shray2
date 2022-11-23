@@ -23,6 +23,7 @@ foreach(suffix
 			nbody
 			nbodyLoadbalance
 			nbodyUnblocked
+			nbody_mt
 			polyhedral
 			random
 			reduce)
