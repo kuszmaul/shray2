@@ -423,7 +423,7 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 
 /* Resetting the protections is done by ShrayRealloc
  * TODO is it necessary to reset everything? */
-static void resetCache()
+void ShrayResetCache()
 {
     cache.usedMemory = 0;
 
@@ -607,7 +607,7 @@ void ShrayRealloc(void *array)
     BARRIERCOUNT;
 
     Allocation *alloc = heap.allocs + findAlloc(array);
-    resetCache();
+    ShrayResetCache();
 
     MPROTECT_SAFE((void *)alloc->location, alloc->size, PROT_NONE);
 
