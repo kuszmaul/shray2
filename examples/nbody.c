@@ -87,8 +87,8 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 
     accelerateHelp(accel, positions, masses, n, localStart, localEnd, block);
 
-    /* Accelerate with respect to P(t) and prefetch the block (we pretend we have a loop, so
-     * P(0) comes after P(p - 1). */
+    /* Accelerate with respect to P(t) and prefetch the next block (we pretend we have a loop, so
+     * P(0) comes after P(p - 1)). */
     for (unsigned int t = (s + 1) % p; t != s; t = (t + 1) % p) {
         size_t startT = t * n / p;
         size_t endT = (t + 1) * n / p;

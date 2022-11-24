@@ -1,6 +1,8 @@
 #!/bin/sh
 
 # A script to automatically benchmark test programs.
+# For Shray on P processors and problem size n bytes,
+# we set the cache size equal to 2n/P.
 
 set -eu
 
@@ -100,19 +102,19 @@ shraytest()
 
 shraytestMatrix()
 {
-    export SHRAY_CACHESIZE=$(($3*$3*3*8/$1))
+    export SHRAY_CACHESIZE=$((2*$3*$3*3*8/$1))
     shraytest $@
 }
 
 shraytestBodies()
 {
-    export SHRAY_CACHESIZE=$((80*$3/$1))
+    export SHRAY_CACHESIZE=$((2*80*$3/$1))
     shraytest $@
 }
 
 shraytestStencil()
 {
-    export SHRAY_CACHESIZE=$(($3*$3*8/$1))
+    export SHRAY_CACHESIZE=$((2*$3*$3*8/$1))
     shraytest $@
 }
 

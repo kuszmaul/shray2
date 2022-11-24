@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export SHRAY_CACHELINE=1
-export SHRAY_CACHESIZE=100000
+export SHRAY_CACHESIZE=200000
 
 mpirun -n 4 bin/nbody_debug 2000 2 &> nbody.out
 grep "\[node 0" nbody.out > nbody0.out

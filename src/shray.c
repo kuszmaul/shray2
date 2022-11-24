@@ -154,7 +154,7 @@ static int findAlloc(void *segfault)
 
 static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
 {
-    /* We get the minimal page-aligned superset [start, end[ of [address, size[,
+    /* We get the minimal page-aligned subset [start, end[ of [address, size[,
      * except for the stuff we already have.
      *
      * Let Ar_ourRank = [ourStart, ourEnd[. Then we need to fetch
@@ -165,8 +165,8 @@ static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
      *
      * This union is disjoint as min(end, ourStart) <= ourStart < ourEnd <= max(start, ourEnd).
      */
-    uintptr_t start = roundDownPage((uintptr_t)address);
-    uintptr_t end = roundUpPage((uintptr_t)address + size);
+    uintptr_t start = roundUpPage((uintptr_t)address);
+    uintptr_t end = roundDownPage((uintptr_t)address + size);
 
     Allocation *alloc = heap.allocs + findAlloc((void *)start);
 
@@ -632,8 +632,6 @@ void ShrayFree(void *address)
     }
 }
 
-/* FIXME Not thread-safe. If we want to go that route, this should at the very least
- * only be called by the memory-thread. */
 void ShrayPrefetch(void *address, size_t size)
 {
     if (size > cache.maximumMemory) {
@@ -646,9 +644,6 @@ void ShrayPrefetch(void *address, size_t size)
 
     DBUG_PRINT("Prefetch issued for [%p, %p[.", address, (void *)((uintptr_t)address + size));
 
-    helpPrefetch(prefetch.start1, prefetch.end1, prefetch.alloc);
-    helpPrefetch(prefetch.start2, prefetch.end2, prefetch.alloc);
-
     size_t prefetchMem = 0;
     if (prefetch.end1 > prefetch.start1) prefetchMem += prefetch.end1 - prefetch.start1;
     if (prefetch.end2 > prefetch.start2) prefetchMem += prefetch.end2 - prefetch.start2;
@@ -656,6 +651,9 @@ void ShrayPrefetch(void *address, size_t size)
     if (cache.usedMemory + prefetchMem > cache.maximumMemory) {
         evict(min(prefetchMem, cache.usedMemory));
     }
+
+    helpPrefetch(prefetch.start1, prefetch.end1, prefetch.alloc);
+    helpPrefetch(prefetch.start2, prefetch.end2, prefetch.alloc);
 
     cache.usedMemory += prefetchMem;
     prefetch.alloc->usedMemory += prefetchMem;
