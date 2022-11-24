@@ -1,5 +1,10 @@
 #!/bin/sh
 
+#SBATCH -p csedu
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=16
+#SBATCH -t 5:00:00
+
 # A script to automatically benchmark test programs.
 # For Shray on P processors and problem size n bytes,
 # we set the cache size equal to 2n/P.
@@ -17,13 +22,8 @@ hash find
 
 export SHRAY_CACHELINE=1
 
-if [ "$#" -lt 2 ]; then
-	printf "Usage: BINDIR OUTPUTDIR\n" >&2
-	exit 1
-fi
-
-bindir="$1"
-outputdir="$2"
+bindir="../bin"
+outputdir="../results"
 
 # Run a single test program using Fortran.
 # $1: executable
@@ -189,10 +189,10 @@ mkdir -p "$datadir"
 }>"$datadir/system.txt"
 
 # Run all tests.
-for nproc in 2 4; do
+for nproc in 2 4 8 16 32; do
 	for test in fortrantest oshmemtest shraytestMatrix; do
 		# Matrix.
-		for size in 2000 4000 8000; do
+		for size in 2048 4096 8192; do
 			if ! "$test" "$nproc" matrix "$size"; then
 				printf '    FAILED\n' >&2
 			fi
@@ -201,7 +201,7 @@ for nproc in 2 4; do
 
 	for test in fortrantest oshmemtest shraytestBodies; do
 		# N-body.
-		for bodies in 1000 2000; do
+		for bodies in 1024 2048; do
 			for iterations in 1 2 5; do
 				if ! "$test" "$nproc" nbody "$bodies" "$iterations"; then
 					printf '    FAILED\n' >&2
@@ -212,7 +212,8 @@ for nproc in 2 4; do
 
 	for test in fortrantest oshmemtest shraytestStencil; do
 		# Stencil.
-		for n in 1000 2000 5000; do
+        # Small because Fortran is very slow
+		for n in 1024 2048 4096; do
 			for iterations in 1 2 5; do
 				if ! "$test" "$nproc" 2dstencil "$n" "$iterations"; then
 					printf '    FAILED\n' >&2

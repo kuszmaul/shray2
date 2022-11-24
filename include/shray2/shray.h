@@ -90,16 +90,14 @@ void ShraySync(void *array);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayRealloc(void *array);
+ * @fn void ShrayResetCache()
  *
- *   @brief Allows a distributed buffer to be reused for a different distributed
- *          array of the same size.
- *
- *   @param array   buffer we want to reallocate
+ *   @brief After this call, any remote reads will segfault. You probably want to
+ *          call this before re-using an array, so you do not read stale data.
  *
  ******************************************************************************/
 
-void ShrayRealloc(void *array);
+void ShrayResetCache(void);
 
 /** <!--********************************************************************-->
  *

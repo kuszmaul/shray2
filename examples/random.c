@@ -21,13 +21,13 @@
 void init(size_t n, double *input)
 {
     for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
-        input[i] = i;
+        input[i] = 1.0;
     }
 }
 
 /* Returns an integer in [0, n] that is in [local_start, local_end[ with probability
  * localProp %. */
-int rand_n_prob(size_t n, size_t local_start, size_t local_end, int localProp)
+int rand_n_prob(size_t local_start, size_t local_end, int localProp, size_t size)
 {
     int n_pes = ShraySize();
 
@@ -35,41 +35,45 @@ int rand_n_prob(size_t n, size_t local_start, size_t local_end, int localProp)
 
     size_t result;
 
-    if (local) {
-        result = (size_t)(rand() % (n / n_pes) + local_start);
+    if (local || n_pes == 1) {
+        result = (size_t)(rand() % (size / n_pes) + local_start);
     } else {
-        size_t randomInt = (size_t)(rand() % (n - (n / n_pes)));
-        result = (randomInt >= local_start) ? randomInt + local_end - local_start : randomInt;
+        size_t randomInt = (size_t)(rand() % (size - (size / n_pes)));
+        result = (randomInt < local_start) ? randomInt : randomInt + local_end - local_start;
     }
 
     return result;
 }
 
-void random_fill(size_t n, int local_prob, double *input, double *output)
+double random_reduce(size_t n, int local_prob, double *input, size_t size)
 {
-    /* Fill our portion of the output array */
-    size_t shray_start = ShrayStart(n);
-    size_t shray_end = ShrayEnd(n);
-    for (size_t i = shray_start; i < shray_end; i++) {
-        /* Generate a random index with a certain probability. */
-        int r = rand_n_prob(n, shray_start, shray_end, local_prob);
+    double result = 0.0;
 
-        /* Do an operation on that random index */
-        output[i] = input[r];
+    size_t shray_start = ShrayStart(size);
+    size_t shray_end = ShrayEnd(size);
+
+    for (size_t i = 0; i < n; i++) {
+        size_t r = rand_n_prob(shray_start, shray_end, local_prob, size);
+        result += input[r];
     }
+
+    return result;
 }
 
 int main(int argc, char **argv)
 {
     ShrayInit(&argc, &argv);
 
-    if (argc != 3) {
-        fprintf(stderr, "Usage: n, probability local access\n");
+    if (argc != 4) {
+        fprintf(stderr, "Usage: array size, number of accesses, probability local access."
+                " Use SHRAY_CACHEsize=4096\n");
         ShrayFinalize(1);
     }
 
-    size_t n = atoll(argv[1]);
-    size_t local_prob = atoll(argv[2]);
+    size_t size = atoll(argv[1]);
+    size_t n = atoll(argv[2]);
+    int local_prob = atoi(argv[3]);
+
     if (local_prob > 100) {
         fprintf(stderr, "Probability can not be greater than 100\n");
         ShrayFinalize(1);
@@ -77,24 +81,28 @@ int main(int argc, char **argv)
 
     srand(time(NULL));
 
-    double *input = ShrayMalloc(n, n * sizeof(double));
-    double *output = ShrayMalloc(n, n * sizeof(double));
+    double *input = ShrayMalloc(size, size * sizeof(double));
 
-    init(n, input);
+    init(size, input);
     ShraySync(input);
 
     double duration;
+    double result;
     TIME(duration,
-    random_fill(n, local_prob, input, output);
-    ShraySync(output);
+    result = random_reduce(n, local_prob, input, size);
     );
 
-    printf("This took %lfs.\n", duration);
+    if (ShrayOutput) printf("%lf\n", duration);
+
+    if (result == (double)n) {
+        fprintf(stderr, "Success!\n");
+    } else {
+        fprintf(stderr, "Failure! Result = %lf\n", result);
+    }
 
     ShrayReport();
 
     ShrayFree(input);
-    ShrayFree(output);
 
     ShrayFinalize(0);
 }

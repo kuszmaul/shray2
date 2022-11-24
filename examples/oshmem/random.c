@@ -21,17 +21,16 @@
 
 void init(size_t n, double *input)
 {
-    int my_pe = shmem_my_pe();
     size_t elems = n / shmem_n_pes();
 
     for (size_t i = 0; i < elems; i++) {
-        input[i] = i + my_pe * elems;
+        input[i] = 1.0;
     }
 }
 
 /* Returns an integer in [0, n] that is in [local_start, local_end[ with probability
  * localProp %. */
-int rand_n_prob(size_t n, size_t local_start, size_t local_end, int localProp)
+int rand_n_prob(size_t local_start, size_t local_end, int localProp, size_t size)
 {
     int n_pes = shmem_n_pes();
 
@@ -39,69 +38,81 @@ int rand_n_prob(size_t n, size_t local_start, size_t local_end, int localProp)
 
     size_t result;
 
-    if (local) {
-        result = (size_t)(rand() % (n / n_pes) + local_start);
+    if (local || n_pes == 1) {
+        result = (size_t)(rand() % (size / n_pes) + local_start);
     } else {
-        size_t randomInt = (size_t)(rand() % (n - (n / n_pes)));
-        result = (randomInt >= local_start) ? randomInt + local_end - local_start : randomInt;
+        size_t randomInt = (size_t)(rand() % (size - (size / n_pes)));
+        result = (randomInt < local_start) ? randomInt : randomInt + local_end - local_start;
     }
 
     return result;
 }
 
-void random_fill(size_t n, int local_prob, double *input, double *output)
+double random_reduce(size_t n, int local_prob, double *input, size_t size)
 {
+    double result = 0.0;
     int my_pe = shmem_my_pe();
     int n_pes = shmem_n_pes();
-    int elems = n / n_pes;
+    int elems = size / n_pes;
 
-    for (int i = 0; i < elems; i++) {
+    for (size_t i = 0; i < n; i++) {
         /* Generate a random index with a certain probability. */
-        int r = rand_n_prob(n, my_pe * elems,  (my_pe + 1) * elems, local_prob);
+        int r = rand_n_prob(my_pe * elems,  (my_pe + 1) * elems, local_prob, size);
 
         /* Determine where it is stored. */
         int target_pe = r / elems;
         int target_offset = r % elems;
-        shmem_getmem(output + i, input + target_offset, sizeof(double), target_pe);
+        double randomDouble;
+        shmem_getmem(&randomDouble, input + target_offset, sizeof(double), target_pe);
+
+        result += randomDouble;
     }
+
+    return result;
 }
 
 int main(int argc, char **argv)
 {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: n, probability local access\n");
-        return EXIT_FAILURE;
+    if (argc != 4) {
+        fprintf(stderr, "Usage: array size, number of accesses, probability local access.\n");
+        exit(EXIT_FAILURE);
     }
 
-    size_t n = atoll(argv[1]);
-    size_t local_prob = atoll(argv[2]);
+    size_t size = atoll(argv[1]);
+    size_t n = atoll(argv[2]);
+    int local_prob = atoi(argv[3]);
+
     if (local_prob > 100) {
         fprintf(stderr, "Probability can not be greater than 100\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     shmem_init();
 
-    int p = shmem_n_pes();
     srand(time(NULL));
 
-    double *input = shmem_malloc(n / p * sizeof(double));
-    double *output = shmem_malloc(n / p * sizeof(double));
+    double *input = shmem_malloc(size * sizeof(double));
 
-    init(n, input);
+    init(size, input);
 
     shmem_barrier_all();
 
     double duration;
+    double result;
 
     TIME(duration,
-    random_fill(n, local_prob, input, output);
+    result = random_reduce(n, local_prob, input, size);
     shmem_barrier_all();)
 
-    printf("This took %lfs.\n", duration);
+    if (shmem_my_pe() == 0) printf("%lf\n", duration);
+
+    if (result == (double)n) {
+        fprintf(stderr, "Success!\n");
+    } else {
+        fprintf(stderr, "Failure! Result = %lf\n", result);
+    }
 
     shmem_free(input);
-    shmem_free(output);
 
     shmem_finalize();
 

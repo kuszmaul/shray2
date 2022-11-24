@@ -8,6 +8,7 @@ cmake \
 	-DGASNet_CONDUIT=mpi \
 	-DGASNet_ROOT_DIR="/usr/local/gasnet" \
 	-DSANITISE=ON \
+	-DOSHCC=/home/thomas/repos/shmemBuild/bin/oshcc \
 	-S . \
 	-B "$builddir"
 cmake --build "$builddir" -j

@@ -25,21 +25,21 @@ void init(double *matrix, size_t n, double value)
 
 /* Assumes A, B, C are distributed blockwise along the first dimension.
  *
- * We use that 
+ * We use that
  * (    A[0]  )      (   A[0]B   )
- * (    ...   ) B =  (   ...     ) 
+ * (    ...   ) B =  (   ...     )
  * ( A[p - 1] )      ( A[p - 1]B )
- * 
+ *
  * where A[s] is the sth block of A, so the part owned by processor s (P(s)).
- * So P(s) has to calculate A[s] B. 
+ * So P(s) has to calculate A[s] B.
  *
  * To ensure memory-scalability, we use
  *
- *                                     (   B[0]   ) 
- * A[s]B = ( A[s][0] ... A[s][p - 1] ) (   ...    ) 
+ *                                     (   B[0]   )
+ * A[s]B = ( A[s][0] ... A[s][p - 1] ) (   ...    )
  *                                     ( B[p - 1] )
  *
- * where A[s][t] means the sth block row-wise of A, and the tth block column-wise. 
+ * where A[s][t] means the sth block row-wise of A, and the tth block column-wise.
  *
  * Assumes C is initialised to 0. */
 void matmul(double *A, double *B, double *C, size_t n)
@@ -50,13 +50,13 @@ void matmul(double *A, double *B, double *C, size_t n)
 
     /* Add A[s][t] B[t] to C. */
     for (int t = 0; t < p; t++) {
-        /* This is where the memory scalability comes from. We grab one block of 
+        /* This is where the memory scalability comes from. We grab one block of
          * B at a time, overwriting the block we are done with every time. */
         shmem_get(Bt, B, n / p * n, t);
 
-        /* blas can operate on subarrays, so no need to pack A[s][t]. 
-         * A[s][t] is an n / p x n / p matrix, and a submatrix of A which 
-         * has leading dimension n. B[t] is a n / p x n matrix, and C is 
+        /* blas can operate on subarrays, so no need to pack A[s][t].
+         * A[s][t] is an n / p x n / p matrix, and a submatrix of A which
+         * has leading dimension n. B[t] is a n / p x n matrix, and C is
          * an n / p x n matrix. */
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                 n / p, n, n / p, 1.0, &A[t * n / p], n, Bt, n, 1.0, C, n);
@@ -109,13 +109,13 @@ int main(int argc, char **argv)
 	TIME(duration, matmul(A, B, C, n); shmem_barrier_all(););
 
     if (shmem_my_pe() == 0) {
-        printf("Time %lf, %lf Gflops/s\n", duration, 2.0 * n * n * n / 1000000000 / duration);
+        printf("%lf\n", 2.0 * n * n * n / 1000000000 / duration);
     }
 
 	if (check(C, n, 0.01)) {
-	    printf("Success!\n");
+	    fprintf(stderr, "Success!\n");
 	} else {
-	    printf("Failure!\n");
+	    fprintf(stderr, "Failure!\n");
 	}
 
 	shmem_free(A);

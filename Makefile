@@ -16,8 +16,8 @@ RELEASE = $(patsubst examples/%.c, bin/%, $(APPS))
 DEBUG = $(patsubst examples/%.c, bin/%_debug, $(APPS))
 PROFILE = $(patsubst examples/%.c, bin/%_profile, $(APPS))
 GRAPH = $(patsubst examples/%.c, bin/%_graph, $(APPS))
-FORTRAN = $(patsubst examples/fortran/%.f90, bin/%_fortran, $(FORTRANAPPS))
-SHMEM = $(patsubst examples/oshmem/%.c, bin/%_shmem, $(SHMEMAPPS))
+FORTRAN = $(patsubst examples/fortran/%.f90, bin/fortran/%_fortran, $(FORTRANAPPS))
+SHMEM = $(patsubst examples/oshmem/%.c, bin/oshmem/%_oshmem, $(SHMEMAPPS))
 
 all: release debug profile $(FORTRAN) $(SHMEM)
 
@@ -57,10 +57,10 @@ bin/%_debug: %.o bin/shray_debug.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
 bin/%_profile: %.o bin/shray_profile.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
 
-bin/%_fortran: examples/fortran/%.f90
+bin/fortran/%_fortran: examples/fortran/%.f90
 	$(FORTRAN_C) $(FORTRAN_FLAGS) $< -o $@ $(FORTRAN_LFLAGS)
 
-bin/%_shmem: examples/oshmem/%.c
+bin/oshmem/%_oshmem: examples/oshmem/%.c
 	$(SHMEM_C) $(FLAGS) $< -o $@ $(LFLAGS)
 
 testMatrix:

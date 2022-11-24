@@ -93,10 +93,10 @@ void stencil(size_t n, double **in, double **out, int iterations)
     for (int t = 1; t < iterations; t++) {
         relax(n, in, out);
         ShraySync(*out);
+        ShrayResetCache();
 
         /* Switch buffers. This is allowed because every processor is done writing to
          * out at this point, hence does not need to read from in anymore. */
-        ShrayRealloc(*in);
         double *temp = *in;
         *in = *out;
         *out = temp;
@@ -129,8 +129,7 @@ int main(int argc, char **argv)
     TIME(duration, stencil(n, &in, &out, iterations););
 
     if (ShrayOutput) {
-        printf("Time %lfs, %lf Gflops/s\n", duration,
-                9.0 * (n - 2) * (n - 2) * iterations / 1000000000.0 / duration);
+        printf("%lf\n", 9.0 * (n - 2) * (n - 2) * iterations / 1000000000.0 / duration);
     }
 
     ShrayFree(in);

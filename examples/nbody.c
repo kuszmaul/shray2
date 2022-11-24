@@ -45,52 +45,64 @@ Point accelerate(Point pos1, Point pos2, double mass)
     return a;
 }
 
+/* Calculates the acceleration of all locally owned bodies with respect to bodies
+ * [start, end[. Blocks the loops with factor block. */
+void accelerateHelp(Point *accel, Point *positions, double *masses, size_t n,
+        size_t start, size_t end, size_t block)
+{
+    size_t localStart = ShrayStart(n);
+    size_t localEnd = ShrayEnd(n);
+
+    for (size_t Ib = localStart; Ib < localEnd; Ib += block) {
+        for (size_t Jb = start; Jb < end; Jb += block) {
+            for (size_t i = Ib; i < min(Ib + block, localEnd); i++) {
+                for (size_t j = Jb; j < min(Jb + block, end); j++) {
+                    Point acceleration = accelerate(positions[i], positions[j], masses[j]);
+                    accel[i].x += acceleration.x;
+                    accel[i].y += acceleration.y;
+                    accel[i].z += acceleration.z;
+                }
+            }
+        }
+    }
+}
+
 void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
-    size_t start = ShrayStart(n);
-    size_t end = ShrayEnd(n);
+    size_t localStart = ShrayStart(n);
+    size_t localEnd = ShrayEnd(n);
     unsigned int p = ShraySize();
     unsigned int s = ShrayRank();
 
-    /* For segfaults it would be best to have block = 1000. For physical cache performance
-     * something like block = 100. So that is why we block twice. */
     size_t block = 200;
 
-    for (size_t i = start; i < end; i++) {
+    for (size_t i = localStart; i < localEnd; i++) {
         accel[i].x = 0.0;
         accel[i].y = 0.0;
         accel[i].z = 0.0;
     }
 
-    /* Accelerate with respect to P((s + t) % p) and prefetch the next block. */
-    for (unsigned int t = 0; t < p; t++) {
-        size_t Jstart = (s + t) % p * n / p;
+    ShrayPrefetch(&positions[(s + 1) % p * n / p], n / p * sizeof(Point));
+    ShrayPrefetch(&masses[(s + 1) % p * n / p], n / p * sizeof(double));
 
-        for (size_t Ib = start; Ib < end; Ib += block) {
-            for (size_t J = Jstart; J < Jstart + n / p; J += block) {
-                for (size_t i = Ib; i < min(Ib + block, end); i++) {
-                    for (size_t j = J; j < min(J + block, Jstart + n / p); j++) {
-                        accel[i].x +=
-                            accelerate(positions[i], positions[j], masses[j]).x;
-                        accel[i].y +=
-                            accelerate(positions[i], positions[j], masses[j]).y;
-                        accel[i].z +=
-                            accelerate(positions[i], positions[j], masses[j]).z;
-                        flopCount += 16 * 3;
-                    }
-                }
-            }
+    accelerateHelp(accel, positions, masses, n, localStart, localEnd, block);
+
+    /* Accelerate with respect to P(t) and prefetch the next block (we pretend we have a loop, so
+     * P(0) comes after P(p - 1)). */
+    for (unsigned int t = (s + 1) % p; t != s; t = (t + 1) % p) {
+        size_t startT = t * n / p;
+        size_t endT = (t + 1) * n / p;
+
+        if ((t + 1) % p != s) {
+            size_t startNext = (t + 1) % p * n / p;
+            ShrayPrefetch(&positions[startNext], n / p * sizeof(Point));
+            ShrayPrefetch(&masses[startNext], n / p * sizeof(double));
         }
 
-        if (t != 0) {
-            ShrayDiscard(&positions[Jstart], n / p * sizeof(Point));
-            ShrayDiscard(&masses[Jstart], n / p * sizeof(double));
-        }
-        
-        if (t != p - 1) {
-            ShrayPrefetch(&positions[(s + t + 1) % p * n / p], n / p * sizeof(Point));
-            ShrayPrefetch(&masses[(s + t + 1) % p * n / p], n / p * sizeof(double));
-        }
+        accelerateHelp(accel, positions, masses, n, startT, endT, block);
+
+        ShrayDiscard(&positions[startT], n / p * sizeof(Point));
+        ShrayDiscard(&masses[startT], n / p * sizeof(double));
     }
 }
 
@@ -111,6 +123,7 @@ void advance(Point *positions, Point *velocities, double *masses,
     }
     ShraySync(positions);
     ShraySync(velocities);
+    ShrayResetCache();
 }
 
 int main(int argc, char **argv)
@@ -143,12 +156,8 @@ int main(int argc, char **argv)
         advance(positions, velocities, masses, accel, 0.1, n);
     });
 
-    printf("Expected flops %zu, actual flops %zu\n", 
-            16 * 3 * n * n * iterations, flopCount * ShraySize());
-
     if (ShrayOutput) {
-        printf("Time: %lfs, %lf Gflops/s\n", duration, 
-                16.0 * n * n * iterations / 1000000000 / duration);
+        printf("%lf\n", 3.0 * 16.0 * n * n * iterations / 1000000000 / duration);
     }
 
     ShrayFree(positions);

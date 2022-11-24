@@ -2,7 +2,8 @@
 foreach(file
 		matrix
 		nbody
-		stencil)
+		2dstencil
+        random)
 	set(EXAMPLE_TARGET "${file}_fortran")
 
 	add_executable("${EXAMPLE_TARGET}"
