@@ -168,12 +168,7 @@ static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
     uintptr_t start = roundUpPage((uintptr_t)address);
     uintptr_t end = roundDownPage((uintptr_t)address + size);
 
-    Allocation *alloc = heap.allocs + findAlloc((void *)start);
-
-    if (!(start == end) && findAlloc((void *)start) != findAlloc((void *)(end - ShrayPagesz))) {
-        DBUG_PRINT("ShrayGet [%p, %p[ is not within a single allocation.", (void *)start,
-                (void *)end);
-    }
+    Allocation *alloc = heap.allocs + findAlloc(address);
 
     uintptr_t ourStart = startRead(alloc, Shray_rank);
     uintptr_t ourEnd = endRead(alloc, Shray_rank);
