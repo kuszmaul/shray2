@@ -89,17 +89,34 @@ typedef struct PrefetchStruct {
         DBUG_PRINT("Moved [%p, %p[ to [%p, %p[", source,                                \
                 (void *)((uintptr_t)source + size), dest,                               \
                 (void *)((uintptr_t)dest + size));                                      \
-        dest = mremap(source, size, size, MREMAP_MAYMOVE | MREMAP_FIXED, dest);         \
-        if (dest == MAP_FAILED) {                                                       \
+        void *dummy;                                                                    \
+        dummy = mremap(source, size, size, MREMAP_MAYMOVE | MREMAP_FIXED, dest);        \
+        if (dummy == MAP_FAILED) {                                                      \
             fprintf(stderr, "Line %d, [node %d]: ", __LINE__, Shray_rank);              \
             perror("mremap failed");                                                    \
             ShrayFinalize(1);                                                           \
         }                                                                               \
     }
 
-#define MMAP_SAFE(variable, fncall)                                                     \
+#define MMAP_SAFE(variable, address, length, prot)                                      \
     {                                                                                   \
-        variable = fncall;                                                              \
+        variable = mmap(address, length, prot, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);     \
+        DBUG_PRINT("%p = mmap(%p, %zu, %s, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);",       \
+                variable, address, length, #prot);                                      \
+        if (variable == MAP_FAILED) {                                                   \
+            fprintf(stderr, "Line %d, [node %d]: ", __LINE__, Shray_rank);              \
+            perror("mmap failed");                                                      \
+            ShrayFinalize(1);                                                           \
+        }                                                                               \
+    }
+
+#define MMAP_FIXED_SAFE(variable, address, length, prot)                                \
+    {                                                                                   \
+        variable = mmap(address, length, prot,                                          \
+                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);                        \
+        DBUG_PRINT("%p = mmap(%p, %zu, %s, "                                            \
+                "MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);",                     \
+                variable, address, length, #prot);                                      \
         if (variable == MAP_FAILED) {                                                   \
             fprintf(stderr, "Line %d, [node %d]: ", __LINE__, Shray_rank);              \
             perror("mmap failed");                                                      \
@@ -135,5 +152,3 @@ typedef struct PrefetchStruct {
             ShrayFinalize(1);                                                           \
         }                                                                               \
     }
-
-

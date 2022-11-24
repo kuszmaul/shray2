@@ -82,10 +82,10 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
         accel[i].z = 0.0;
     }
 
-    accelerateHelp(accel, positions, masses, n, localStart, localEnd, block);
-
     ShrayPrefetch(&positions[(s + 1) % p * n / p], n / p * sizeof(Point));
     ShrayPrefetch(&masses[(s + 1) % p * n / p], n / p * sizeof(double));
+
+    accelerateHelp(accel, positions, masses, n, localStart, localEnd, block);
 
     /* Accelerate with respect to P(t) and prefetch the block (we pretend we have a loop, so
      * P(0) comes after P(p - 1). */

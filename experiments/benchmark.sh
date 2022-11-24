@@ -77,12 +77,10 @@ oshmemtest()
 # $1: executable
 # $2: number of processors
 # remainder: arguments to the program
-shraytestMatrix()
+shraytest()
 {
 	nproc="$1"
 	example="$2"
-    # 3 matrices of n x n doubles (8 bytes per double)
-    export SHRAY_CACHESIZE=$(($3*$3*3*8/$1))
 	shift
 	shift
 
@@ -98,74 +96,30 @@ shraytestMatrix()
 	timefile="$resultdir/$nproc.time"
 
     mpirun -n "$nproc" ${bindir}/${example}_profile "$@" > "$timefile" 2> "$outfile"
+}
+
+shraytestMatrix()
+{
+    export SHRAY_CACHESIZE=$(($3*$3*3*8/$1))
+    shraytest $@
 }
 
 shraytestBodies()
 {
-	nproc="$1"
-	example="$2"
-    # 3 arrays of n Points, 1 array of n doubles. So n * (3 * 3 * 8 + 8) = 80 * n
     export SHRAY_CACHESIZE=$((80*$3/$1))
-	shift
-	shift
-
-	printf 'Running %s (%s proc, shray) with arguments: %s\n' \
-		"$example" \
-		"$nproc" \
-		"$*"
-
-	resultdir="$datadir/$example/$*/shray"
-	mkdir -p "$resultdir"
-
-	outfile="$resultdir/$nproc.out"
-	timefile="$resultdir/$nproc.time"
-
-    mpirun -n "$nproc" ${bindir}/${example}_profile "$@" > "$timefile" 2> "$outfile"
+    shraytest $@
 }
 
 shraytestStencil()
 {
-	nproc="$1"
-	example="$2"
-    # 2 arrays of n x n doubles
     export SHRAY_CACHESIZE=$(($3*$3*8/$1))
-	shift
-	shift
-
-	printf 'Running %s (%s proc, shray) with arguments: %s\n' \
-		"$example" \
-		"$nproc" \
-		"$*"
-
-	resultdir="$datadir/$example/$*/shray"
-	mkdir -p "$resultdir"
-
-	outfile="$resultdir/$nproc.out"
-	timefile="$resultdir/$nproc.time"
-
-    mpirun -n "$nproc" ${bindir}/${example}_profile "$@" > "$timefile" 2> "$outfile"
+    shraytest $@
 }
 
 shraytestRandom()
 {
-	nproc="$1"
-	example="$2"
     export SHRAY_CACHESIZE=4096
-	shift
-	shift
-
-	printf 'Running %s (%s proc, shray) with arguments: %s\n' \
-		"$example" \
-		"$nproc" \
-		"$*"
-
-	resultdir="$datadir/$example/$*/shray"
-	mkdir -p "$resultdir"
-
-	outfile="$resultdir/$nproc.out"
-	timefile="$resultdir/$nproc.time"
-
-    mpirun -n "$nproc" ${bindir}/${example}_profile "$@" > "$timefile" 2> "$outfile"
+    shraytest $@
 }
 
 # Run a single test program using GlobalArrays.
@@ -207,10 +161,6 @@ mkdir -p "$datadir"
 # Create a file with the system parameters.
 {
 	printf 'Benchmark system configuration on %s\n' "$curdate"
-
-	printf '\nShray:\n'
-	printf 'SHRAY_CACHESIZE: %s\n' "$SHRAY_CACHESIZE"
-	printf 'SHRAY_CACHELINE: %s\n' "$SHRAY_CACHELINE"
 
 	printf '\nMPI:\n'
 	mpirun --version

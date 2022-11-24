@@ -125,8 +125,7 @@ static inline void freeRAM(uintptr_t start, uintptr_t end)
 
     void *dummy;
     MUNMAP_SAFE((void *)start, end - start);
-    MMAP_SAFE(dummy, mmap((void *)start, end - start, PROT_NONE,
-                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
+    MMAP_FIXED_SAFE(dummy, (void *)start, end - start, PROT_NONE);
 }
 
 /* Simple binary search, assumes heap.allocs is sorted. Returns the index of the
@@ -302,8 +301,7 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
                (entry->end - alloc->location) / ShrayPagesz);
 
         MREMAP_MOVE(start, toShadow(entry->start, alloc), entry->end - entry->start);
-        MMAP_SAFE(start, mmap(toShadow(entry->start, alloc), entry->end - entry->start, PROT_WRITE,
-                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+        MMAP_FIXED_SAFE(start, toShadow(entry->start, alloc), entry->end - entry->start, PROT_WRITE);
         BitmapSetOnes(alloc->local, (entry->start - alloc->location) / ShrayPagesz,
                 (entry->end - alloc->location) / ShrayPagesz);
     } else {
@@ -421,8 +419,6 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
     }
 }
 
-/* Resetting the protections is done by ShrayRealloc
- * TODO is it necessary to reset everything? */
 void ShrayResetCache()
 {
     cache.usedMemory = 0;
@@ -444,11 +440,8 @@ void ShrayResetCache()
 
         BitmapReset(alloc->local);
         BitmapReset(alloc->prefetched);
-        freeRAM(alloc->location, alloc->location + alloc->size);
-
-        size_t segmentLength = endRead(alloc, Shray_rank) - startRead(alloc, Shray_rank);
-
-        MPROTECT_SAFE((void *)startRead(alloc, Shray_rank), segmentLength, PROT_READ | PROT_WRITE);
+        freeRAM(alloc->location, startRead(alloc, Shray_rank));
+        freeRAM(endRead(alloc, Shray_rank), alloc->location + alloc->size);
     }
 
     /* Free the cache data structures. */
@@ -524,8 +517,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
      * pointer up. */
     if (Shray_rank == 0) {
         void *mmapAddress;
-        MMAP_SAFE(mmapAddress, mmap(NULL, totalSize + 2 * ShrayPagesz,
-                    PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+        MMAP_SAFE(mmapAddress, NULL, totalSize + 2 * ShrayPagesz, PROT_NONE);
         location = (void *)roundUpPage((uintptr_t)mmapAddress);
         DBUG_PRINT("mmapAddress = %p, allocation start = %p", mmapAddress, location);
     }
@@ -535,13 +527,11 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
             sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
     if (Shray_rank != 0) {
-        MMAP_SAFE(location, mmap(location, totalSize + ShrayPagesz, PROT_NONE,
-                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
+        MMAP_FIXED_SAFE(location, location, totalSize + ShrayPagesz, PROT_NONE);
     }
 
     void *shadow;
-    MMAP_SAFE(shadow, mmap(NULL, totalSize + ShrayPagesz, PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE,
-                -1, 0));
+    MMAP_SAFE(shadow, NULL, totalSize + ShrayPagesz, PROT_WRITE);
     DBUG_PRINT("We allocate shadow [%p, %p[", shadow,
             (void *)((uintptr_t)shadow + totalSize + ShrayPagesz));
 
@@ -570,8 +560,8 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 
     size_t segmentLength = endRead(alloc, Shray_rank) - startRead(alloc, Shray_rank);
 
-    DBUG_PRINT("Made a DSM allocation [%p, %p[, of which \n\t\tAw = [%p, %p[, "
-            "\n\t\tAr = [%p, %p[,\n\t\tAp = [%p, %p[.",
+    DBUG_PRINT("Made a DSM allocation [%p, %p[, of which \t\tAw = [%p, %p[, "
+            "\t\tAr = [%p, %p[,\t\tAp = [%p, %p[.",
             location, (void *)((uintptr_t)location + totalSize),
             (void *)startWrite(alloc, Shray_rank), (void *)endWrite(alloc, Shray_rank),
             (void *)startRead(alloc, Shray_rank), (void *)endRead(alloc, Shray_rank),
@@ -597,24 +587,6 @@ size_t ShrayEnd(size_t firstDimension)
 {
     return (Shray_rank == Shray_size - 1) ? firstDimension :
         (Shray_rank + 1) * roundUp(firstDimension, Shray_size);
-}
-
-/* FIXME why is this so expensive? */
-void ShrayRealloc(void *array)
-{
-    /* Make sure every node has finished reading. */
-    gasnetBarrier();
-    BARRIERCOUNT;
-
-    Allocation *alloc = heap.allocs + findAlloc(array);
-    ShrayResetCache();
-
-    MPROTECT_SAFE((void *)alloc->location, alloc->size, PROT_NONE);
-
-    uintptr_t firstPage = startRead(alloc, Shray_rank);
-    uintptr_t lastPage = endRead(alloc, Shray_rank);
-
-    MPROTECT_SAFE((void *)firstPage, lastPage - firstPage, PROT_READ | PROT_WRITE);
 }
 
 void ShraySync(void *array)
@@ -711,8 +683,7 @@ static void DiscardGet(queue_entry_t *get, size_t index)
         uintptr_t end = start + get->end - get->start;
         void *dummy;
         MUNMAP_SAFE((void *)start, end - start);
-        MMAP_SAFE(dummy, mmap((void *)start, end - start, PROT_READ | PROT_WRITE,
-                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0));
+        MMAP_FIXED_SAFE(dummy, (void *)start, end - start, PROT_READ | PROT_WRITE);
     }
 
     queue_remove_at(cache.prefetchCaches, index);
