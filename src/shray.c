@@ -170,7 +170,7 @@ static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
 
     Allocation *alloc = heap.allocs + findAlloc((void *)start);
 
-    if (findAlloc((void *)start) != findAlloc((void *)(end - ShrayPagesz))) {
+    if (!(start == end) && findAlloc((void *)start) != findAlloc((void *)(end - ShrayPagesz))) {
         DBUG_PRINT("ShrayGet [%p, %p[ is not within a single allocation.", (void *)start,
                 (void *)end);
     }
