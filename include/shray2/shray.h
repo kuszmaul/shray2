@@ -187,9 +187,24 @@ typedef struct {
 
 typedef void (*shray_fn)(worker_info_t *info);
 
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayRunWorker(shray_fn fn, size_t n, void *args);
+ *
+ *   @brief          Executes fn on args with args->start = ShrayStart(n),
+ *                   args->end = ShrayEnd(n) using multithreading.
+ *
+ *   @param fn       Function that writes to distributed array A only on
+ *                   indices (i1, ..., id) satisfying
+ *                   workerinfo_t->start <= i1 < worker_info_t->end.
+ *          n        First dimension of A.
+ *          args     Arguments of fn.
+ *
+ ******************************************************************************/
+
 void ShrayRunWorker(shray_fn fn, size_t n, void *args);
 
-/* The elipses are a function call block. Example usage:
+/* Example
  *
  * double duration;
  * TIME(duration, f(in, out); ShraySync(out););

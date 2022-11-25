@@ -1,30 +1,3 @@
-1. nbody with Shray is much faster than Fortran or OpenShmem. That makes no sense either.
-   A month back this was not yet the case?! The Fortran or OpenShmem code was not changed
-   since then.
+1. Get chapel version
 
-2. When it does not prefetch due to a too small cache, it is faster
-
-thomas@thomas-laptop:~/work/dsm/shray2.0$ mpirun -n 4 bin/matrix_profile 8000
-Time 12.810294, 79.935714 Gflops/s
-Shray report P(1): 2 segfaults, 9 barriers, 8192 bytes communicated.
-Shray report P(2): 2 segfaults, 9 barriers, 8192 bytes communicated.
-Shray report P(3): 2 segfaults, 9 barriers, 8192 bytes communicated.
-Shray report P(0): 2 segfaults, 9 barriers, 8192 bytes communicated.
-Success!
-Success!
-Success!
-Success!
-
-thomas@thomas-laptop:~/work/dsm/shray2.0$ export SHRAY_CACHESIZE=4096000
-thomas@thomas-laptop:~/work/dsm/shray2.0$ mpirun -n 4 bin/matrix_profile 8000
-Shray report P(3): 93750 segfaults, 9 barriers, 384000000 bytes communicated.
-Shray report P(0): 93750 segfaults, 9 barriers, 384000000 bytes communicated.
-Shray report P(1): 93750 segfaults, 9 barriers, 384000000 bytes communicated.
-Shray report P(2): 93750 segfaults, 9 barriers, 384000000 bytes communicated.
-Time 10.363380, 98.809462 Gflops/s
-Success!
-Success!
-Success!
-Success!
-
-But this is probably due to the poor prefetching.
+3. Get global arrays measurements
