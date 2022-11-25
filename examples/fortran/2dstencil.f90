@@ -10,19 +10,11 @@ subroutine relax(n, input, output)
     integer, intent(in) :: n
     real(KIND=8) :: input(n, n)[*]
     real(KIND=8) :: output(n, n)[*]
+    real(KIND=8) :: constants(3, 3)
 
     integer :: i, j, s, p
-    real(KIND=8) :: center
-    real(KIND=8) :: lower
-    real(KIND=8) :: upper
-    real(KIND=8) :: left
-    real(KIND=8) :: right
 
-    center = 0.25
-    lower = 0.25
-    upper = 0.25
-    left = 0.25
-    right = 0.25
+    constants = reshape([0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 0.0, 0.5, 0.5], shape=[3, 3])
 
     s = this_image()
     p = num_images()
@@ -30,34 +22,23 @@ subroutine relax(n, input, output)
     ! Inner part of the computation
     do j = 2, n / p - 1
         do i = 2, n - 1
-            output(i, j) = center * input(i, j) + &
-                       lower * input(i - 1, j) + &
-                       upper * input(i + 1, j) + &
-                       left * input(i, j - 1) + &
-                       right * input(i, j + 1)
+            output(i, j) = sum(input(i - 1: i + 1, j - 1: j + 1) * constants)
         end do
     end do
 
     ! Left-most column
     if (s /= 1) then
         do i = 2, n - 1
-            output(i, 1) = center * input(i, 1) + &
-                          lower * input(i - 1, 1) + &
-                          upper * input(i + 1, 1) + &
-                          left * input(i, n / p)[s - 1] + &
-                          right * input(i, 2)
-
+            output(i, 1) = sum(input(i - 1:i + 1, 1:2) * constants(:, 2:3)) + &
+                           sum(input(i - 1:i + 1, n / p)[s - 1] * constants(:, 1))
         end do
     end if
 
     ! Right-most column
     if (s /= p) then
         do i = 2, n - 1
-            output(i, n / p) = center * input(i, n / p) + &
-                            lower * input(i - 1, n / p) + &
-                            upper * input(i + 1, n / p) + &
-                            left * input(i, n / p) + &
-                            right * input(i, 1)[s + 1]
+            output(i, n / p) = sum(input(i - 1:i + 1, 2:3) * constants(:, 1:2)) + &
+                               sum(input(i - 1:i + 1, 1)[s + 1] * constants(:, 3))
         end do
     end if
 end subroutine relax

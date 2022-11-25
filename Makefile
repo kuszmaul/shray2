@@ -3,7 +3,8 @@ include /usr/local/gasnet/include/mpi-conduit/mpi-seq.mak
 #include /usr/local/gasnet/include/udp-conduit/udp-seq.mak
 
 FORTRAN_C = gfortran
-SHMEM_C = /home/thomas/repos/shmemBuild/bin/oshcc
+CHAPEL_C = chpl
+SHMEM_C = oshcc
 FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude -g -fsanitize=undefined
 LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread
 #LFLAGS = -lm -lopenblas -fsanitize=undefined -pthread
@@ -12,14 +13,16 @@ FORTRAN_LFLAGS = -lcaf_openmpi
 APPS = $(wildcard examples/*.c)
 FORTRANAPPS = $(wildcard examples/fortran/*.f90)
 SHMEMAPPS = $(wildcard examples/oshmem/*.c)
+CHAPELAPPS = $(wildcard examples/chapel/*.chpl)
 RELEASE = $(patsubst examples/%.c, bin/%, $(APPS))
 DEBUG = $(patsubst examples/%.c, bin/%_debug, $(APPS))
 PROFILE = $(patsubst examples/%.c, bin/%_profile, $(APPS))
 GRAPH = $(patsubst examples/%.c, bin/%_graph, $(APPS))
 FORTRAN = $(patsubst examples/fortran/%.f90, bin/fortran/%_fortran, $(FORTRANAPPS))
 SHMEM = $(patsubst examples/oshmem/%.c, bin/oshmem/%_oshmem, $(SHMEMAPPS))
+CHAPEL = $(patsubst examples/chapel/%.chpl, bin/chapel/%, $(CHAPELAPPS))
 
-all: release debug profile $(FORTRAN) $(SHMEM)
+all: release debug profile $(FORTRAN) $(CHAPEL)
 
 release: $(RELEASE)
 
@@ -62,6 +65,9 @@ bin/fortran/%_fortran: examples/fortran/%.f90
 
 bin/oshmem/%_oshmem: examples/oshmem/%.c
 	$(SHMEM_C) $(FLAGS) $< -o $@ $(LFLAGS)
+
+bin/chapel/%: examples/chapel/%.chpl
+	chpl $< -o $@
 
 testMatrix:
 	export SHRAY_CACHESIZE=4096000
