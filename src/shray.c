@@ -688,6 +688,14 @@ void ShraySync(void *array)
 
     UpdatePage(firstPage, index);
     if (firstPage != lastPage) UpdatePage(lastPage, index);
+
+    /* Technically this is not necessary after every sync, but the call is cheap, and it makes
+     * the consistency easier. A reuse of buffers is now always allowed for the following reason:
+     * Suppose we use the same buffer for A and B. We can only read old data of A when reading B
+     * if the same location was read of A. But that is only allowed after a ShraySync(A), which
+     * resets the cache. */
+    ShrayResetCache();
+
     gasnet_wait_syncnbi_gets();
     DBUG_PRINT("We are done updating pages for %p", array);
 

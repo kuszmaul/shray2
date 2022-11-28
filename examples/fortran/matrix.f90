@@ -39,7 +39,7 @@ program main
     sync all
     call system_clock(cpu_count, count_rate, count_max)
 
-    do s = 1, p
+    do s = 1, num_images()
         C = C + matmul(A(:,:)[s], B(1 + (s - 1) * n / p: s * n / p, :))
     end do
 

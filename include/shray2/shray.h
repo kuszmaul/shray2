@@ -90,17 +90,6 @@ void ShraySync(void *array);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayResetCache()
- *
- *   @brief After this call, any remote reads will segfault. You probably want to
- *          call this before re-using an array, so you do not read stale data.
- *
- ******************************************************************************/
-
-void ShrayResetCache(void);
-
-/** <!--********************************************************************-->
- *
  * @fn void ShrayFree(void *array)
  *
  *   @brief         Frees distributed array.
