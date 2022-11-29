@@ -6,7 +6,7 @@ FORTRAN_C = gfortran
 CHAPEL_C = chpl
 SHMEM_C = oshcc
 FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude -pg
-LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread
+LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread -pg
 #LFLAGS = -lm -lopenblas -fsanitize=undefined -pthread
 FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib -g
 FORTRAN_LFLAGS = -lcaf_openmpi

@@ -45,40 +45,18 @@ Point accelerate(Point pos1, Point pos2, double mass)
 
 void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
-    size_t start = ShrayStart(n);
-    size_t end = ShrayEnd(n);
-    unsigned int p = ShraySize();
-    unsigned int s = ShrayRank();
+    size_t localStart = ShrayStart(n);
+    size_t localEnd = ShrayEnd(n);
 
-    for (size_t i = start; i < end; i++) {
+    for (size_t i = localStart; i < localEnd; i++) {
         accel[i].x = 0.0;
         accel[i].y = 0.0;
         accel[i].z = 0.0;
-    }
-
-    /* Accelerate with respect to P((s + t) % p) and prefetch the next block. */
-    for (unsigned int t = 0; t < p; t++) {
-        size_t Jstart = (s + t) % p * n / p;
-
-        for (size_t i = start; i < end; i++) {
-            for (size_t j = Jstart; j < Jstart + n / p; j++) {
-                accel[i].x +=
-                    accelerate(positions[i], positions[j], masses[j]).x;
-                accel[i].y +=
-                    accelerate(positions[i], positions[j], masses[j]).y;
-                accel[i].z +=
-                    accelerate(positions[i], positions[j], masses[j]).z;
-            }
-        }
-
-        if (t != 0) {
-            ShrayDiscard(&positions[Jstart], n / p * sizeof(Point));
-            ShrayDiscard(&masses[Jstart], n / p * sizeof(double));
-        }
-
-        if (t != p - 1) {
-            ShrayPrefetch(&positions[(s + t + 1) % p * n / p], n / p * sizeof(Point));
-            ShrayPrefetch(&masses[(s + t + 1) % p * n / p], n / p * sizeof(double));
+        for (size_t j = 0; j < n; j++) {
+            Point point = accelerate(positions[i], positions[j], masses[j]);
+            accel[i].x += point.x;
+            accel[i].y += point.y;
+            accel[i].z += point.z;
         }
     }
 }
@@ -133,8 +111,7 @@ int main(int argc, char **argv)
     });
 
     if (ShrayOutput) {
-        printf("Time: %lfs, %lf Gflops/s\n", duration,
-                3.0 * 16.0 * n * n * iterations / 1000000000 / duration);
+        printf("%lf\n", 3.0 * 16.0 * n * n * iterations / 1000000000 / duration);
     }
 
     ShrayFree(positions);

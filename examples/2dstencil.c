@@ -93,10 +93,8 @@ void stencil(size_t n, double **in, double **out, int iterations)
     for (int t = 1; t < iterations; t++) {
         relax(n, in, out);
         ShraySync(*out);
-        ShrayResetCache();
 
-        /* Switch buffers. This is allowed because every processor is done writing to
-         * out at this point, hence does not need to read from in anymore. */
+        /* Switch buffers. */
         double *temp = *in;
         *in = *out;
         *out = temp;

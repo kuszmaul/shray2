@@ -490,6 +490,7 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
     }
 }
 
+/* Is linear in the number of allocations when we do not prefetch. */
 void ShrayResetCache()
 {
     cache.usedMemory = 0;

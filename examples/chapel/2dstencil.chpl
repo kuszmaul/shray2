@@ -14,8 +14,12 @@ proc relax(input: [1..n, 1..n] real)
     var output: [1..n, 1..n] real;
 
     /* Inner part */
+//    forall (i, j) in {2..n - 1, 2..n - 1} do
+//        output[i, j] = + reduce (input[i - 1..i + 1, j - 1..j + 1] * constants);
     forall (i, j) in {2..n - 1, 2..n - 1} do
-        output[i, j] = + reduce (input[i - 1..i + 1, j - 1..j + 1] * constants);
+        for di in -1..1 do
+            for dj in -1..1 do
+                output[i, j] += input[i + di, j + dj] * constants[2 + di, 2 + dj];
 
     /* Boundary */
     output[1, ..] = input[1, ..];

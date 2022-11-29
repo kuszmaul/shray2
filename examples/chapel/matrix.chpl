@@ -1,19 +1,31 @@
+/* Assumes n is divisible by number of locales */
+
 use Time;
 use IO;
 use BLAS;
+use BlockDist;
 /* Needs BLAS or lapack */
 use LinearAlgebra;
 
-/* Use ./2dstencil --n=20000 */
 config const n: int = 4000;
 
-var mat: [1..n, 1..n] real = 1;
+const Space = {1..n, 1..n};
+const BlockSpace = Space dmapped Block(boundingBox=Space);
+var A: [BlockSpace] real = 1;
+var B: [BlockSpace] real = 1;
+var C: [BlockSpace] real;
+var Al: [1..n / numLocales, 1..n / numLocales] real;
+var Bl: [1..n / numLocales, 1..n] real;
+
 var watch: Timer;
 watch.start();
 
-mat = dot(mat, mat);
+for l in 1..numLocales do
+    Al = A[A.localSubdomain()](.., 1..n / numLocales);
+    Bl = B[B.localSubdomain()];
+    C[C.localSubdomain()] += dot(Al, Bl);
 
 watch.stop();
-stderr.writeln('Anti-optimisation number: ', + reduce mat, '\n');
+stderr.writeln('Anti-optimisation number: ', + reduce C, '\n');
 
 stdout.writeln(2.0 * n * n * n / watch.elapsed() / 1000000000, '\n');

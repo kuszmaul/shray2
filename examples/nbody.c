@@ -123,7 +123,6 @@ void advance(Point *positions, Point *velocities, double *masses,
     }
     ShraySync(positions);
     ShraySync(velocities);
-    ShrayResetCache();
 }
 
 int main(int argc, char **argv)

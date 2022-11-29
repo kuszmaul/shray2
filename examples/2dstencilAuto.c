@@ -71,12 +71,7 @@ void stencil(size_t n, double **in, double **out, int iterations)
         relax(n, in, out);
         ShraySync(*out);
 
-        /* Switch buffers. This is allowed because every processor is done writing to
-         * out at this point, hence does not need to read from in anymore. When we read
-         * from an array, the protections of non-owned parts change. For writing to it,
-         * this does not matter. But when we want to read from it again, we may not read
-         * stale data. So every two iterations, we want to reset the cache. */
-        ShrayResetCache();
+        /* Switch buffers. */
         double *temp = *in;
         *in = *out;
         *out = temp;

@@ -121,7 +121,6 @@ void ShrayReport(void);
 
 unsigned int ShrayRank(void);
 
-
 /** <!--********************************************************************-->
  *
  * @fn size_t ShraySize(void)
