@@ -1,5 +1,4 @@
 #include <shray2/shray.h>
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -67,28 +66,30 @@ int main(int argc, char **argv)
     ShrayInit(&argc, &argv);
 
     if (argc != 2) {
-        printf("Usage: n\n");
+        printf("Usage: lenght of the vector you reduce\n");
         ShrayFinalize(1);
     }
-    size_t n = atol(argv[1]);
-    assert(n % ShraySize() == 0);
 
-    double *arr = ShrayMalloc(n, n * sizeof(double));
+    size_t n = atoll(argv[1]);
 
-    init(arr, n);
-    ShraySync(arr);
+    double *A = ShrayMalloc(n, n * sizeof(double));
+    init(A, n);
+    ShraySync(A);
 
-    double result = reduce(arr, n);
-    ShrayFree(arr);
+    double duration;
+    double result;
 
-    ShrayReport();
+    if (ShrayOutput) {
+        TIME(duration, result = reduceAuto(A, n););
 
-    if (result == n) {
-        printf("Success from node %d\n", ShrayRank());
-    } else {
-        printf("Failure from node %d (%lf != %lf)\n", ShrayRank(), result,
-               (double)n);
+        double microsPerPage = 1000000.0 * duration / (n / 512);
+
+        fprintf(stderr, "We reduced an array on %d processors at %lf microseconds per page:\n"
+                "That is a bandwidth of %lf GB/s\n",
+                ShraySize(), microsPerPage, 4096.0 / microsPerPage / 1000.0);
+        printf("%lf\n", microsPerPage);
     }
 
+    ShrayFree(A);
     ShrayFinalize(0);
 }
