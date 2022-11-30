@@ -51,6 +51,9 @@ bin/%.o: src/%.c src/%.h
 bin/queue.o: src/queue.c src/queue.h
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
+bin/fortran/mmio.o: examples/fortran/modules/mmio.f90
+	$(FORTRAN_C) -c $(FORTRAN_FLAGS) $< -o $@
+
 %.o: examples/%.c
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
@@ -63,8 +66,8 @@ bin/shray/%_debug: %.o bin/shray_debug.o bin/bitmap.o bin/queue.o bin/ringbuffer
 bin/shray/%_profile: %.o bin/shray_profile.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
 
-bin/fortran/%_fortran: examples/fortran/%.f90
-	$(FORTRAN_C) $(FORTRAN_FLAGS) $< -o $@ $(FORTRAN_LFLAGS)
+bin/fortran/%_fortran: examples/fortran/%.f90 bin/fortran/mmio.o
+	$(FORTRAN_C) $(FORTRAN_FLAGS) $^ -o $@ $(FORTRAN_LFLAGS)
 
 bin/oshmem/%_oshmem: examples/oshmem/%.c
 	$(SHMEM_C) $(FLAGS) $< -o $@ $(LFLAGS)

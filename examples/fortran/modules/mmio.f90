@@ -8,7 +8,7 @@ module matrix_market
         real(KIND=8), allocatable :: val(:)
         ! The first non-zero of row k is the row_ptr(k)th non-zero overall.
         ! row_ptr(m + 1) is the total number of non-zeroes.
-        integer, allocatable :: row_ptr(:)
+        integer(KIND=8), allocatable :: row_ptr(:)
         ! The kth non-zero has column-index col_ind(k)
         integer, allocatable :: col_ind(:)
     end type
@@ -101,7 +101,7 @@ contains
 !
       integer ival(*)
       double precision rval(*)
-      complex cval(*)
+      complex(KIND=8) cval(*)
       double precision rpart,ipart
       integer indx(*)
       integer jndx(*)
@@ -180,7 +180,7 @@ contains
 !
       backspace (iunit)
       read (iunit,end=1000,fmt=5) tmp1
-      call countwd(tmp1,1024,1,count)
+      call countwd(tmp1,count)
       if ( rep .eq. 'array' .and. count .ne. 2 ) go to 3000
       if ( rep .eq. 'coordinate' .and. count .ne. 3 ) go to 3500
 !
@@ -217,7 +217,8 @@ contains
         elseif ( field .eq. 'complex' ) then
           do 40 i=1,nnz
             read (iunit,fmt=*,end=4000) indx(i),jndx(i),rpart,ipart
-            cval(i) = cmplx(rpart,ipart)
+            ! dcmplx is a GNU extension
+            cval(i) = dcmplx(rpart,ipart)
  40       continue
         elseif ( field .eq. 'pattern' ) then
           do 50 i=1,nnz
@@ -269,7 +270,8 @@ contains
         elseif ( field .eq. 'complex' ) then
           do 70 i=1,nnzreq
             read (iunit,fmt=*,end=4000) rpart,ipart
-            cval(i) = cmplx(rpart,ipart)
+            ! dcmplx is a GNU extension
+            cval(i) = dcmplx(rpart,ipart)
  70      continue
         else
            print *,'''pattern'' data not consistant with type ''array'''
@@ -402,7 +404,7 @@ contains
 !
 ! Declarations:
 !
-      integer i, rows, cols, nnz, iunit
+      integer rows, cols, nnz, iunit
       integer count
       character mmhead*14
       character mmtype*6
@@ -479,7 +481,7 @@ contains
 !
       backspace (iunit)
       read (iunit,end=1000,fmt=5) tmp1
-      call countwd(tmp1,1024,1,count)
+      call countwd(tmp1,count)
       if ( rep .eq. 'array' .and. count .ne. 2 ) go to 3000
       if ( rep .eq. 'coordinate' .and. count .ne. 3 ) go to 3500
 !
@@ -652,7 +654,7 @@ contains
 !
       integer ival(*)
       double precision rval(*)
-      complex cval(*)
+      complex(KIND=8) cval(*)
       integer indx(*)
       integer jndx(*)
       integer i, rows, cols, nnz, nnzreq, ounit
@@ -817,14 +819,16 @@ contains
       return
       end subroutine getwd
 
-      subroutine countwd(string,slen,start,count)
+      subroutine countwd(string,count)
 !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-!     Countwd counts the number of words in string starting
-!     at position start.  On return, count is the number of words.
+!     Countwd counts the number of words in string
+!     On return, count is the number of words.
 ! 30-Oct-96   Routine added
+! 30-Nov-22   The routine did not start at 'start', and it was only used
+!             for start = 1 anyways, so I deleted this.
 !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       character*(*) string
-      integer slen, start, next, wordlength, count
+      integer next, wordlength, count
       character tmp2*2
 
       count = 0
@@ -863,14 +867,27 @@ contains
     function CSR_Real(iunit, nnzmax) result(mat)
         implicit none
         character rep*10, field*7, symm*19
-        integer :: rows, cols, indx(nnzmax), jndx(nnzmax), iunit, ival(nnzmax)
-        integer(KIND=8) :: nnz, nnzmax
+        integer :: rows, cols, indx(nnzmax), jndx(nnzmax), iunit, ival(nnzmax), current_row
+        integer(KIND=8) :: nnz, nnzmax, i
         real(KIND=8) :: rval(nnzmax)
-        complex :: cval(nnzmax)
+        complex(KIND=8) :: cval(nnzmax)
         type (CSRMatrix) :: mat
 
         call mmread(iunit, rep, field, symm, rows, cols, nnz, nnzmax, indx, jndx, ival, rval, cval)
 
+        allocate(mat%row_ptr(rows + 1))
+        mat%col_ind = jndx
+        mat%val = rval
+
+        current_row = 1
+        mat%row_ptr(current_row) = 1
+        mat%row_ptr(rows + 1) = nnz
+        do i = 1,nnz
+            if (indx(i) .gt. current_row) then
+                current_row = current_row + 1
+                mat%row_ptr(current_row) = i
+            end if
+        end do
 
     end function CSR_Real
 
