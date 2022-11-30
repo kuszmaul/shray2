@@ -1,30 +1,31 @@
-#include /usr/local/gasnet/include/smp-conduit/smp-seq.mak
 include /usr/local/gasnet/include/mpi-conduit/mpi-seq.mak
-#include /usr/local/gasnet/include/udp-conduit/udp-seq.mak
 
 FORTRAN_C = gfortran
+MPICC = mpicc
 CHAPEL_C = chpl
 SHMEM_C = oshcc
-FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude -pg
+FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude
 LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread -pg
-#LFLAGS = -lm -lopenblas -fsanitize=undefined -pthread
 FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib -g
 FORTRAN_LFLAGS = -lcaf_openmpi
 CHAPEL_FLAGS = --fast
 CHAPEL_LFLAGS = -lblis64
-APPS = $(wildcard examples/*.c)
+
 FORTRANAPPS = $(wildcard examples/fortran/*.f90)
-SHMEMAPPS = $(wildcard examples/oshmem/*.c)
+FORTRAN = $(patsubst examples/fortran/%.f90, bin/fortran/%_fortran, $(FORTRANAPPS))
+
 CHAPELAPPS = $(wildcard examples/chapel/*.chpl)
+CHAPEL = $(patsubst examples/chapel/%.chpl, bin/chapel/%, $(CHAPELAPPS))
+
+MPIAPPS = $(wildcard examples/mpi/*.c)
+MPI = $(patsubst examples/mpi/%.c, bin/mpi/%, $(MPIAPPS))
+
+APPS = $(wildcard examples/*.c)
 RELEASE = $(patsubst examples/%.c, bin/shray/%, $(APPS))
 DEBUG = $(patsubst examples/%.c, bin/shray/%_debug, $(APPS))
 PROFILE = $(patsubst examples/%.c, bin/shray/%_profile, $(APPS))
-GRAPH = $(patsubst examples/%.c, bin/%_graph, $(APPS))
-FORTRAN = $(patsubst examples/fortran/%.f90, bin/fortran/%_fortran, $(FORTRANAPPS))
-SHMEM = $(patsubst examples/oshmem/%.c, bin/oshmem/%_oshmem, $(SHMEMAPPS))
-CHAPEL = $(patsubst examples/chapel/%.chpl, bin/chapel/%, $(CHAPELAPPS))
 
-all: release debug profile $(FORTRAN) $(CHAPEL)
+all: release debug profile $(FORTRAN) $(CHAPEL) $(MPI)
 
 release: $(RELEASE)
 
@@ -71,10 +72,13 @@ bin/oshmem/%_oshmem: examples/oshmem/%.c
 bin/chapel/%: examples/chapel/%.chpl
 	chpl $< $(CHAPEL_FLAGS) -o $@ $(CHAPEL_LFLAGS)
 
+bin/mpi/%: examples/mpi/%.c
+	$(MPICC) $< $(FLAGS) -o $@ $(LFLAGS)
+
 testMatrix:
 	export SHRAY_CACHESIZE=4096000
 	export SHRAY_CACHELINE=1
 	mpirun.mpich -n 4 bin/matrix_debug 1000 2>&1 | grep "\[node 1" > matrix.out
 
 clean:
-	$(RM) bin/shray/* bin/oshmem/* bin/chapel/* bin/fortran/* *.mod
+	$(RM) bin/shray/* bin/oshmem/* bin/chapel/* bin/fortran/* bin/mpi/* *.mod
