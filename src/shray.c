@@ -27,11 +27,12 @@ static size_t barrierCounter;
 static size_t ShrayPagesz;
 static size_t cacheLineSize;
 
+// TODO: this is not really necessary anymore
 enum WorkerState
 {
-    WORKER_STATE_DONE = 0,
+    WORKER_STATE_WAITING = 0,
     WORKER_STATE_BUSY = 1,
-    WORKER_STATE_REAP = 2,
+    WORKER_STATE_TERMINATE = 2
 };
 
 typedef struct
@@ -43,12 +44,14 @@ typedef struct
     shray_fn handler;
     worker_info_t info;
     pthread_t id;
+    int work;
 } shray_worker_t;
 
 // TODO: move threading to its own file? */
 static size_t workerThreadCount;
 static shray_worker_t *workerThreads;
 static pthread_t memoryThread;
+static pthread_barrier_t workerBarrier;
 
 static pthread_key_t key;
 
@@ -364,11 +367,7 @@ static void handleWorkerFault(void *address)
     sigemptyset(&mask);
 
     worker->address = (uintptr_t)address;
-    // TODO: must (?) be an atomic set
     worker->request = 1;
-    // TODO: suspend must be the last thing, but what if you get a signal
-    // between setting the request variable and actually suspending, is the
-    // thread forever suspended?
     sigsuspend(&mask);
 }
 
@@ -448,6 +447,24 @@ static void UpdatePage(uintptr_t page, int index)
     }
 }
 
+static void *workerMain(void *args)
+{
+    shray_worker_t *worker = args;
+    DBUG_PRINT("Starting working %zu (%lu)", worker->thread_index, worker->id);
+    pthread_setspecific(key, worker);
+    while (worker->state != WORKER_STATE_TERMINATE) {
+        if (worker->work) {
+            DBUG_PRINT("Worker %zu (%lu) received work", worker->thread_index, worker->id);
+            worker->handler(&worker->info);
+            worker->work = 0;
+            DBUG_PRINT("Worker %zu (%lu) finished work", worker->thread_index, worker->id);
+            pthread_barrier_wait(&workerBarrier);
+        }
+    }
+
+    pthread_exit(NULL);
+}
+
 /* Gets [get.start, get.end[ asynchronously to the allocation shadow
  * start, end are page-aligned and not owned by our rank. Adds gets to the queue. */
 static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *alloc)
@@ -497,13 +514,13 @@ void ShrayResetCache()
 
     /* Finish the prefetches */
     size_t next_index = cache.prefetchCaches->data_start;
-	while (next_index != NOLINK) {
-		queue_entry_t *entry = &cache.prefetchCaches->data[next_index];
+    while (next_index != NOLINK) {
+    	queue_entry_t *entry = &cache.prefetchCaches->data[next_index];
 
         if (!entry->gottem) gasnet_wait_syncnb(entry->handle);
 
-		next_index = entry->next;
-	}
+        next_index = entry->next;
+    }
 
     /* Reset the protections and bitmaps. */
     for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
@@ -519,6 +536,30 @@ void ShrayResetCache()
     /* Free the cache data structures. */
     ringbuffer_reset(cache.autoCaches);
     queue_reset(cache.prefetchCaches);
+}
+
+static void startShrayWorkers()
+{
+    MALLOC_SAFE(workerThreads, sizeof(shray_worker_t) * workerThreadCount);
+    /* + 1 for the memory thread */
+    pthread_barrier_init(&workerBarrier, NULL, workerThreadCount + 1);
+    for (size_t i = 0; i < workerThreadCount; ++i) {
+        shray_worker_t *worker = &workerThreads[i];
+        worker->handler = NULL;
+        worker->thread_index = i;
+        worker->info.args = NULL;
+        worker->info.start = 0;
+        worker->info.end = 0;
+        worker->state = WORKER_STATE_WAITING;
+        worker->request = 0;
+        worker->address = 0;
+        worker->work = 0;
+
+        if (pthread_create(&workerThreads[i].id, NULL, workerMain, worker)) {
+            fprintf(stderr, "Could not create worker thread %zu\n", i);
+            ShrayFinalize(1);
+        }
+    }
 }
 
 /*****************************************************
@@ -552,7 +593,7 @@ void ShrayInit(int *argc, char ***argv)
     // TODO: use macro to check whether or not multi-threading is supported
     char *workerThreadsEnv = getenv("SHRAY_WORKERTHREADS");
     if (workerThreadsEnv == NULL) {
-        fprintf(stderr, "Please set the worker threads environment variable SHRAY_WORKERTHREADS\n");
+        fprintf(stderr, "Please set the worker threads environment variable SHRAY_WORKERTHREADS, use 0 for single threaded\n");
         gasnet_exit(1);
     } else {
         workerThreadCount = atol(workerThreadsEnv);
@@ -585,9 +626,11 @@ void ShrayInit(int *argc, char ***argv)
         gasnet_exit(1);
     }
 
-    MALLOC_SAFE(workerThreads, sizeof(shray_worker_t) * workerThreadCount);
     memoryThread = pthread_self();
     pthread_key_create(&key, NULL);
+    if (workerThreadCount > 0) {
+        startShrayWorkers();
+    }
 
     registerHandlers();
 }
@@ -808,28 +851,6 @@ void ShrayDiscard(void *address, size_t size)
     }
 }
 
-static void *workerStart(void *args)
-{
-    shray_worker_t *worker = args;
-
-    DBUG_PRINT("Starting working %zu (%lu)", worker->thread_index, worker->id);
-    pthread_setspecific(key, worker);
-    worker->handler(&worker->info);
-    worker->state = WORKER_STATE_REAP;
-    pthread_exit(NULL);
-}
-
-static void collectFinishedWorker(shray_worker_t *worker)
-{
-    if (pthread_join(worker->id, NULL)) {
-        fprintf(stderr, "Could not join worker thread\n");
-        ShrayFinalize(1);
-    }
-
-    worker->state = WORKER_STATE_DONE;
-    DBUG_PRINT("Collected worker %zu", worker->thread_index);
-}
-
 static int pageFaultHandled(uintptr_t address)
 {
     uintptr_t roundedAddress = roundDownPage(address);
@@ -846,8 +867,6 @@ static void handleWorkerRequest(shray_worker_t *worker)
         handlePageFault((void*)worker->address);
     }
 
-    // TODO: atomic set (not actually necessary, the other thread is already
-    // suspended so it can not access this)
     worker->request = 0;
     DBUG_PRINT("Sending USR1 to worker %zu (%lu)", worker->thread_index, worker->id);
     pthread_kill(worker->id, SIGUSR1);
@@ -856,6 +875,10 @@ static void handleWorkerRequest(shray_worker_t *worker)
 void ShrayRunWorker(shray_fn handler, size_t n, void *args)
 {
     DBUG_PRINT("Starting threaded workload (%zu workers)", workerThreadCount);
+    if (workerThreadCount == 0) {
+        fprintf(stderr, "Can not run ShrayRunWorker without any workers");
+        ShrayFinalize(1);
+    }
 
     /* Start the worker threads */
     size_t start = ShrayStart(n);
@@ -864,45 +887,35 @@ void ShrayRunWorker(shray_fn handler, size_t n, void *args)
     for (size_t i = 0; i < workerThreadCount; ++i) {
         shray_worker_t *worker = &workerThreads[i];
         worker->handler = handler;
-        worker->thread_index = i;
         worker->info.args = args;
         worker->info.start = start + i * workPerThread;
         worker->info.end = i == workerThreadCount - 1 ? end : worker->info.start + workPerThread;
         worker->state = WORKER_STATE_BUSY;
         worker->request = 0;
         worker->address = 0;
-        if (pthread_create(&workerThreads[i].id, NULL, workerStart, worker)) {
-            fprintf(stderr, "Could not create worker thread %zu\n", i);
-            ShrayFinalize(1);
-        }
+
+        worker->work = 1;
     }
 
     /* Listen for memory requests until all workers have finished. */
     size_t busy = workerThreadCount;
-    while (busy > 0) {
+    while (busy != 0) {
+        busy = workerThreadCount;
+
         for (size_t i = 0; i < workerThreadCount; ++i) {
             shray_worker_t *worker = &workerThreads[i];
-            // TODO: make the state an atomic read?
-            switch (worker->state) {
-                case WORKER_STATE_DONE:
-                    /* Nothing to do */
-                    break;
-                case WORKER_STATE_BUSY:
-                    // TODO: atomic read
-                    if (worker->request) {
-                        handleWorkerRequest(worker);
-                    }
-                    break;
-                case WORKER_STATE_REAP:
-                    // TODO: could delay this in order to handle busy requests
-                    // faster, then do 1 large reap of all pro
-                    collectFinishedWorker(worker);
-                    busy -= 1;
-                    break;
+
+            if (worker->request) {
+                handleWorkerRequest(worker);
+            }
+
+            if (!worker->work) {
+                busy -= 1;
             }
         }
     }
 
+    pthread_barrier_wait(&workerBarrier);
     DBUG_PRINT("Finished threaded workload (%zu workers)", workerThreadCount);
 }
 
@@ -924,10 +937,32 @@ unsigned int ShraySize(void)
     return Shray_size;
 }
 
+static void terminateWorkers()
+{
+    for (size_t i = 0; i < workerThreadCount; ++i) {
+        shray_worker_t *worker = &workerThreads[i];
+        worker->state = WORKER_STATE_TERMINATE;
+        /*
+         * Can only join on threads that have finished their task. If this
+         * function is called on non-error termination then no threads are
+         * working. In case of a crash gasnet_exit will terminate the process
+         * anyway.
+         */
+        if (!worker->work) {
+            pthread_join(worker->id, NULL);
+        }
+    }
+}
+
 void ShrayFinalize(int exit_code)
 {
+    DBUG_PRINT("Terminating with code %d", exit_code);
+    if (workerThreadCount > 0) {
+        terminateWorkers();
+        pthread_barrier_destroy(&workerBarrier);
+    }
+    free(workerThreads);
     ringbuffer_free(cache.autoCaches);
     queue_free(cache.prefetchCaches);
     gasnet_exit(exit_code);
-    free(workerThreads);
 }
