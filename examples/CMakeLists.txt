@@ -19,6 +19,7 @@ foreach(suffix
 	foreach(file
 			2dstencil
 			matrix
+			matrix_mt
 			hello
 			nbody
 			nbodyLoadbalance
