@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 
     int p;
     MPI_Comm_size(MPI_COMM_WORLD, &p);
-    size_t n = atoll(argv[1]) / p * p;
+    size_t n = atoll(argv[1]) / (p * 4096) * (p * 4096);
 
     double *A = malloc(n / p * sizeof(double));
     init(A, n, p);
