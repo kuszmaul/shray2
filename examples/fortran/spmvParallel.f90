@@ -20,27 +20,24 @@ contains
     ! Computes the local part of matmul(mat, output), where mat
     ! is the local part of a sparse matrix distributed blockwise along
     ! the first dimension.
-    function spmv(mat, input) result(output)
+    function spmv(mat, input, global_rows) result(output)
         implicit none
         type(CSRMatrix), intent(in) :: mat
-        real(KIND=8), intent(in) :: input((mat%n + num_images() - 1) / num_images())[*]
+        real(KIND=8), intent(in) :: input(mat%n)[*]
+        integer, intent(in) :: global_rows
         real(KIND=8), allocatable :: output(:)
 
         integer :: row, col, j, blockSize, processor, localIndex
 
-        blockSize = (mat%n + num_images() - 1) / num_images()
-        allocate(output(blockSize))
+        blockSize = (global_rows + num_images() - 1) / num_images()
+        allocate(output(mat%m))
 
-!        do concurrent (row = 1:mat%m)
-         do row = 1,mat%m
-!            print '(/,3x,"image = ",i6, 3x, "row = ",i6)', this_image(), row
+        do concurrent (row = 1:mat%m)
             output(row) = 0.0
             do j = mat%row_ptr(row), mat%row_ptr(row + 1) - 1
                 col = mat%col_ind(j)
                 localIndex = modulo(col - 1, blockSize) + 1
                 processor = (col - 1) / blockSize + 1
-!                print '(/,3x,"image = ",i6, 3x, "global index = ",i6, 3x, "local index = ",i6)', &
-!                    this_image(), col, localIndex
                 output(row) = output(row) + mat%val(j) * input(localIndex)[processor]
             end do
         end do
@@ -52,20 +49,17 @@ contains
         implicit none
         type(CSRMatrix), intent(in) :: mat
         integer, intent(in) :: iterations
-        real(KIND=8), allocatable :: state(:)
+        real(KIND=8), allocatable :: state(:), input(:)[:]
+        integer :: t
 
-        real(KIND=8), allocatable :: input(:)[:]
-        integer :: i
-
-        allocate(input((mat%n + this_image() - 1) / this_image())[*])
+        allocate(input(mat%m)[*])
+        allocate(state(mat%m))
 
         state = 1 / mat%n;
 
-        do i = 1,iterations
-!            write(*, *) i
-            input = spmv(mat, input)
+        do t = 1,iterations
+            input = spmv(mat, input, 5)
             sync all
-            input = state
         end do
 
         state = input
@@ -121,6 +115,6 @@ program main
     read(values_io, *) mat%val
     close(values_io)
 
-    res = steady_state(mat, 1)
+    res = steady_state(mat, 10)
 
 end program main
