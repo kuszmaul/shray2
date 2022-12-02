@@ -1,14 +1,14 @@
       BLOCK DATA
       INTEGER NSUBS
-      PARAMETER (NSUBS = 8)
+      PARAMETER (NSUBS = 7)
       CHARACTER*7        SNAMES( NSUBS )
       COMMON             /SNAMEC/SNAMES
-      DATA               SNAMES/'PDGEMM ', 'PDSYMM ', 'PDSYRK ',
-     $                   'PDSYR2K', 'PDTRMM ', 'PDTRSM ',
-     $                   'PDGEADD', 'PDTRADD'/
+      DATA               SNAMES/'PDGEMV ', 'PDSYMV ', 'PDTRMV ',
+     $                   'PDTRSV ', 'PDGER  ', 'PDSYR  ',
+     $                   'PDSYR2 '/
       END BLOCK DATA
 
-      PROGRAM PDBLA3TIM
+      PROGRAM PDBLA2TIM
 *
 *  -- PBLAS timing driver (version 2.0.2) --
 *     Univ. of Tennessee, Univ. of California Berkeley, Univ. of Colorado Denver
@@ -17,15 +17,15 @@
 *  Purpose
 *  =======
 *
-*  PDBLA3TIM  is the main timing program for the Level 3 PBLAS routines.
+*  PDBLA2TIM  is the main timing program for the Level 2 PBLAS routines.
 *
 *  The program must be driven by a short data file.  An  annotated exam-
 *  ple of a data file can be obtained by deleting the first 3 characters
-*  from the following 56 lines:
-*  'Level 3 PBLAS, Timing input file'
+*  from the following 55 lines:
+*  'Level 2 PBLAS, Timing input file'
 *  'Intel iPSC/860 hypercube, gamma model.'
-*  'PDBLAS3TIM.SUMM'     output file name (if any)
-*  6     device out
+*  'PDBLAS2TIM.SUMM'   output file name (if any)
+*  6       device out
 *  10              value of the logical computational blocksize NB
 *  1               number of process grids (ordered pairs of P & Q)
 *  2 2 1 4 2 3 8   values of P
@@ -33,14 +33,11 @@
 *  1.0D0           value of ALPHA
 *  1.0D0           value of BETA
 *  2               number of tests problems
-*  'N' 'U'         values of DIAG
-*  'L' 'R'         values of SIDE
-*  'N' 'T'         values of TRANSA
-*  'N' 'T'         values of TRANSB
 *  'U' 'L'         values of UPLO
+*  'N' 'T'         values of TRANS
+*  'N' 'U'         values of DIAG
 *  3  4            values of M
 *  3  4            values of N
-*  3  4            values of K
 *  6 10            values of M_A
 *  6 10            values of N_A
 *  2  5            values of IMB_A
@@ -51,34 +48,35 @@
 *  0  0            values of CSRC_A
 *  1  1            values of IA
 *  1  1            values of JA
-*  6 10            values of M_B
-*  6 10            values of N_B
-*  2  5            values of IMB_B
-*  2  5            values of INB_B
-*  2  5            values of MB_B
-*  2  5            values of NB_B
-*  0  1            values of RSRC_B
-*  0  0            values of CSRC_B
-*  1  1            values of IB
-*  1  1            values of JB
-*  6 10            values of M_C
-*  6 10            values of N_C
-*  2  5            values of IMB_C
-*  2  5            values of INB_C
-*  2  5            values of MB_C
-*  2  5            values of NB_C
-*  0  1            values of RSRC_C
-*  0  0            values of CSRC_C
-*  1  1            values of IC
-*  1  1            values of JC
-*  PDGEMM  T  put F for no test in the same column
-*  PDSYMM  T  put F for no test in the same column
-*  PDSYRK  T  put F for no test in the same column
-*  PDSYR2K T  put F for no test in the same column
-*  PDTRMM  T  put F for no test in the same column
-*  PDTRSM  T  put F for no test in the same column
-*  PDGEADD T  put F for no test in the same column
-*  PDTRADD T  put F for no test in the same column
+*  6 10            values of M_X
+*  6 10            values of N_X
+*  2  5            values of IMB_X
+*  2  5            values of INB_X
+*  2  5            values of MB_X
+*  2  5            values of NB_X
+*  0  1            values of RSRC_X
+*  0  0            values of CSRC_X
+*  1  1            values of IX
+*  1  1            values of JX
+*  1  1            values of INCX
+*  6 10            values of M_Y
+*  6 10            values of N_Y
+*  2  5            values of IMB_Y
+*  2  5            values of INB_Y
+*  2  5            values of MB_Y
+*  2  5            values of NB_Y
+*  0  1            values of RSRC_Y
+*  0  0            values of CSRC_Y
+*  1  1            values of IY
+*  1  1            values of JY
+*  6  1            values of INCY
+*  PDGEMV  T  put F for no test in the same column
+*  PDSYMV  T  put F for no test in the same column
+*  PDTRMV  T  put F for no test in the same column
+*  PDTRSV  T  put F for no test in the same column
+*  PDGER   T  put F for no test in the same column
+*  PDSYR   T  put F for no test in the same column
+*  PDSYR2  T  put F for no test in the same column
 *
 *  Internal Parameters
 *  ===================
@@ -117,7 +115,7 @@
      $                   NSUBS
       DOUBLE PRECISION   ONE
       PARAMETER          ( MAXTESTS = 20, MAXGRIDS = 20, DBLESZ = 8,
-     $                   ONE = 1.0D+0, TOTMEM = 2000000000, NSUBS = 8,
+     $                   ONE = 1.0D+0, TOTMEM = 2000000, NSUBS = 7,
      $                   MEMSIZ = TOTMEM / DBLESZ )
       INTEGER            BLOCK_CYCLIC_2D_INB, CSRC_, CTXT_, DLEN_,
      $                   DTYPE_, IMB_, INB_, LLD_, MB_, M_, NB_, N_,
@@ -128,61 +126,60 @@
      $                   RSRC_ = 9, CSRC_ = 10, LLD_ = 11 )
 *     ..
 *     .. Local Scalars ..
-      CHARACTER*1        ADIAGDO, AFORM, CFORM, DIAG, SIDE, TRANSA,
-     $                   TRANSB, UPLO
-      INTEGER            CSRCA, CSRCB, CSRCC, I, IA, IAM, IASEED, IB,
-     $                   IBSEED, IC, ICSEED, ICTXT, IMBA, IMBB, IMBC,
-     $                   IMIDA, IMIDB, IMIDC, INBA, INBB, INBC, IPA,
-     $                   IPB, IPC, IPOSTA, IPOSTB, IPOSTC, IPREA, IPREB,
-     $                   IPREC, J, JA, JB, JC, K, L, M, MA, MB, MBA,
-     $                   MBB, MBC, MC, MEMREQD, MPA, MPB, MPC, MYCOL,
-     $                   MYROW, N, NA, NB, NBA, NBB, NBC, NC, NCOLA,
-     $                   NCOLB, NCOLC, NGRIDS, NOUT, NPCOL, NPROCS,
-     $                   NPROW, NQA, NQB, NQC, NROWA, NROWB, NROWC,
-     $                   NTESTS, OFFDA, OFFDC, RSRCA, RSRCB, RSRCC
+      CHARACTER*1        AFORM, DIAG, DIAGDO, TRANS, UPLO
+      INTEGER            CSRCA, CSRCX, CSRCY, I, IA, IAM, IASEED, ICTXT,
+     $                   IMBA, IMBX, IMBY, IMIDA, IMIDX, IMIDY, INBA,
+     $                   INBX, INBY, INCX, INCY, IPA, IPOSTA, IPOSTX,
+     $                   IPOSTY, IPREA, IPREX, IPREY, IPX, IPY, IX,
+     $                   IXSEED, IY, IYSEED, J, JA, JX, JY, K, M, MA,
+     $                   MBA, MBX, MBY, MEMREQD, MPA, MPX, MPY, MX, MY,
+     $                   MYCOL, MYROW, N, NA, NBA, NBX, NBY, NCOLA,
+     $                   NGRIDS, NLX, NLY, NOUT, NPCOL, NPROCS, NPROW,
+     $                   NQA, NQX, NQY, NROWA, NTESTS, NX, NY, OFFD,
+     $                   RSRCA, RSRCX, RSRCY
       DOUBLE PRECISION   ALPHA, BETA, CFLOPS, NOPS, SCALE, WFLOPS
 *     ..
 *     .. Local Arrays ..
-      LOGICAL            LTEST( NSUBS ), BCHECK( NSUBS ),
-     $                   CCHECK( NSUBS )
-      CHARACTER*1        DIAGVAL( MAXTESTS ), SIDEVAL( MAXTESTS ),
-     $                   TRNAVAL( MAXTESTS ), TRNBVAL( MAXTESTS ),
+      LOGICAL            LTEST( NSUBS ), YCHECK( NSUBS )
+      CHARACTER*1        DIAGVAL( MAXTESTS ), TRANVAL( MAXTESTS ),
      $                   UPLOVAL( MAXTESTS )
       CHARACTER*80       OUTFILE
-      INTEGER            CSCAVAL( MAXTESTS ), CSCBVAL( MAXTESTS ),
-     $                   CSCCVAL( MAXTESTS ), DESCA( DLEN_ ),
-     $                   DESCB( DLEN_ ), DESCC( DLEN_ ),
-     $                   IAVAL( MAXTESTS ), IBVAL( MAXTESTS ),
-     $                   ICVAL( MAXTESTS ), IERR( 3 ),
-     $                   IMBAVAL( MAXTESTS ), IMBBVAL( MAXTESTS ),
-     $                   IMBCVAL( MAXTESTS ), INBAVAL( MAXTESTS ),
-     $                   INBBVAL( MAXTESTS ), INBCVAL( MAXTESTS ),
-     $                   JAVAL( MAXTESTS ), JBVAL( MAXTESTS ),
-     $                   JCVAL( MAXTESTS ), KVAL( MAXTESTS ),
-     $                   MAVAL( MAXTESTS ), MBAVAL( MAXTESTS ),
-     $                   MBBVAL( MAXTESTS ), MBCVAL( MAXTESTS ),
-     $                   MBVAL( MAXTESTS ), MCVAL( MAXTESTS ),
-     $                   MVAL( MAXTESTS ), NAVAL( MAXTESTS ),
-     $                   NBAVAL( MAXTESTS ), NBBVAL( MAXTESTS ),
-     $                   NBCVAL( MAXTESTS ), NBVAL( MAXTESTS ),
-     $                   NCVAL( MAXTESTS ), NVAL( MAXTESTS ),
-     $                   PVAL( MAXTESTS ), QVAL( MAXTESTS ),
-     $                   RSCAVAL( MAXTESTS ), RSCBVAL( MAXTESTS ),
-     $                   RSCCVAL( MAXTESTS ), MEM( MEMSIZ )
+      INTEGER            CSCAVAL( MAXTESTS ), CSCXVAL( MAXTESTS ),
+     $                   CSCYVAL( MAXTESTS ), DESCA( DLEN_ ),
+     $                   DESCX( DLEN_ ), DESCY( DLEN_ ),
+     $                   IAVAL( MAXTESTS ), IERR( 3 ),
+     $                   IMBAVAL( MAXTESTS ), IMBXVAL( MAXTESTS ),
+     $                   IMBYVAL( MAXTESTS ), INBAVAL( MAXTESTS ),
+     $                   INBXVAL( MAXTESTS ), INBYVAL( MAXTESTS ),
+     $                   INCXVAL( MAXTESTS ), INCYVAL( MAXTESTS ),
+     $                   IXVAL( MAXTESTS ), IYVAL( MAXTESTS ),
+     $                   JAVAL( MAXTESTS ), JXVAL( MAXTESTS ),
+     $                   JYVAL( MAXTESTS ), MAVAL( MAXTESTS ),
+     $                   MBAVAL( MAXTESTS ), MBXVAL( MAXTESTS ),
+     $                   MBYVAL( MAXTESTS ), MVAL( MAXTESTS ),
+     $                   MXVAL( MAXTESTS ), MYVAL( MAXTESTS ),
+     $                   NAVAL( MAXTESTS ), NBAVAL( MAXTESTS ),
+     $                   NBXVAL( MAXTESTS ), NBYVAL( MAXTESTS ),
+     $                   NVAL( MAXTESTS ), NXVAL( MAXTESTS ),
+     $                   NYVAL( MAXTESTS ), PVAL( MAXTESTS ),
+     $                   QVAL( MAXTESTS ), RSCAVAL( MAXTESTS ),
+     $                   RSCXVAL( MAXTESTS ), RSCYVAL( MAXTESTS ),
+     $                   MEM( MEMSIZ )
       DOUBLE PRECISION   CTIME( 1 ), WTIME( 1 )
 *     ..
 *     .. External Subroutines ..
       EXTERNAL           BLACS_BARRIER, BLACS_EXIT, BLACS_GET,
      $                   BLACS_GRIDEXIT, BLACS_GRIDINFO, BLACS_GRIDINIT,
      $                   BLACS_PINFO, IGSUM2D, PB_BOOT, PB_COMBINE,
-     $                   PB_TIMER, PDBLA3TIMINFO, PDGEADD, PDGEMM,
-     $                   PDLAGEN, PDLASCAL, PDSYMM, PDSYR2K, PDSYRK,
-     $                   PDTRADD, PDTRMM, PDTRSM, PMDESCCHK, PMDIMCHK
+     $                   PB_TIMER, PDBLA2TIMINFO, PDGEMV, PDGER,
+     $                   PDLAGEN, PDLASCAL, PDSYMV, PDSYR, PDSYR2,
+     $                   PDTRMV, PDTRSV, PMDESCCHK, PMDIMCHK, PVDESCCHK,
+     $                   PVDIMCHK
 *     ..
 *     .. External Functions ..
       LOGICAL            LSAME
-      DOUBLE PRECISION   PDOPBL3
-      EXTERNAL           LSAME, PDOPBL3
+      DOUBLE PRECISION   PDOPBL2
+      EXTERNAL           LSAME, PDOPBL2
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          DBLE, MAX
@@ -196,10 +193,8 @@
       COMMON             /PBERRORC/NOUT, ABRTFLG
 *     ..
 *     .. Data Statements ..
-      DATA               BCHECK/.TRUE., .TRUE., .FALSE., .TRUE., .TRUE.,
-     $                   .TRUE., .FALSE., .FALSE./
-      DATA               CCHECK/.TRUE., .TRUE., .TRUE., .TRUE., .FALSE.,
-     $                   .FALSE., .TRUE., .TRUE./
+      DATA               YCHECK/.TRUE., .TRUE., .FALSE., .FALSE.,
+     $                   .TRUE., .FALSE., .TRUE./
 *     ..
 *     .. Executable Statements ..
 *
@@ -208,31 +203,30 @@
 *     Set flag so that the PBLAS error handler won't abort on errors, so
 *     that the tester will detect unsupported operations.
 *
-      ABRTFLG = .FALSE.
+      ABRTFLG = .TRUE.
 *
 *     Seeds for random matrix generations.
 *
       IASEED = 100
-      IBSEED = 200
-      ICSEED = 300
+      IXSEED = 200
+      IYSEED = 300
 *
 *     Get starting information
 *
       CALL BLACS_PINFO( IAM, NPROCS )
-      CALL PDBLA3TIMINFO( OUTFILE, NOUT, NTESTS, DIAGVAL, SIDEVAL,
-     $                    TRNAVAL, TRNBVAL, UPLOVAL, MVAL, NVAL,
-     $                    KVAL, MAVAL, NAVAL, IMBAVAL, MBAVAL,
-     $                    INBAVAL, NBAVAL, RSCAVAL, CSCAVAL, IAVAL,
-     $                    JAVAL, MBVAL, NBVAL, IMBBVAL, MBBVAL,
-     $                    INBBVAL, NBBVAL, RSCBVAL, CSCBVAL, IBVAL,
-     $                    JBVAL, MCVAL, NCVAL, IMBCVAL, MBCVAL,
-     $                    INBCVAL, NBCVAL, RSCCVAL, CSCCVAL, ICVAL,
-     $                    JCVAL, MAXTESTS, NGRIDS, PVAL, MAXGRIDS,
-     $                    QVAL, MAXGRIDS, NBLOG, LTEST, IAM, NPROCS,
-     $                    ALPHA, BETA, MEM )
+      CALL PDBLA2TIMINFO( OUTFILE, NOUT, NTESTS, DIAGVAL, TRANVAL,
+     $                    UPLOVAL, MVAL, NVAL, MAVAL, NAVAL, IMBAVAL,
+     $                    MBAVAL, INBAVAL, NBAVAL, RSCAVAL, CSCAVAL,
+     $                    IAVAL, JAVAL, MXVAL, NXVAL, IMBXVAL, MBXVAL,
+     $                    INBXVAL, NBXVAL, RSCXVAL, CSCXVAL, IXVAL,
+     $                    JXVAL, INCXVAL, MYVAL, NYVAL, IMBYVAL,
+     $                    MBYVAL, INBYVAL, NBYVAL, RSCYVAL,
+     $                    CSCYVAL, IYVAL, JYVAL, INCYVAL, MAXTESTS,
+     $                    NGRIDS, PVAL, MAXGRIDS, QVAL, MAXGRIDS,
+     $                    NBLOG, LTEST, IAM, NPROCS, ALPHA, BETA, MEM )
 *
       IF( IAM.EQ.0 )
-     $   WRITE( NOUT, FMT = 9984 )
+     $   WRITE( NOUT, FMT = 9983 )
 *
 *     Loop over different process grids
 *
@@ -282,15 +276,12 @@
 *
 *           Get the test parameters
 *
-            DIAG   = DIAGVAL( J )
-            SIDE   = SIDEVAL( J )
-            TRANSA = TRNAVAL( J )
-            TRANSB = TRNBVAL( J )
-            UPLO   = UPLOVAL( J )
+            DIAG  = DIAGVAL( J )
+            TRANS = TRANVAL( J )
+            UPLO  = UPLOVAL( J )
 *
-            M      = MVAL( J )
-            N      = NVAL( J )
-            K      = KVAL( J )
+            M     = MVAL( J )
+            N     = NVAL( J )
 *
             MA    = MAVAL( J )
             NA    = NAVAL( J )
@@ -303,27 +294,29 @@
             IA    = IAVAL( J )
             JA    = JAVAL( J )
 *
-            MB    = MBVAL( J )
-            NB    = NBVAL( J )
-            IMBB  = IMBBVAL( J )
-            MBB   = MBBVAL( J )
-            INBB  = INBBVAL( J )
-            NBB   = NBBVAL( J )
-            RSRCB = RSCBVAL( J )
-            CSRCB = CSCBVAL( J )
-            IB    = IBVAL( J )
-            JB    = JBVAL( J )
+            MX    = MXVAL( J )
+            NX    = NXVAL( J )
+            IMBX  = IMBXVAL( J )
+            MBX   = MBXVAL( J )
+            INBX  = INBXVAL( J )
+            NBX   = NBXVAL( J )
+            RSRCX = RSCXVAL( J )
+            CSRCX = CSCXVAL( J )
+            IX    = IXVAL( J )
+            JX    = JXVAL( J )
+            INCX  = INCXVAL( J )
 *
-            MC    = MCVAL( J )
-            NC    = NCVAL( J )
-            IMBC  = IMBCVAL( J )
-            MBC   = MBCVAL( J )
-            INBC  = INBCVAL( J )
-            NBC   = NBCVAL( J )
-            RSRCC = RSCCVAL( J )
-            CSRCC = CSCCVAL( J )
-            IC    = ICVAL( J )
-            JC    = JCVAL( J )
+            MY    = MYVAL( J )
+            NY    = NYVAL( J )
+            IMBY  = IMBYVAL( J )
+            MBY   = MBYVAL( J )
+            INBY  = INBYVAL( J )
+            NBY   = NBYVAL( J )
+            RSRCY = RSCYVAL( J )
+            CSRCY = CSCYVAL( J )
+            IY    = IYVAL( J )
+            JY    = JYVAL( J )
+            INCY  = INCYVAL( J )
 *
             IF( IAM.EQ.0 ) THEN
 *
@@ -334,8 +327,7 @@
                WRITE( NOUT, FMT = 9995 )
                WRITE( NOUT, FMT = 9994 )
                WRITE( NOUT, FMT = 9995 )
-               WRITE( NOUT, FMT = 9993 ) M, N, K, SIDE, UPLO, TRANSA,
-     $                                   TRANSB, DIAG
+               WRITE( NOUT, FMT = 9993 ) M, N, UPLO, TRANS, DIAG
 *
                WRITE( NOUT, FMT = 9995 )
                WRITE( NOUT, FMT = 9992 )
@@ -346,14 +338,14 @@
                WRITE( NOUT, FMT = 9995 )
                WRITE( NOUT, FMT = 9990 )
                WRITE( NOUT, FMT = 9995 )
-               WRITE( NOUT, FMT = 9991 ) IB, JB, MB, NB, IMBB, INBB,
-     $                                   MBB, NBB, RSRCB, CSRCB
+               WRITE( NOUT, FMT = 9989 ) IX, JX, MX, NX, IMBX, INBX,
+     $                                   MBX, NBX, RSRCX, CSRCX, INCX
 *
                WRITE( NOUT, FMT = 9995 )
-               WRITE( NOUT, FMT = 9989 )
+               WRITE( NOUT, FMT = 9988 )
                WRITE( NOUT, FMT = 9995 )
-               WRITE( NOUT, FMT = 9991 ) IC, JC, MC, NC, IMBC, INBC,
-     $                                   MBC, NBC, RSRCC, CSRCC
+               WRITE( NOUT, FMT = 9989 ) IY, JY, MY, NY, IMBY, INBY,
+     $                                   MBY, NBY, RSRCY, CSRCY, INCY
 *
                WRITE( NOUT, FMT = 9995 )
                WRITE( NOUT, FMT = 9980 )
@@ -362,13 +354,6 @@
 *
 *           Check the validity of the input test parameters
 *
-            IF( .NOT.LSAME( SIDE, 'L' ).AND.
-     $          .NOT.LSAME( SIDE, 'R' ) ) THEN
-               IF( IAM.EQ.0 )
-     $            WRITE( NOUT, FMT = 9997 ) 'SIDE'
-               GO TO 40
-            END IF
-*
             IF( .NOT.LSAME( UPLO, 'U' ).AND.
      $          .NOT.LSAME( UPLO, 'L' ) ) THEN
                IF( IAM.EQ.0 )
@@ -376,26 +361,19 @@
                GO TO 40
             END IF
 *
-            IF( .NOT.LSAME( TRANSA, 'N' ).AND.
-     $          .NOT.LSAME( TRANSA, 'T' ).AND.
-     $          .NOT.LSAME( TRANSA, 'C' ) ) THEN
+            IF( .NOT.LSAME( TRANS, 'N' ).AND.
+     $          .NOT.LSAME( TRANS, 'T' ).AND.
+     $          .NOT.LSAME( TRANS, 'C' ) ) THEN
                IF( IAM.EQ.0 )
-     $            WRITE( NOUT, FMT = 9997 ) 'TRANSA'
-               GO TO 40
-            END IF
-*
-            IF( .NOT.LSAME( TRANSB, 'N' ).AND.
-     $          .NOT.LSAME( TRANSB, 'T' ).AND.
-     $          .NOT.LSAME( TRANSB, 'C' ) ) THEN
-               IF( IAM.EQ.0 )
-     $            WRITE( NOUT, FMT = 9997 ) 'TRANSB'
+     $            WRITE( NOUT, FMT = 9997 ) 'TRANS'
                GO TO 40
             END IF
 *
             IF( .NOT.LSAME( DIAG , 'U' ).AND.
-     $          .NOT.LSAME( DIAG , 'N' ) )THEN
+     $         .NOT.LSAME( DIAG , 'N' ) )THEN
                IF( IAM.EQ.0 )
-     $            WRITE( NOUT, FMT = 9997 ) 'DIAG'
+     $            WRITE( NOUT, FMT = 9997 ) TRANS
+               WRITE( NOUT, FMT = 9997 ) 'DIAG'
                GO TO 40
             END IF
 *
@@ -405,16 +383,14 @@
      $                      BLOCK_CYCLIC_2D_INB, MA, NA, IMBA, INBA,
      $                      MBA, NBA, RSRCA, CSRCA, MPA, NQA, IPREA,
      $                      IMIDA, IPOSTA, 0, 0, IERR( 1 ) )
-*
-            CALL PMDESCCHK( ICTXT, NOUT, 'B', DESCB,
-     $                      BLOCK_CYCLIC_2D_INB, MB, NB, IMBB, INBB,
-     $                      MBB, NBB, RSRCB, CSRCB, MPB, NQB, IPREB,
-     $                      IMIDB, IPOSTB, 0, 0, IERR( 2 ) )
-*
-            CALL PMDESCCHK( ICTXT, NOUT, 'C', DESCC,
-     $                      BLOCK_CYCLIC_2D_INB, MC, NC, IMBC, INBC,
-     $                      MBC, NBC, RSRCC, CSRCC, MPC, NQC, IPREC,
-     $                      IMIDC, IPOSTC, 0, 0, IERR( 3 ) )
+            CALL PVDESCCHK( ICTXT, NOUT, 'X', DESCX,
+     $                      BLOCK_CYCLIC_2D_INB, MX, NX, IMBX, INBX,
+     $                      MBX, NBX, RSRCX, CSRCX, INCX, MPX, NQX,
+     $                      IPREX, IMIDX, IPOSTX, 0, 0, IERR( 2 ) )
+            CALL PVDESCCHK( ICTXT, NOUT, 'Y', DESCY,
+     $                      BLOCK_CYCLIC_2D_INB, MY, NY, IMBY, INBY,
+     $                      MBY, NBY, RSRCY, CSRCY, INCY, MPY, NQY,
+     $                      IPREY, IMIDY, IPOSTY, 0, 0, IERR( 3 ) )
 *
             IF( IERR( 1 ).GT.0 .OR. IERR( 2 ).GT.0 .OR.
      $          IERR( 3 ).GT.0 ) THEN
@@ -424,17 +400,17 @@
 *           Assign pointers into MEM for matrices corresponding to
 *           the distributed matrices A, X and Y.
 *
-            IPA = IPREA + 1
-            IPB = IPA + DESCA( LLD_ )*NQA
-            IPC = IPB + DESCB( LLD_ )*NQB
+            IPA = 1
+            IPX = IPA + DESCA( LLD_ ) * NQA
+            IPY = IPX + DESCX( LLD_ ) * NQX
 *
 *           Check if sufficient memory.
 *
-            MEMREQD = IPC + DESCC( LLD_ )*NQC - 1
+            MEMREQD = IPY + DESCY( LLD_ ) * NQY - 1
             IERR( 1 ) = 0
             IF( MEMREQD.GT.MEMSIZ ) THEN
                IF( IAM.EQ.0 )
-     $            WRITE( NOUT, FMT = 9987 ) MEMREQD*DBLESZ
+     $            WRITE( NOUT, FMT = 9986 ) MEMREQD*DBLESZ
                IERR( 1 ) = 1
             END IF
 *
@@ -444,183 +420,85 @@
 *
             IF( IERR( 1 ).GT.0 ) THEN
                IF( IAM.EQ.0 )
-     $            WRITE( NOUT, FMT = 9988 )
+     $            WRITE( NOUT, FMT = 9987 )
                GO TO 40
             END IF
 *
-*           Loop over all PBLAS 3 routines
+*           Loop over all PBLAS 2 routines
 *
-            DO 30 L = 1, NSUBS
+            DO 30 K = 1, NSUBS
 *
 *              Continue only if this subroutine has to be tested.
 *
-               IF( .NOT.LTEST( L ) )
+               IF( .NOT.LTEST( K ) )
      $            GO TO 30
 *
 *              Define the size of the operands
 *
-               IF( L.EQ.1 ) THEN
-*
-*                 PDGEMM
-*
-                  NROWC = M
-                  NCOLC = N
-                  IF( LSAME( TRANSA, 'N' ) ) THEN
-                     NROWA = M
-                     NCOLA = K
+               IF( K.EQ.1 ) THEN
+                  NROWA = M
+                  NCOLA = N
+                  IF( LSAME( TRANS, 'N' ) ) THEN
+                     NLX = N
+                     NLY = M
                   ELSE
-                     NROWA = K
-                     NCOLA = M
+                     NLX = M
+                     NLY = N
                   END IF
-                  IF( LSAME( TRANSB, 'N' ) ) THEN
-                     NROWB = K
-                     NCOLB = N
-                  ELSE
-                     NROWB = N
-                     NCOLB = K
-                  END IF
-               ELSE IF( L.EQ.2 ) THEN
-*
-*                 PDSYMM
-*
-                  NROWC = M
-                  NCOLC = N
-                  NROWB = M
-                  NCOLB = N
-                  IF( LSAME( SIDE, 'L' ) ) THEN
-                     NROWA = M
-                     NCOLA = M
-                  ELSE
-                     NROWA = N
-                     NCOLA = N
-                  END IF
-               ELSE IF( L.EQ.3 ) THEN
-*
-*                 PDSYRK
-*
-                  NROWC = N
-                  NCOLC = N
-                  IF( LSAME( TRANSA, 'N' ) ) THEN
-                     NROWA = N
-                     NCOLA = K
-                  ELSE
-                     NROWA = K
-                     NCOLA = N
-                  END IF
-                  NROWB = 0
-                  NCOLB = 0
-               ELSE IF( L.EQ.4 ) THEN
-*
-*                 PDSYR2K
-*
-                  NROWC = N
-                  NCOLC = N
-                  IF( LSAME( TRANSA, 'N' ) ) THEN
-                     NROWA = N
-                     NCOLA = K
-                     NROWB = N
-                     NCOLB = K
-                  ELSE
-                     NROWA = K
-                     NCOLA = N
-                     NROWB = K
-                     NCOLB = N
-                  END IF
-               ELSE IF( L.EQ.5 .OR. L.EQ.6 ) THEN
-*
-*                 PDTRMM, PDTRSM
-*
-                  NROWB = M
-                  NCOLB = N
-                  IF( LSAME( SIDE, 'L' ) ) THEN
-                     NROWA = M
-                     NCOLA = M
-                  ELSE
-                     NROWA = N
-                     NCOLA = N
-                  END IF
-                  NROWC = 0
-                  NCOLC = 0
-               ELSE IF( L.EQ.7 .OR. L.EQ.8 ) THEN
-*
-*                 PDGEADD, PDTRADD
-*
-                  IF( LSAME( TRANSA, 'N' ) ) THEN
-                     NROWA = M
-                     NCOLA = N
-                  ELSE
-                     NROWA = N
-                     NCOLA = M
-                  END IF
-                  NROWC = M
-                  NCOLC = N
-                  NROWB = 0
-                  NCOLB = 0
-*
+               ELSE IF( K.EQ.5 ) THEN
+                  NROWA = M
+                  NCOLA = N
+                  NLX = M
+                  NLY = N
+               ELSE
+                  NROWA = N
+                  NCOLA = N
+                  NLX = N
+                  NLY = N
                END IF
 *
 *              Check the validity of the operand sizes
 *
                CALL PMDIMCHK( ICTXT, NOUT, NROWA, NCOLA, 'A', IA, JA,
      $                        DESCA, IERR( 1 ) )
-               CALL PMDIMCHK( ICTXT, NOUT, NROWB, NCOLB, 'B', IB, JB,
-     $                        DESCB, IERR( 2 ) )
-               CALL PMDIMCHK( ICTXT, NOUT, NROWC, NCOLC, 'C', IC, JC,
-     $                        DESCC, IERR( 3 ) )
+               CALL PVDIMCHK( ICTXT, NOUT, NLX, 'X', IX, JX, DESCX,
+     $                        INCX, IERR( 2 ) )
+               CALL PVDIMCHK( ICTXT, NOUT, NLY, 'Y', IY, JY, DESCY,
+     $                        INCY, IERR( 3 ) )
 *
                IF( IERR( 1 ).NE.0 .OR. IERR( 2 ).NE.0 .OR.
      $             IERR( 3 ).NE.0 ) THEN
                   GO TO 30
                END IF
 *
-*              Generate distributed matrices A, B and C
+*              Generate distributed matrices A, X and Y
 *
-               IF( L.EQ.2 ) THEN
-*
-*                 PDSYMM
-*
-                  AFORM   = 'S'
-                  ADIAGDO = 'N'
-                  OFFDA   = IA - JA
-                  CFORM   = 'N'
-                  OFFDC   = 0
-*
-               ELSE IF( L.EQ.3 .OR. L.EQ.4 ) THEN
-*
-*                 PDSYRK, PDSYR2K
-*
-                  AFORM   = 'N'
-                  ADIAGDO = 'N'
-                  OFFDA   = 0
-                  CFORM   = 'S'
-                  OFFDC   = IC - JC
-*
-               ELSE IF( ( L.EQ.6 ).AND.( LSAME( DIAG, 'N' ) ) ) THEN
-*
-*                 PDTRSM
-*
-                  AFORM   = 'N'
-                  ADIAGDO = 'D'
-                  OFFDA   = IA - JA
-                  CFORM   = 'N'
-                  OFFDC   = 0
-*
+               IF( K.EQ.2 .OR. K.EQ.6 .OR. K.EQ.7 ) THEN
+                  AFORM  = 'S'
+                  DIAGDO = 'N'
+                  OFFD   = IA - JA
+               ELSE IF( ( K.EQ.4 ).AND.( LSAME( DIAG, 'N' ) ) ) THEN
+                  AFORM  = 'N'
+                  DIAGDO = 'D'
+                  OFFD   = IA - JA
                ELSE
-*
-*                 Default values
-*
-                  AFORM   = 'N'
-                  ADIAGDO = 'N'
-                  OFFDA   = 0
-                  CFORM   = 'N'
-                  OFFDC   = 0
-*
+                  AFORM  = 'N'
+                  DIAGDO = 'N'
+                  OFFD   = 0
                END IF
 *
-               CALL PDLAGEN( .FALSE., AFORM, ADIAGDO, OFFDA, MA, NA,
+               CALL PDLAGEN( .FALSE., AFORM, DIAGDO, OFFD, MA, NA,
      $                       1, 1, DESCA, IASEED, MEM( IPA ),
      $                       DESCA( LLD_ ) )
-               IF( ( L.EQ.6 ).AND.( .NOT.( LSAME( DIAG, 'N' ) ) ).AND.
+               CALL PDLAGEN( .FALSE., 'None', 'No diag', 0, MX, NX,
+     $                       1, 1, DESCX, IXSEED, MEM( IPX ),
+     $                       DESCX( LLD_ ) )
+               IF( YCHECK( K ) )
+     $            CALL PDLAGEN( .FALSE., 'None', 'No diag', 0, MY,
+     $                          NY, 1, 1, DESCY, IYSEED, MEM( IPY ),
+     $                          DESCY( LLD_ ) )
+*
+               IF( ( K.EQ.4 ).AND.( .NOT.( LSAME( DIAG, 'N' ) ) ).AND.
      $             ( MAX( NROWA, NCOLA ).GT.1 ) ) THEN
                   SCALE = ONE / DBLE( MAX( NROWA, NCOLA ) )
                   IF( LSAME( UPLO, 'L' ) ) THEN
@@ -630,136 +508,79 @@
                      CALL PDLASCAL( 'Upper', NROWA-1, NCOLA-1, SCALE,
      $                              MEM( IPA ), IA, JA+1, DESCA )
                   END IF
-*
                END IF
-*
-               IF( BCHECK( L ) )
-     $            CALL PDLAGEN( .FALSE., 'None', 'No diag', 0, MB, NB,
-     $                          1, 1, DESCB, IBSEED, MEM( IPB ),
-     $                          DESCB( LLD_ ) )
-*
-               IF( CCHECK( L ) )
-     $            CALL PDLAGEN( .FALSE., CFORM, 'No diag', OFFDC, MC,
-     $                          NC, 1, 1, DESCC, ICSEED, MEM( IPC ),
-     $                          DESCC( LLD_ ) )
 *
                INFO = 0
                CALL PB_BOOT()
                CALL BLACS_BARRIER( ICTXT, 'All' )
 *
-*              Call the Level 3 PBLAS routine
+*              Call the Level 2 PBLAS routine
 *
-               IF( L.EQ.1 ) THEN
+               IF( K.EQ.1 ) THEN
 *
-*                 Test PDGEMM
-*
-                  NOPS = PDOPBL3( SNAMES( L ), M, N, K )
+*                 Test PDGEMV
 *
                   CALL PB_TIMER( 1 )
-                  CALL PDGEMM( TRANSA, TRANSB, M, N, K, ALPHA,
-     $                         MEM( IPA ), IA, JA, DESCA, MEM( IPB ),
-     $                         IB, JB, DESCB, BETA, MEM( IPC ), IC, JC,
-     $                         DESCC )
+                  CALL PDGEMV( TRANS, M, N, ALPHA, MEM( IPA ), IA, JA,
+     $                         DESCA, MEM( IPX ), IX, JX, DESCX, INCX,
+     $                         BETA, MEM( IPY ), IY, JY, DESCY, INCY )
                   CALL PB_TIMER( 1 )
 *
-               ELSE IF( L.EQ.2 ) THEN
+               ELSE IF( K.EQ.2 ) THEN
 *
-*                 Test PDSYMM
-*
-                  IF( LSAME( SIDE, 'L' ) ) THEN
-                     NOPS = PDOPBL3( SNAMES( L ), M, N, 0 )
-                  ELSE
-                     NOPS = PDOPBL3( SNAMES( L ), M, N, 1 )
-                  END IF
+*                 Test PDSYMV
 *
                   CALL PB_TIMER( 1 )
-                  CALL PDSYMM( SIDE, UPLO, M, N, ALPHA, MEM( IPA ), IA,
-     $                         JA, DESCA, MEM( IPB ), IB, JB, DESCB,
-     $                         BETA, MEM( IPC ), IC, JC, DESCC )
+                  CALL PDSYMV( UPLO, N, ALPHA, MEM( IPA ), IA, JA,
+     $                         DESCA, MEM( IPX ), IX, JX, DESCX, INCX,
+     $                         BETA, MEM( IPY ), IY, JY, DESCY, INCY )
                   CALL PB_TIMER( 1 )
 *
-               ELSE IF( L.EQ.3 ) THEN
+               ELSE IF( K.EQ.3 ) THEN
 *
-*                 Test PDSYRK
-*
-                  NOPS = PDOPBL3( SNAMES( L ), N, N, K )
+*                 Test PDTRMV
 *
                   CALL PB_TIMER( 1 )
-                  CALL PDSYRK( UPLO, TRANSA, N, K, ALPHA, MEM( IPA ),
-     $                         IA, JA, DESCA, BETA, MEM( IPC ), IC, JC,
-     $                         DESCC )
+                  CALL PDTRMV( UPLO, TRANS, DIAG, N, MEM( IPA ), IA, JA,
+     $                         DESCA, MEM( IPX ), IX, JX, DESCX, INCX )
                   CALL PB_TIMER( 1 )
 *
-               ELSE IF( L.EQ.4 ) THEN
+               ELSE IF( K.EQ.4 ) THEN
 *
-*                 Test PDSYR2K
-*
-                  NOPS = PDOPBL3( SNAMES( L ), N, N, K )
+*                 Test PDTRSV
 *
                   CALL PB_TIMER( 1 )
-                  CALL PDSYR2K( UPLO, TRANSA, N, K, ALPHA, MEM( IPA ),
-     $                          IA, JA, DESCA, MEM( IPB ), IB, JB,
-     $                          DESCB, BETA, MEM( IPC ), IC, JC,
-     $                          DESCC )
+                  CALL PDTRSV( UPLO, TRANS, DIAG, N, MEM( IPA ), IA, JA,
+     $                         DESCA, MEM( IPX ), IX, JX, DESCX, INCX )
                   CALL PB_TIMER( 1 )
 *
-               ELSE IF( L.EQ.5 ) THEN
+               ELSE IF( K.EQ.5 ) THEN
 *
-*                 Test PDTRMM
-*
-                  IF( LSAME( SIDE, 'L' ) ) THEN
-                     NOPS = PDOPBL3( SNAMES( L ), M, N, 0 )
-                  ELSE
-                     NOPS = PDOPBL3( SNAMES( L ), M, N, 1 )
-                  END IF
+*                 Test PDGER
 *
                   CALL PB_TIMER( 1 )
-                  CALL PDTRMM( SIDE, UPLO, TRANSA, DIAG, M, N, ALPHA,
-     $                         MEM( IPA ), IA, JA, DESCA, MEM( IPB ),
-     $                         IB, JB, DESCB )
+                  CALL PDGER( M, N, ALPHA, MEM( IPX ), IX, JX, DESCX,
+     $                        INCX, MEM( IPY ), IY, JY, DESCY, INCY,
+     $                        MEM( IPA ), IA, JA, DESCA )
                   CALL PB_TIMER( 1 )
 *
-               ELSE IF( L.EQ.6 ) THEN
+               ELSE IF( K.EQ.6 ) THEN
 *
-*                 Test PDTRSM
-*
-                  IF( LSAME( SIDE, 'L' ) ) THEN
-                     NOPS = PDOPBL3( SNAMES( L ), M, N, 0 )
-                  ELSE
-                     NOPS = PDOPBL3( SNAMES( L ), M, N, 1 )
-                  END IF
+*                 Test PDSYR
 *
                   CALL PB_TIMER( 1 )
-                  CALL PDTRSM( SIDE, UPLO, TRANSA, DIAG, M, N, ALPHA,
-     $                         MEM( IPA ), IA, JA, DESCA, MEM( IPB ),
-     $                         IB, JB, DESCB )
+                  CALL PDSYR( UPLO, N, ALPHA, MEM( IPX ), IX, JX, DESCX,
+     $                         INCX, MEM( IPA ), IA, JA, DESCA )
                   CALL PB_TIMER( 1 )
 *
-               ELSE IF( L.EQ.7 ) THEN
+               ELSE IF( K.EQ.7 ) THEN
 *
-*                 Test PDGEADD
-*
-                  NOPS = PDOPBL3( SNAMES( L ), M, N, M )
+*                 Test PDSYR2
 *
                   CALL PB_TIMER( 1 )
-                  CALL PDGEADD( TRANSA, M, N, ALPHA, MEM( IPA ), IA, JA,
-     $                          DESCA, BETA, MEM( IPC ), IC, JC, DESCC )
-                  CALL PB_TIMER( 1 )
-*
-               ELSE IF( L.EQ.8 ) THEN
-*
-*                 Test PDTRADD
-*
-                  IF( LSAME( UPLO, 'U' ) ) THEN
-                     NOPS = PDOPBL3( SNAMES( L ), M, N, 0 )
-                  ELSE
-                     NOPS = PDOPBL3( SNAMES( L ), M, N, 1 )
-                  END IF
-*
-                  CALL PB_TIMER( 1 )
-                  CALL PDTRADD( UPLO, TRANSA, M, N, ALPHA, MEM( IPA ),
-     $                          IA, JA, DESCA, BETA, MEM( IPC ), IC, JC,
-     $                          DESCC )
+                  CALL PDSYR2( UPLO, N, ALPHA, MEM( IPX ), IX, JX,
+     $                         DESCX, INCX, MEM( IPY ), IY, JY, DESCY,
+     $                         INCY, MEM( IPA ), IA, JA, DESCA )
                   CALL PB_TIMER( 1 )
 *
                END IF
@@ -779,6 +600,10 @@
 *
                IF( IAM.EQ.0 ) THEN
 *
+*                 Calculate total flops
+*
+                  NOPS = PDOPBL2( SNAMES( K ), NROWA, NCOLA, 0, 0 )
+*
 *                 Print WALL time if machine supports it
 *
                   IF( WTIME( 1 ).GT.0.0D+0 ) THEN
@@ -795,7 +620,7 @@
                      CFLOPS = 0.0D+0
                   END IF
 *
-                  WRITE( NOUT, FMT = 9981 ) SNAMES( L ), WTIME( 1 ),
+                  WRITE( NOUT, FMT = 9981 ) SNAMES( K ), WTIME( 1 ),
      $                                      WFLOPS, CTIME( 1 ), CFLOPS
 *
                END IF
@@ -805,7 +630,7 @@
    40       IF( IAM.EQ.0 ) THEN
                WRITE( NOUT, FMT = 9995 )
                WRITE( NOUT, FMT = * )
-               WRITE( NOUT, FMT = 9986 ) J
+               WRITE( NOUT, FMT = 9985 ) J
             END IF
 *
    50   CONTINUE
@@ -814,9 +639,11 @@
 *
    60 CONTINUE
 *
+*     Print results
+*
       IF( IAM.EQ.0 ) THEN
          WRITE( NOUT, FMT = * )
-         WRITE( NOUT, FMT = 9985 )
+         WRITE( NOUT, FMT = 9984 )
          WRITE( NOUT, FMT = * )
       END IF
 *
@@ -830,26 +657,25 @@
  9996 FORMAT( 2X, 'Test number ', I2 , ' started on a ', I4, ' x ',
      $        I4, ' process grid.' )
  9995 FORMAT( 2X, '   ------------------------------------------------',
-     $        '-------------------' )
- 9994 FORMAT( 2X, '        M      N      K    SIDE  UPLO  TRANSA  ',
-     $        'TRANSB  DIAG' )
- 9993 FORMAT( 5X,I6,1X,I6,1X,I6,6X,A1,5X,A1,7X,A1,7X,A1,5X,A1 )
+     $        '--------------------------' )
+ 9994 FORMAT( 2X, '        M      N       UPLO       TRANS       DIAG' )
+ 9993 FORMAT( 5X,I6,1X,I6,9X,A1,11X,A1,10X,A1 )
  9992 FORMAT( 2X, '       IA     JA     MA     NA   IMBA   INBA',
      $        '    MBA    NBA RSRCA CSRCA' )
  9991 FORMAT( 5X,I6,1X,I6,1X,I6,1X,I6,1X,I6,1X,I6,1X,I6,1X,I6,
      $        1X,I5,1X,I5 )
- 9990 FORMAT( 2X, '       IB     JB     MB     NB   IMBB   INBB',
-     $        '    MBB    NBB RSRCB CSRCB' )
- 9989 FORMAT( 2X, '       IC     JC     MC     NC   IMBC   INBC',
-     $        '    MBC    NBC RSRCC CSRCC' )
- 9988 FORMAT( 'Not enough memory for this test: going on to',
+ 9990 FORMAT( 2X, '       IX     JX     MX     NX   IMBX   INBX',
+     $        '    MBX    NBX RSRCX CSRCX   INCX' )
+ 9989 FORMAT( 5X,I6,1X,I6,1X,I6,1X,I6,1X,I6,1X,I6,1X,I6,1X,I6,
+     $        1X,I5,1X,I5,1X,I6 )
+ 9988 FORMAT( 2X, '       IY     JY     MY     NY   IMBY   INBY',
+     $        '    MBY    NBY RSRCY CSRCY   INCY' )
+ 9987 FORMAT( 'Not enough memory for this test: going on to',
      $        ' next test case.' )
- 9987 FORMAT( 'Not enough memory. Need: ', I12 )
- 9986 FORMAT( 2X, 'Test number ', I2, ' completed.' )
- 9985 FORMAT( 2X, 'End of Tests.' )
- 9984 FORMAT( 2X, 'Tests started.' )
- 9983 FORMAT( 5X, A, '     ***** ', A, ' has an incorrect value:     ',
-     $            ' BYPASS  *****' )
+ 9986 FORMAT( 'Not enough memory. Need: ', I12 )
+ 9985 FORMAT( 2X, 'Test number ', I2, ' completed.' )
+ 9984 FORMAT( 2X, 'End of Tests.' )
+ 9983 FORMAT( 2X, 'Tests started.' )
  9982 FORMAT( 2X, '   ***** Operation not supported, error code: ',
      $        I5, ' *****' )
  9981 FORMAT( 2X, '|  ', A, 2X, F13.3, 2X, F13.3, 2X, F13.3, 2X, F13.3 )
@@ -858,21 +684,21 @@
 *
       STOP
 *
-*     End of PDBLA3TIM
+*     End of PDBLA2TIM
 *
       END
-      SUBROUTINE PDBLA3TIMINFO( SUMMRY, NOUT, NMAT, DIAGVAL, SIDEVAL,
-     $                          TRNAVAL, TRNBVAL, UPLOVAL, MVAL,
-     $                          NVAL, KVAL, MAVAL, NAVAL, IMBAVAL,
-     $                          MBAVAL, INBAVAL, NBAVAL, RSCAVAL,
-     $                          CSCAVAL, IAVAL, JAVAL, MBVAL, NBVAL,
-     $                          IMBBVAL, MBBVAL, INBBVAL, NBBVAL,
-     $                          RSCBVAL, CSCBVAL, IBVAL, JBVAL,
-     $                          MCVAL, NCVAL, IMBCVAL, MBCVAL,
-     $                          INBCVAL, NBCVAL, RSCCVAL, CSCCVAL,
-     $                          ICVAL, JCVAL, LDVAL, NGRIDS, PVAL,
-     $                          LDPVAL, QVAL, LDQVAL, NBLOG, LTEST,
-     $                          IAM, NPROCS, ALPHA, BETA, WORK )
+      SUBROUTINE PDBLA2TIMINFO( SUMMRY, NOUT, NMAT, DIAGVAL, TRANVAL,
+     $                          UPLOVAL, MVAL, NVAL, MAVAL, NAVAL,
+     $                          IMBAVAL, MBAVAL, INBAVAL, NBAVAL,
+     $                          RSCAVAL, CSCAVAL, IAVAL, JAVAL,
+     $                          MXVAL, NXVAL, IMBXVAL, MBXVAL,
+     $                          INBXVAL, NBXVAL, RSCXVAL, CSCXVAL,
+     $                          IXVAL, JXVAL, INCXVAL, MYVAL, NYVAL,
+     $                          IMBYVAL, MBYVAL, INBYVAL, NBYVAL,
+     $                          RSCYVAL, CSCYVAL, IYVAL, JYVAL,
+     $                          INCYVAL, LDVAL, NGRIDS, PVAL, LDPVAL,
+     $                          QVAL, LDQVAL, NBLOG, LTEST, IAM, NPROCS,
+     $                          ALPHA, BETA, WORK )
 *
 *  -- PBLAS test routine (version 2.0) --
 *     University of Tennessee, Knoxville, Oak Ridge National Laboratory,
@@ -886,33 +712,32 @@
 *     ..
 *     .. Array Arguments ..
       CHARACTER*( * )    SUMMRY
-      CHARACTER*1        DIAGVAL( LDVAL ), SIDEVAL( LDVAL ),
-     $                   TRNAVAL( LDVAL ), TRNBVAL( LDVAL ),
+      CHARACTER*1        DIAGVAL( LDVAL ), TRANVAL( LDVAL ),
      $                   UPLOVAL( LDVAL )
       LOGICAL            LTEST( * )
-      INTEGER            CSCAVAL( LDVAL ), CSCBVAL( LDVAL ),
-     $                   CSCCVAL( LDVAL ), IAVAL( LDVAL ),
-     $                   IBVAL( LDVAL ), ICVAL( LDVAL ),
-     $                   IMBAVAL( LDVAL ), IMBBVAL( LDVAL ),
-     $                   IMBCVAL( LDVAL ), INBAVAL( LDVAL ),
-     $                   INBBVAL( LDVAL ), INBCVAL( LDVAL ),
-     $                   JAVAL( LDVAL ), JBVAL( LDVAL ), JCVAL( LDVAL ),
-     $                   KVAL( LDVAL ), MAVAL( LDVAL ), MBAVAL( LDVAL ),
-     $                   MBBVAL( LDVAL ), MBCVAL( LDVAL ),
-     $                   MBVAL( LDVAL ), MCVAL( LDVAL ), MVAL( LDVAL ),
-     $                   NAVAL( LDVAL ), NBAVAL( LDVAL ),
-     $                   NBBVAL( LDVAL ), NBCVAL( LDVAL ),
-     $                   NBVAL( LDVAL ), NCVAL( LDVAL ), NVAL( LDVAL ),
-     $                   PVAL( LDPVAL ), QVAL( LDQVAL ),
-     $                   RSCAVAL( LDVAL ), RSCBVAL( LDVAL ),
-     $                   RSCCVAL( LDVAL ), WORK( * )
+      INTEGER            CSCAVAL( LDVAL ), CSCXVAL( LDVAL ),
+     $                   CSCYVAL( LDVAL ), IAVAL( LDVAL ),
+     $                   IMBAVAL( LDVAL ), IMBXVAL( LDVAL ),
+     $                   IMBYVAL( LDVAL ), INBAVAL( LDVAL ),
+     $                   INBXVAL( LDVAL ), INBYVAL( LDVAL ),
+     $                   INCXVAL( LDVAL ), INCYVAL( LDVAL ),
+     $                   IXVAL( LDVAL ), IYVAL( LDVAL ), JAVAL( LDVAL ),
+     $                   JXVAL( LDVAL ), JYVAL( LDVAL ), MAVAL( LDVAL ),
+     $                   MBAVAL( LDVAL ), MBXVAL( LDVAL ),
+     $                   MBYVAL( LDVAL ), MVAL( LDVAL ), MXVAL( LDVAL ),
+     $                   MYVAL( LDVAL ), NAVAL( LDVAL ),
+     $                   NBAVAL( LDVAL ), NBXVAL( LDVAL ),
+     $                   NBYVAL( LDVAL ), NVAL( LDVAL ), NXVAL( LDVAL ),
+     $                   NYVAL( LDVAL ), PVAL( LDPVAL ), QVAL( LDQVAL ),
+     $                   RSCAVAL( LDVAL ), RSCXVAL( LDVAL ),
+     $                   RSCYVAL( LDVAL ), WORK( * )
 *     ..
 *
 *  Purpose
 *  =======
 *
-*  PDBLA3TIMINFO  get  the needed startup information for timing various
-*  Level 3 PBLAS routines, and transmits it to all processes.
+*  PDBLA2TIMINFO  get  the needed startup information for timing various
+*  Level 2 PBLAS routines, and transmits it to all processes.
 *
 *  Notes
 *  =====
@@ -939,18 +764,9 @@
 *          On entry,  DIAGVAL  is  an array of dimension LDVAL. On exit,
 *          this array contains the values of DIAG to run the code with.
 *
-*  SIDEVAL (global output) CHARACTER array
-*          On entry,  SIDEVAL  is  an array of dimension LDVAL. On exit,
-*          this array contains the values of SIDE to run the code with.
-*
-*  TRNAVAL (global output) CHARACTER array
-*          On entry, TRNAVAL  is an array of dimension LDVAL.  On  exit,
-*          this array contains  the  values  of  TRANSA  to run the code
-*          with.
-*
-*  TRNBVAL (global output) CHARACTER array
-*          On entry, TRNBVAL  is an array of dimension LDVAL.  On  exit,
-*          this array contains  the  values  of  TRANSB  to run the code
+*  TRANVAL (global output) CHARACTER array
+*          On entry, TRANVAL  is an array of dimension LDVAL.  On  exit,
+*          this array contains  the  values  of  TRANS  to  run the code
 *          with.
 *
 *  UPLOVAL (global output) CHARACTER array
@@ -964,10 +780,6 @@
 *  NVAL    (global output) INTEGER array
 *          On entry, NVAL is an array of dimension LDVAL.  On exit, this
 *          array contains the values of N to run the code with.
-*
-*  KVAL    (global output) INTEGER array
-*          On entry, KVAL is an array of dimension LDVAL.  On exit, this
-*          array contains the values of K to run the code with.
 *
 *  MAVAL   (global output) INTEGER array
 *          On entry, MAVAL is an array of dimension LDVAL. On exit, this
@@ -1017,107 +829,115 @@
 *          On entry, JAVAL is an array of dimension LDVAL. On exit, this
 *          array  contains the values of JA to run the code with.
 *
-*  MBVAL   (global output) INTEGER array
-*          On entry, MBVAL is an array of dimension LDVAL. On exit, this
-*          array  contains  the values  of  DESCB( M_ )  to run the code
+*  MXVAL   (global output) INTEGER array
+*          On entry, MXVAL is an array of dimension LDVAL. On exit, this
+*          array  contains  the values  of  DESCX( M_ )  to run the code
 *          with.
 *
-*  NBVAL   (global output) INTEGER array
-*          On entry, NBVAL is an array of dimension LDVAL. On exit, this
-*          array  contains  the values  of  DESCB( N_ )  to run the code
+*  NXVAL   (global output) INTEGER array
+*          On entry, NXVAL is an array of dimension LDVAL. On exit, this
+*          array  contains  the values  of  DESCX( N_ )  to run the code
 *          with.
 *
-*  IMBBVAL (global output) INTEGER array
-*          On entry,  IMBBVAL  is an array of  dimension LDVAL. On exit,
-*          this  array  contains  the values of DESCB( IMB_ ) to run the
+*  IMBXVAL (global output) INTEGER array
+*          On entry,  IMBXVAL  is an array of  dimension LDVAL. On exit,
+*          this  array  contains  the values of DESCX( IMB_ ) to run the
 *          code with.
 *
-*  MBBVAL  (global output) INTEGER array
-*          On entry,  MBBVAL  is an array of  dimension  LDVAL. On exit,
-*          this  array  contains  the values of DESCB( MB_ ) to  run the
+*  MBXVAL  (global output) INTEGER array
+*          On entry,  MBXVAL  is an array of  dimension  LDVAL. On exit,
+*          this  array  contains  the values of DESCX( MB_ ) to  run the
 *          code with.
 *
-*  INBBVAL (global output) INTEGER array
-*          On entry,  INBBVAL  is an array of  dimension LDVAL. On exit,
-*          this  array  contains  the values of DESCB( INB_ ) to run the
+*  INBXVAL (global output) INTEGER array
+*          On entry,  INBXVAL  is an array of  dimension LDVAL. On exit,
+*          this  array  contains  the values of DESCX( INB_ ) to run the
 *          code with.
 *
-*  NBBVAL  (global output) INTEGER array
-*          On entry,  NBBVAL  is an array of  dimension  LDVAL. On exit,
-*          this  array  contains  the values of DESCB( NB_ ) to  run the
+*  NBXVAL  (global output) INTEGER array
+*          On entry,  NBXVAL  is an array of  dimension  LDVAL. On exit,
+*          this  array  contains  the values of DESCX( NB_ ) to  run the
 *          code with.
 *
-*  RSCBVAL (global output) INTEGER array
-*          On entry, RSCBVAL  is an array of  dimension  LDVAL. On exit,
-*          this  array  contains the values of DESCB( RSRC_ ) to run the
+*  RSCXVAL (global output) INTEGER array
+*          On entry, RSCXVAL  is an array of  dimension  LDVAL. On exit,
+*          this  array  contains the values of DESCX( RSRC_ ) to run the
 *          code with.
 *
-*  CSCBVAL (global output) INTEGER array
-*          On entry, CSCBVAL  is an array of  dimension  LDVAL. On exit,
-*          this  array  contains the values of DESCB( CSRC_ ) to run the
+*  CSCXVAL (global output) INTEGER array
+*          On entry, CSCXVAL  is an array of  dimension  LDVAL. On exit,
+*          this  array  contains the values of DESCX( CSRC_ ) to run the
 *          code with.
 *
-*  IBVAL   (global output) INTEGER array
-*          On entry, IBVAL is an array of dimension LDVAL. On exit, this
-*          array  contains the values of IB to run the code with.
+*  IXVAL   (global output) INTEGER array
+*          On entry, IXVAL is an array of dimension LDVAL. On exit, this
+*          array  contains the values of IX to run the code with.
 *
-*  JBVAL   (global output) INTEGER array
-*          On entry, JBVAL is an array of dimension LDVAL. On exit, this
-*          array  contains the values of JB to run the code with.
+*  JXVAL   (global output) INTEGER array
+*          On entry, JXVAL is an array of dimension LDVAL. On exit, this
+*          array  contains the values of JX to run the code with.
 *
-*  MCVAL   (global output) INTEGER array
-*          On entry, MCVAL is an array of dimension LDVAL. On exit, this
-*          array  contains  the values  of  DESCC( M_ )  to run the code
+*  INCXVAL (global output) INTEGER array
+*          On entry,  INCXVAL  is  an array of dimension LDVAL. On exit,
+*          this array  contains the values of INCX to run the code with.
+*
+*  MYVAL   (global output) INTEGER array
+*          On entry, MYVAL is an array of dimension LDVAL. On exit, this
+*          array  contains  the values  of  DESCY( M_ )  to run the code
 *          with.
 *
-*  NCVAL   (global output) INTEGER array
-*          On entry, NCVAL is an array of dimension LDVAL. On exit, this
-*          array  contains  the values  of  DESCC( N_ )  to run the code
+*  NYVAL   (global output) INTEGER array
+*          On entry, NYVAL is an array of dimension LDVAL. On exit, this
+*          array  contains  the values  of  DESCY( N_ )  to run the code
 *          with.
 *
-*  IMBCVAL (global output) INTEGER array
-*          On entry,  IMBCVAL  is an array of  dimension LDVAL. On exit,
-*          this  array  contains  the values of DESCC( IMB_ ) to run the
+*  IMBYVAL (global output) INTEGER array
+*          On entry,  IMBYVAL  is an array of  dimension LDVAL. On exit,
+*          this  array  contains  the values of DESCY( IMB_ ) to run the
 *          code with.
 *
-*  MBCVAL  (global output) INTEGER array
-*          On entry,  MBCVAL  is an array of  dimension  LDVAL. On exit,
-*          this  array  contains  the values of DESCC( MB_ ) to  run the
+*  MBYVAL  (global output) INTEGER array
+*          On entry,  MBYVAL  is an array of  dimension  LDVAL. On exit,
+*          this  array  contains  the values of DESCY( MB_ ) to  run the
 *          code with.
 *
-*  INBCVAL (global output) INTEGER array
-*          On entry,  INBCVAL  is an array of  dimension LDVAL. On exit,
-*          this  array  contains  the values of DESCC( INB_ ) to run the
+*  INBYVAL (global output) INTEGER array
+*          On entry,  INBYVAL  is an array of  dimension LDVAL. On exit,
+*          this  array  contains  the values of DESCY( INB_ ) to run the
 *          code with.
 *
-*  NBCVAL  (global output) INTEGER array
-*          On entry,  NBCVAL  is an array of  dimension  LDVAL. On exit,
-*          this  array  contains  the values of DESCC( NB_ ) to  run the
+*  NBYVAL  (global output) INTEGER array
+*          On entry,  NBYVAL  is an array of  dimension  LDVAL. On exit,
+*          this  array  contains  the values of DESCY( NB_ ) to  run the
 *          code with.
 *
-*  RSCCVAL (global output) INTEGER array
-*          On entry, RSCCVAL  is an array of  dimension  LDVAL. On exit,
-*          this  array  contains the values of DESCC( RSRC_ ) to run the
+*  RSCYVAL (global output) INTEGER array
+*          On entry, RSCYVAL  is an array of  dimension  LDVAL. On exit,
+*          this  array  contains the values of DESCY( RSRC_ ) to run the
 *          code with.
 *
-*  CSCCVAL (global output) INTEGER array
-*          On entry, CSCCVAL  is an array of  dimension  LDVAL. On exit,
-*          this  array  contains the values of DESCC( CSRC_ ) to run the
+*  CSCYVAL (global output) INTEGER array
+*          On entry, CSCYVAL  is an array of  dimension  LDVAL. On exit,
+*          this  array  contains the values of DESCY( CSRC_ ) to run the
 *          code with.
 *
-*  ICVAL   (global output) INTEGER array
-*          On entry, ICVAL is an array of dimension LDVAL. On exit, this
-*          array  contains the values of IC to run the code with.
+*  IYVAL   (global output) INTEGER array
+*          On entry, IYVAL is an array of dimension LDVAL. On exit, this
+*          array  contains the values of IY to run the code with.
 *
-*  JCVAL   (global output) INTEGER array
-*          On entry, JCVAL is an array of dimension LDVAL. On exit, this
-*          array  contains the values of JC to run the code with.
+*  JYVAL   (global output) INTEGER array
+*          On entry, JYVAL is an array of dimension LDVAL. On exit, this
+*          array  contains the values of JY to run the code with.
+*
+*  INCYVAL (global output) INTEGER array
+*          On entry,  INCYVAL  is  an array of dimension LDVAL. On exit,
+*          this array  contains the values of INCY to run the code with.
 *
 *  LDVAL   (global input) INTEGER
 *          On entry, LDVAL specifies the maximum number of different va-
-*          lues  that  can be used for DIAG, SIDE, TRANSA, TRANSB, UPLO,
-*          M,  N,  K,  DESCA(:), IA, JA, DESCB(:), IB, JB, DESCC(:), IC,
-*          JC. This is also the maximum number of test cases.
+*          lues that can be used for DIAG, TRANS, UPLO, M, N,  DESCA(:),
+*          IA,  JA,  DESCX(:),  IX, JX, INCX, DESCY(:), IY, JY and INCY.
+*          This is also the maximum number of test cases.
 *
 *  NGRIDS  (global output) INTEGER
 *          On exit, NGRIDS specifies the number of different values that
@@ -1144,8 +964,8 @@
 *          to run the tests with. NBLOG must be at least one.
 *
 *  LTEST   (global output) LOGICAL array
-*          On entry,  LTEST  is an array of dimension at least eight. On
-*          exit, if LTEST( i ) is .TRUE., the i-th Level 3 PBLAS routine
+*          On entry,  LTEST  is an array of dimension at least seven. On
+*          exit, if LTEST( i ) is .TRUE., the i-th Level 2 PBLAS routine
 *          will be tested.  See  the  input file for the ordering of the
 *          routines.
 *
@@ -1166,7 +986,7 @@
 *
 *  WORK    (local workspace) INTEGER array
 *          On   entry,   WORK   is   an  array  of  dimension  at  least
-*          MAX( 3, 2*NGRIDS+38*NMAT+NSUBS ) with NSUBS = 8.  This  array
+*          MAX( 3, 2*NGRIDS+37*NMAT+NSUBS ) with NSUBS = 7.  This  array
 *          is  used  to  pack all output arrays in order to send info in
 *          one message.
 *
@@ -1177,7 +997,7 @@
 *
 *     .. Parameters ..
       INTEGER            NIN, NSUBS
-      PARAMETER          ( NIN = 11, NSUBS = 8 )
+      PARAMETER          ( NIN = 11, NSUBS = 7 )
 *     ..
 *     .. Local Scalars ..
       LOGICAL            LTESTT
@@ -1208,7 +1028,7 @@
 *
 *        Open file and skip data file header
 *
-         OPEN( NIN, FILE='PDBLAS3TIM.dat', STATUS='OLD' )
+         OPEN( NIN, FILE='PDBLAS2TIM.dat', STATUS='OLD' )
          READ( NIN, FMT = * ) SUMMRY
          SUMMRY = ' '
 *
@@ -1258,48 +1078,47 @@
          IF( NMAT.LT.1 .OR. NMAT.GT.LDVAL ) THEN
             WRITE( NOUT, FMT = 9998 ) 'Tests', LDVAL
             GO TO 120
-         ENDIF
+         END IF
 *
 *        Read in input data into arrays.
 *
-         READ( NIN, FMT = * ) ( DIAGVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( SIDEVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( TRNAVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( TRNBVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( UPLOVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( MVAL   ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( NVAL   ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( KVAL   ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( MAVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( NAVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( IMBAVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( INBAVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( MBAVAL ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( NBAVAL ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( RSCAVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( CSCAVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( IAVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( JAVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( MBVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( NBVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( IMBBVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( INBBVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( MBBVAL ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( NBBVAL ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( RSCBVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( CSCBVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( IBVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( JBVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( MCVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( NCVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( IMBCVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( INBCVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( MBCVAL ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( NBCVAL ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( RSCCVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( CSCCVAL( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( ICVAL  ( I ), I = 1, NMAT )
-         READ( NIN, FMT = * ) ( JCVAL  ( I ), I = 1, NMAT )
+         READ( NIN, FMT = * ) ( UPLOVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( TRANVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( DIAGVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( MVAL   ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( NVAL   ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( MAVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( NAVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( IMBAVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( INBAVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( MBAVAL ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( NBAVAL ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( RSCAVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( CSCAVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( IAVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( JAVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( MXVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( NXVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( IMBXVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( INBXVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( MBXVAL ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( NBXVAL ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( RSCXVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( CSCXVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( IXVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( JXVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( INCXVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( MYVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( NYVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( IMBYVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( INBYVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( MBYVAL ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( NBYVAL ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( RSCYVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( CSCYVAL( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( IYVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( JYVAL  ( I ),  I = 1, NMAT )
+         READ( NIN, FMT = * ) ( INCYVAL( I ),  I = 1, NMAT )
 *
 *        Read names of subroutines and flags which indicate
 *        whether they are to be tested.
@@ -1347,7 +1166,7 @@
 *        Pack information arrays and broadcast
 *
          CALL DGEBS2D( ICTXT, 'All', ' ', 1, 1, ALPHA, 1 )
-         CALL DGEBS2D( ICTXT, 'All', ' ', 1, 1, BETA,  1 )
+         CALL DGEBS2D( ICTXT, 'All', ' ', 1, 1, BETA, 1 )
 *
          WORK( 1 ) = NGRIDS
          WORK( 2 ) = NMAT
@@ -1356,12 +1175,10 @@
 *
          I = 1
          DO 70 J = 1, NMAT
-            WORK( I   ) = ICHAR( DIAGVAL( J ) )
-            WORK( I+1 ) = ICHAR( SIDEVAL( J ) )
-            WORK( I+2 ) = ICHAR( TRNAVAL( J ) )
-            WORK( I+3 ) = ICHAR( TRNBVAL( J ) )
-            WORK( I+4 ) = ICHAR( UPLOVAL( J ) )
-            I = I + 5
+            WORK( I )   = ICHAR( DIAGVAL( J ) )
+            WORK( I+1 ) = ICHAR( TRANVAL( J ) )
+            WORK( I+2 ) = ICHAR( UPLOVAL( J ) )
+            I = I + 3
    70    CONTINUE
          CALL ICOPY( NGRIDS, PVAL,     1, WORK( I ), 1 )
          I = I + NGRIDS
@@ -1370,8 +1187,6 @@
          CALL ICOPY( NMAT,   MVAL,     1, WORK( I ), 1 )
          I = I + NMAT
          CALL ICOPY( NMAT,   NVAL,     1, WORK( I ), 1 )
-         I = I + NMAT
-         CALL ICOPY( NMAT,   KVAL,     1, WORK( I ), 1 )
          I = I + NMAT
          CALL ICOPY( NMAT,   MAVAL,    1, WORK( I ), 1 )
          I = I + NMAT
@@ -1393,45 +1208,49 @@
          I = I + NMAT
          CALL ICOPY( NMAT,   JAVAL,    1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   MBVAL,    1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   MXVAL,    1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   NBVAL,    1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   NXVAL,    1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   IMBBVAL,  1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   IMBXVAL,  1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   INBBVAL,  1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   INBXVAL,  1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   MBBVAL,   1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   MBXVAL,   1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   NBBVAL,   1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   NBXVAL,   1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   RSCBVAL,  1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   RSCXVAL,  1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   CSCBVAL,  1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   CSCXVAL,  1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   IBVAL,    1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   IXVAL,    1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   JBVAL,    1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   JXVAL,    1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   MCVAL,    1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   INCXVAL,  1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   NCVAL,    1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   MYVAL,    1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   IMBCVAL,  1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   NYVAL,    1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   INBCVAL,  1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   IMBYVAL,  1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   MBCVAL,   1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   INBYVAL,  1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   NBCVAL,   1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   MBYVAL,   1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   RSCCVAL,  1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   NBYVAL,   1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   CSCCVAL,  1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   RSCYVAL,  1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   ICVAL,    1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   CSCYVAL,  1, WORK( I ), 1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   JCVAL,    1, WORK( I ), 1 )
+         CALL ICOPY( NMAT,   IYVAL,    1, WORK( I ), 1 )
+         I = I + NMAT
+         CALL ICOPY( NMAT,   JYVAL,    1, WORK( I ), 1 )
+         I = I + NMAT
+         CALL ICOPY( NMAT,   INCYVAL,  1, WORK( I ), 1 )
          I = I + NMAT
 *
          DO 80 J = 1, NSUBS
@@ -1448,12 +1267,12 @@
 *        regurgitate input
 *
          WRITE( NOUT, FMT = 9999 )
-     $               'Level 3 PBLAS timing program.'
+     $               'Level 2 PBLAS timing program.'
          WRITE( NOUT, FMT = 9999 ) USRINFO
          WRITE( NOUT, FMT = * )
          WRITE( NOUT, FMT = 9999 )
      $               'Tests of the real double precision '//
-     $               'Level 3 PBLAS'
+     $               'Level 2 PBLAS'
          WRITE( NOUT, FMT = * )
          WRITE( NOUT, FMT = 9992 ) NMAT
          WRITE( NOUT, FMT = 9986 ) NBLOG
@@ -1485,7 +1304,7 @@
          ELSE
             WRITE( NOUT, FMT = 9988 ) SNAMES( 1 ), ' ... No '
          END IF
-         DO 90 I = 2, NSUBS
+         DO 90 I = 1, NSUBS
             IF( LTEST( I ) ) THEN
                WRITE( NOUT, FMT = 9987 ) SNAMES( I ), ' ... Yes'
             ELSE
@@ -1508,24 +1327,22 @@
          CALL BLACS_GRIDINIT( ICTXT, 'Row-major', 1, NPROCS )
 *
          CALL DGEBR2D( ICTXT, 'All', ' ', 1, 1, ALPHA, 1, 0, 0 )
-         CALL DGEBR2D( ICTXT, 'All', ' ', 1, 1, BETA,  1, 0, 0 )
+         CALL DGEBR2D( ICTXT, 'All', ' ', 1, 1, BETA, 1, 0, 0 )
 *
          CALL IGEBR2D( ICTXT, 'All', ' ', 3, 1, WORK, 3, 0, 0 )
          NGRIDS = WORK( 1 )
          NMAT   = WORK( 2 )
          NBLOG  = WORK( 3 )
 *
-         I = 2*NGRIDS + 38*NMAT + NSUBS
+         I = 2*NGRIDS + 37*NMAT + NSUBS
          CALL IGEBR2D( ICTXT, 'All', ' ', I, 1, WORK, I, 0, 0 )
 *
          I = 1
          DO 100 J = 1, NMAT
-            DIAGVAL( J ) = CHAR( WORK( I   ) )
-            SIDEVAL( J ) = CHAR( WORK( I+1 ) )
-            TRNAVAL( J ) = CHAR( WORK( I+2 ) )
-            TRNBVAL( J ) = CHAR( WORK( I+3 ) )
-            UPLOVAL( J ) = CHAR( WORK( I+4 ) )
-            I = I + 5
+            DIAGVAL( J ) = CHAR( WORK( I ) )
+            TRANVAL( J ) = CHAR( WORK( I+1 ) )
+            UPLOVAL( J ) = CHAR( WORK( I+2 ) )
+            I = I + 3
   100    CONTINUE
          CALL ICOPY( NGRIDS, WORK( I ), 1, PVAL,     1 )
          I = I + NGRIDS
@@ -1534,8 +1351,6 @@
          CALL ICOPY( NMAT,   WORK( I ), 1, MVAL,     1 )
          I = I + NMAT
          CALL ICOPY( NMAT,   WORK( I ), 1, NVAL,     1 )
-         I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, KVAL,     1 )
          I = I + NMAT
          CALL ICOPY( NMAT,   WORK( I ), 1, MAVAL,    1 )
          I = I + NMAT
@@ -1557,45 +1372,49 @@
          I = I + NMAT
          CALL ICOPY( NMAT,   WORK( I ), 1, JAVAL,    1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, MBVAL,    1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, MXVAL,    1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, NBVAL,    1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, NXVAL,    1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, IMBBVAL,  1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, IMBXVAL,  1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, INBBVAL,  1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, INBXVAL,  1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, MBBVAL,   1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, MBXVAL,   1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, NBBVAL,   1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, NBXVAL,   1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, RSCBVAL,  1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, RSCXVAL,  1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, CSCBVAL,  1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, CSCXVAL,  1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, IBVAL,    1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, IXVAL,    1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, JBVAL,    1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, JXVAL,    1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, MCVAL,    1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, INCXVAL,  1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, NCVAL,    1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, MYVAL,    1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, IMBCVAL,  1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, NYVAL,    1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, INBCVAL,  1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, IMBYVAL,  1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, MBCVAL,   1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, INBYVAL,  1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, NBCVAL,   1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, MBYVAL,   1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, RSCCVAL,  1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, NBYVAL,   1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, CSCCVAL,  1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, RSCYVAL,  1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, ICVAL,    1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, CSCYVAL,  1 )
          I = I + NMAT
-         CALL ICOPY( NMAT,   WORK( I ), 1, JCVAL,    1 )
+         CALL ICOPY( NMAT,   WORK( I ), 1, IYVAL,    1 )
+         I = I + NMAT
+         CALL ICOPY( NMAT,   WORK( I ), 1, JYVAL,    1 )
+         I = I + NMAT
+         CALL ICOPY( NMAT,   WORK( I ), 1, INCYVAL,  1 )
          I = I + NMAT
 *
          DO 110 J = 1, NSUBS
@@ -1638,6 +1457,6 @@
  9987 FORMAT( 2X, '                                 ', A, A8 )
  9986 FORMAT( 2X, 'Logical block size        : ', I6 )
 *
-*     End of PDBLA3TIMINFO
+*     End of PDBLA2TIMINFO
 *
       END
