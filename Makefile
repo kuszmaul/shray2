@@ -3,12 +3,11 @@ include /usr/local/gasnet/include/mpi-conduit/mpi-seq.mak
 FORTRAN_C = gfortran
 MPICC = mpicc
 CHAPEL_C = chpl
-SHMEM_C = oshcc
 FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic -fno-math-errno -Iinclude
 LFLAGS = -lm -lblis64 -fsanitize=undefined -pthread -pg
 FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib -g
 FORTRAN_LFLAGS = -lcaf_openmpi
-CHAPEL_FLAGS = --fast
+CHAPEL_FLAGS = --fast -g
 CHAPEL_LFLAGS = -lblis64
 
 FORTRANAPPS = $(wildcard examples/fortran/*.f90)
@@ -20,12 +19,12 @@ CHAPEL = $(patsubst examples/chapel/%.chpl, bin/chapel/%, $(CHAPELAPPS))
 MPIAPPS = $(wildcard examples/mpi/*.c)
 MPI = $(patsubst examples/mpi/%.c, bin/mpi/%, $(MPIAPPS))
 
-APPS = $(wildcard examples/*.c)
-RELEASE = $(patsubst examples/%.c, bin/shray/%, $(APPS))
-DEBUG = $(patsubst examples/%.c, bin/shray/%_debug, $(APPS))
-PROFILE = $(patsubst examples/%.c, bin/shray/%_profile, $(APPS))
+APPS = $(wildcard examples/shray/*.c)
+RELEASE = $(patsubst examples/shray/%.c, bin/shray/%, $(APPS))
+DEBUG = $(patsubst examples/shray/%.c, bin/shray/%_debug, $(APPS))
+PROFILE = $(patsubst examples/shray/%.c, bin/shray/%_profile, $(APPS))
 
-all: release debug profile $(FORTRAN) $(CHAPEL) $(MPI)
+all: release debug profile $(FORTRAN) $(MPI) $(CHAPEL)
 
 release: $(RELEASE)
 
@@ -44,17 +43,13 @@ bin/shray_debug.o: src/shray.c include/shray2/shray.h src/shray.h
 bin/shray_profile.o: src/shray.c include/shray2/shray.h src/shray.h
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
-#FIXME This compiler should have the same ABI as the compiler used by GASNET_CC (e.g. gcc and clang)
 bin/%.o: src/%.c src/%.h
 	gcc $(FLAGS) -c $< -o $@
 
 bin/queue.o: src/queue.c src/queue.h
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
-bin/fortran/mmio.o: examples/fortran/modules/mmio.f90
-	$(FORTRAN_C) -c $(FORTRAN_FLAGS) $< -o $@
-
-%.o: examples/%.c
+%.o: examples/shray/%.c
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
 bin/shray/%: %.o bin/shray.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
@@ -66,11 +61,8 @@ bin/shray/%_debug: %.o bin/shray_debug.o bin/bitmap.o bin/queue.o bin/ringbuffer
 bin/shray/%_profile: %.o bin/shray_profile.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
 
-bin/fortran/%_fortran: examples/fortran/%.f90 bin/fortran/mmio.o
+bin/fortran/%_fortran: examples/fortran/%.f90
 	$(FORTRAN_C) $(FORTRAN_FLAGS) $^ -o $@ $(FORTRAN_LFLAGS)
-
-bin/oshmem/%_oshmem: examples/oshmem/%.c
-	$(SHMEM_C) $(FLAGS) $< -o $@ $(LFLAGS)
 
 bin/chapel/%: examples/chapel/%.chpl
 	chpl $< $(CHAPEL_FLAGS) -o $@ $(CHAPEL_LFLAGS)
@@ -78,10 +70,5 @@ bin/chapel/%: examples/chapel/%.chpl
 bin/mpi/%: examples/mpi/%.c
 	$(MPICC) $< $(FLAGS) -o $@ $(LFLAGS)
 
-testMatrix:
-	export SHRAY_CACHESIZE=4096000
-	export SHRAY_CACHELINE=1
-	mpirun.mpich -n 4 bin/matrix_debug 1000 2>&1 | grep "\[node 1" > matrix.out
-
 clean:
-	$(RM) bin/shray/* bin/oshmem/* bin/chapel/* bin/fortran/* bin/mpi/* *.mod
+	$(RM) bin/shray/* bin/chapel/* bin/fortran/* bin/mpi/* *.mod

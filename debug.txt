@@ -1,5 +1,0 @@
-Running 2dstencil (16 proc, shray) with arguments: 20480 2
-    FAILED
-
-Strangely enough 2dstencil (16 proc, shray) with arguments: 20480 10 was succesfull.
-I cannot reproduce this failure locally.

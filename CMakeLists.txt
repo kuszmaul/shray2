@@ -30,8 +30,8 @@ project(shray2
 	LANGUAGES ${PROJECT_LANGUAGES})
 set(PROJECT_VERSION_SUFFIX "") # alpha/beta/rc, e.g. "-rc0"
 set(PROJECT_VERSION "${PROJECT_VERSION}${PROJECT_VERSION_SUFFIX}")
-set(PROJECT_AUTHOR "Thomas Koopman")
-set(PROJECT_COPYRIGHT "2022, Thomas Koopman")
+set(PROJECT_AUTHOR "Thomas Koopman, Stefan Schrijvers")
+set(PROJECT_COPYRIGHT "2022, Thomas Koopman, Stefan Schrijvers")
 set(PROJECT_MAIL "thomas.koopman@ru.nl")
 # only set CMAKE variant when local name matches CMAKE name
 # this avoids clashing when being used as a subproject

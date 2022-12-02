@@ -1,3 +1,8 @@
-1. Get chapel version
-
-3. Get global arrays measurements
+1. Test Chapel on multiple locales
+2. Make the ScalaPack benchmark
+3. Investigate the 2dstencil Shray bug
+4(?). Simplifying the Shray code by not evicting prefetches
+5. Shray spmv
+6. GA spmv
+7. GA matrix-multiplication
+8. Update benchmark script

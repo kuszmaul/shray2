@@ -13,4 +13,4 @@ cmake \
 	-B "$builddir"
 cmake --build "$builddir" -j
 
-# -DGASNet_ROOT_DIR="/home/ximin/tmp/gasnet/install_segmenteverything_nophsm" \
+-DGASNet_ROOT_DIR="/home/ximin/tmp/gasnet/install_segmenteverything_nophsm" \

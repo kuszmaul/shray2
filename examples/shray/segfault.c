@@ -49,9 +49,6 @@ double reduce(double *arr, size_t n)
  * other nodes. Each node sums up the array. */
 double reduceAuto(double *arr, size_t n)
 {
-	unsigned int p = ShraySize();
-	unsigned int s = ShrayRank();
-
     double sum = 0.0;
 
     for (size_t i = 0; i < n; i++) {
@@ -88,6 +85,7 @@ int main(int argc, char **argv)
                 "That is a bandwidth of %lf GB/s\n",
                 ShraySize(), microsPerPage, 4096.0 / microsPerPage / 1000.0);
         printf("%lf\n", microsPerPage);
+        fprintf(stderr, "%lf\n", result);
     }
 
     ShrayFree(A);
