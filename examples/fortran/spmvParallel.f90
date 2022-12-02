@@ -20,16 +20,15 @@ contains
     ! Computes the local part of matmul(mat, output), where mat
     ! is the local part of a sparse matrix distributed blockwise along
     ! the first dimension.
-    function spmv(mat, input, global_rows) result(output)
+    function spmv(mat, input) result(output)
         implicit none
         type(CSRMatrix), intent(in) :: mat
-        real(KIND=8), intent(in) :: input(mat%n)[*]
-        integer, intent(in) :: global_rows
+        real(KIND=8), intent(in) :: input((mat%n + num_images() - 1) / num_images())[*]
         real(KIND=8), allocatable :: output(:)
 
         integer :: row, col, j, blockSize, processor, localIndex
 
-        blockSize = (global_rows + num_images() - 1) / num_images()
+        blockSize = (mat%n + num_images() - 1) / num_images()
         allocate(output(mat%m))
 
         do concurrent (row = 1:mat%m)
@@ -58,7 +57,7 @@ contains
         state = 1 / mat%n;
 
         do t = 1,iterations
-            input = spmv(mat, input, 5)
+            input = spmv(mat, input)
             sync all
         end do
 
@@ -74,21 +73,26 @@ program main
     use CSR_SPMV
     implicit none
 
-    integer :: info_io, row_io, column_io, values_io, s
+    integer :: iterations
+    ! File handles
+    integer :: info_io, row_io, column_io, values_io
+    ! Timing
+    integer :: cpu_count, cpu_count2, count_rate, count_max
     integer(KIND=8) :: nz
-    character(len=12), dimension(:), allocatable :: args
+    character(len=12), dimension(:), allocatable :: args(:)
     character(len=100) :: numberString, info, row, column, values, filename
     type(CSRMatrix) :: mat
     real(KIND=8), allocatable :: res(:)
 
     ! Parse the distributed array
-    allocate(args(1))
+    allocate(args(2))
     call get_command_argument(1, args(1))
     read (unit=args(1), fmt=*) filename
 
-    s = this_image()
+    call get_command_argument(2, args(2))
+    read (unit=args(2), fmt=*) iterations
 
-    write(numberString, fmt='(I0)') s
+    write(numberString, fmt='(I0)') this_image()
     info = trim(filename) // trim("_info") // trim(numberString)
     column = trim(filename) // trim("_column") // trim(numberString)
     row = trim(filename) // trim("_row") // trim(numberString)
@@ -115,6 +119,14 @@ program main
     read(values_io, *) mat%val
     close(values_io)
 
-    res = steady_state(mat, 10)
+    call system_clock(cpu_count, count_rate, count_max)
 
+    res = steady_state(mat, iterations)
+
+    call system_clock(cpu_count2, count_rate, count_max)
+
+    ! In seconds because the total number of non-zeroes is not known
+    if (this_image() .eq. 1) then
+        write (*, *) 'This took this many seconds: ', real(cpu_count2 - cpu_count) / count_rate
+    end if
 end program main
