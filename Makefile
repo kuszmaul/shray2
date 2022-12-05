@@ -19,12 +19,15 @@ CHAPEL = $(patsubst examples/chapel/%.chpl, bin/chapel/%, $(CHAPELAPPS))
 MPIAPPS = $(wildcard examples/mpi/*.c)
 MPI = $(patsubst examples/mpi/%.c, bin/mpi/%, $(MPIAPPS))
 
+UPCAPPS = $(wildcard examples/upc/*.c)
+UPC = $(patsubst examples/upc/%.c, bin/upc/%, $(UPCAPPS))
+
 APPS = $(wildcard examples/shray/*.c)
 RELEASE = $(patsubst examples/shray/%.c, bin/shray/%, $(APPS))
 DEBUG = $(patsubst examples/shray/%.c, bin/shray/%_debug, $(APPS))
 PROFILE = $(patsubst examples/shray/%.c, bin/shray/%_profile, $(APPS))
 
-all: release debug profile $(FORTRAN) $(MPI) $(CHAPEL)
+all: release debug profile $(FORTRAN) $(MPI) $(CHAPEL) $(UPC)
 
 release: $(RELEASE)
 
@@ -52,13 +55,13 @@ bin/queue.o: src/queue.c src/queue.h
 %.o: examples/shray/%.c
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(FLAGS) -c $< -o $@
 
-bin/shray/%: %.o bin/shray.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
+bin/shray/%: %.o bin/shray.o bin/bitmap.o bin/queue.o bin/ringbuffer.o bin/csr.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
 
-bin/shray/%_debug: %.o bin/shray_debug.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
+bin/shray/%_debug: %.o bin/shray_debug.o bin/bitmap.o bin/queue.o bin/ringbuffer.o bin/csr.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
 
-bin/shray/%_profile: %.o bin/shray_profile.o bin/bitmap.o bin/queue.o bin/ringbuffer.o
+bin/shray/%_profile: %.o bin/shray_profile.o bin/bitmap.o bin/queue.o bin/ringbuffer.o bin/csr.o
 	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
 
 bin/fortran/%_fortran: examples/fortran/%.f90
@@ -70,5 +73,11 @@ bin/chapel/%: examples/chapel/%.chpl
 bin/mpi/%: examples/mpi/%.c
 	$(MPICC) $< $(FLAGS) -o $@ $(LFLAGS)
 
+bin/upc/%: examples/upc/%.c
+	upcc $< -o $@
+
+bin/csr.o: examples/util/csr.c examples/util/csr.h
+	gcc $(FLAGS) -c $< -o $@
+
 clean:
-	$(RM) bin/shray/* bin/chapel/* bin/fortran/* bin/mpi/* *.mod
+	$(RM) bin/shray/* bin/chapel/* bin/fortran/* bin/mpi/* bin/upc/* *.mod

@@ -276,17 +276,6 @@ static void evict(size_t size)
         }
     }
 
-    /* Next, try to go through the prefetches in FIFO order to evict. */
-    while (!queue_empty(cache.prefetchCaches)) {
-        queue_entry_t q_entry = queue_dequeue(cache.prefetchCaches);
-        chain = roundUp(q_entry.end - q_entry.start, ShrayPagesz);
-        evictCacheEntry(q_entry.alloc, q_entry.start, chain);
-        evicted += chain;
-        if (evicted >= size_pages) {
-            return;
-        }
-    }
-
     if (evicted < size_pages) {
         DBUG_PRINT("Was only able to evict %zu pages (requested %zu) SHOULD NEVER HAPPEN",
                 evicted, size_pages);
@@ -770,29 +759,12 @@ void ShrayFree(void *address)
 
 void ShrayPrefetch(void *address, size_t size)
 {
-    if (size > cache.maximumMemory) {
-        fprintf(stderr, "WARNING Can not prefetch %zu bytes since cache is only %zu."
-                "Ignoring prefetch", size, cache.maximumMemory); return;
-        return;
-    }
-
     PrefetchStruct prefetch = GetPrefetchStruct(address, size);
 
     DBUG_PRINT("Prefetch issued for [%p, %p[.", address, (void *)((uintptr_t)address + size));
 
-    size_t prefetchMem = 0;
-    if (prefetch.end1 > prefetch.start1) prefetchMem += prefetch.end1 - prefetch.start1;
-    if (prefetch.end2 > prefetch.start2) prefetchMem += prefetch.end2 - prefetch.start2;
-
-    if (cache.usedMemory + prefetchMem > cache.maximumMemory) {
-        evict(min(prefetchMem, cache.usedMemory));
-    }
-
     helpPrefetch(prefetch.start1, prefetch.end1, prefetch.alloc);
     helpPrefetch(prefetch.start2, prefetch.end2, prefetch.alloc);
-
-    cache.usedMemory += prefetchMem;
-    prefetch.alloc->usedMemory += prefetchMem;
 }
 
 static void DiscardGet(queue_entry_t *get, size_t index)
@@ -821,8 +793,6 @@ static void DiscardGet(queue_entry_t *get, size_t index)
     }
 
     queue_remove_at(cache.prefetchCaches, index);
-    cache.usedMemory -= get->end - get->start;
-    alloc->usedMemory -= get->end - get->start;
 }
 
 /* Returns true iff [subStart, subEnd[ \subseteq [start, end[. */

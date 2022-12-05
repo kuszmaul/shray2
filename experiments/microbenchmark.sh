@@ -71,8 +71,6 @@ chapeltest()
 	outfile="$resultdir/$nproc.out"
 	timefile="$resultdir/$nproc.time"
 
-    # TODO chapel does not take commandline arguments, you have to manually
-    # override them as --argument=...
     ${bindir}/chapel/${example}  "$@" -nl "$nproc" > "$timefile" 2> "$outfile"
 }
 
@@ -109,7 +107,7 @@ shraytestMatrix()
 
 shraytestSpmv()
 {
-    export SHRAY_CACHESIZE=$(2*5154859*8/$1)
+    export SHRAY_CACHESIZE=$(8*5154859/$1)
     shraytest $@
 }
 
@@ -181,6 +179,9 @@ mkdir -p "$datadir"
 	if gasnet_trace -h; then
 		true
 	fi
+
+	printf '\n----------\nOpenSHMEM:\n'
+	oshrun -h
 
 	printf '\n----------\nGlobalArrays:\n'
 #	ga-config --version
