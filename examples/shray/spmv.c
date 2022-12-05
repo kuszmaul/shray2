@@ -12,7 +12,7 @@ void init(double *a, size_t n)
 	}
 }
 
-void spmv(csr_t *matrix, double *vector, double *out, size_t n)
+void spmv(csr_t *matrix, double *vector, double *out)
 {
 	for (size_t i = ShrayStart(matrix->m_total), k = 0; i < ShrayEnd(matrix->m_total); ++i, ++k) {
 		double outval = 0;
@@ -30,10 +30,10 @@ void spmv(csr_t *matrix, double *vector, double *out, size_t n)
 	}
 }
 
-void steady_state(csr_t *matrix, double *vector, double *out, size_t n, size_t iterations)
+void steady_state(csr_t *matrix, double *vector, double *out, size_t iterations)
 {
 	for (size_t i = 0; i < iterations; ++i) {
-		spmv(matrix, vector, out, n);
+		spmv(matrix, vector, out);
 		ShraySync(out);
 		double *tmp = vector;
 		vector = out;
@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 
 	double duration;
 
-	TIME(duration, steady_state(matrix, vector, out, matrix->n, iterations););
+	TIME(duration, steady_state(matrix, vector, out, iterations););
 
 	if (ShrayOutput) {
 	    printf("%lf\n", matrix->nnz * 2.0 / 1000000000 / duration);
