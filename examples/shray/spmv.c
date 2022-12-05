@@ -14,7 +14,7 @@ void init(double *a, size_t n)
 
 void spmv(csr_t *matrix, double *vector, double *out)
 {
-	for (size_t i = ShrayStart(matrix->m_total), k = 0; i < ShrayEnd(matrix->m_total); ++i, ++k) {
+	for (size_t i = ShrayStart(matrix->n), k = 0; i < ShrayEnd(matrix->n); ++i, ++k) {
 		double outval = 0;
 
 		size_t row_start = matrix->row_indices[k];
@@ -55,11 +55,17 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Could not parse matrix for %s\n", argv[1]);
 		ShrayFinalize(1);
 	}
+	if (matrix->n != matrix->m_total) {
+		fprintf(stderr, "Expected a square matrix (%zu x %zu)\n",
+				matrix->n,
+				matrix->m_total);
+		ShrayFinalize(1);
+	}
 
 	size_t iterations = atoll(argv[2]);
 
 	double *vector = ShrayMalloc(matrix->n, matrix->n * sizeof(double));
-	double *out = ShrayMalloc(matrix->m_total, matrix->m_total * sizeof(double));
+	double *out = ShrayMalloc(matrix->n, matrix->n * sizeof(double));
 
 	init(vector, matrix->n);
 	ShraySync(vector);
