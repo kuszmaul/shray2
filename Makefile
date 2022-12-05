@@ -22,12 +22,15 @@ MPI = $(patsubst examples/mpi/%.c, bin/mpi/%, $(MPIAPPS))
 UPCAPPS = $(wildcard examples/upc/*.c)
 UPC = $(patsubst examples/upc/%.c, bin/upc/%, $(UPCAPPS))
 
+GAAPPS = $(wildcard examples/globalarrays/*.c)
+GA = $(patsubst examples/globalarrays/%.c, bin/globalarrays/%, $(GAAPPS))
+
 APPS = $(wildcard examples/shray/*.c)
 RELEASE = $(patsubst examples/shray/%.c, bin/shray/%, $(APPS))
 DEBUG = $(patsubst examples/shray/%.c, bin/shray/%_debug, $(APPS))
 PROFILE = $(patsubst examples/shray/%.c, bin/shray/%_profile, $(APPS))
 
-all: release debug profile $(FORTRAN) $(MPI) $(CHAPEL) $(UPC)
+all: release debug profile $(FORTRAN) $(MPI) $(CHAPEL) $(UPC) $(GA)
 
 release: $(RELEASE)
 
@@ -78,6 +81,9 @@ bin/upc/%: examples/upc/%.c bin/csr.o
 
 bin/csr.o: examples/util/csr.c examples/util/csr.h
 	gcc $(FLAGS) -c $< -o $@
+
+bin/globalarrays/%: examples/globalarrays/%.c
+	$(MPICC) $(FLAGS) $< -o $@ -lga -lm -llapack -lblis64 -lga -lgfortran -larmci -lscalapack-openmpi
 
 clean:
 	$(RM) bin/shray/* bin/chapel/* bin/fortran/* bin/mpi/* bin/upc/* *.mod

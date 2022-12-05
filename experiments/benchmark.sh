@@ -12,7 +12,7 @@ hash gnuplot
 hash gasnetrun_mpi
 hash time
 hash find
-#hash ga-config
+hash ga-config
 
 export SHRAY_CACHELINE=1
 
