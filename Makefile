@@ -82,7 +82,7 @@ bin/upc/%: examples/upc/%.c bin/csr.o
 bin/csr.o: examples/util/csr.c examples/util/csr.h
 	gcc $(FLAGS) -c $< -o $@
 
-bin/globalarrays/%: examples/globalarrays/%.c
+bin/globalarrays/%: examples/globalarrays/%.c bin/csr.o
 	$(MPICC) $(FLAGS) $< -o $@ -lga -lm -llapack -lblis64 -lga -lgfortran -larmci -lscalapack-openmpi
 
 clean:
