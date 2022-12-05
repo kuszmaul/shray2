@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 	TIME(duration, steady_state(matrix, vector, out, matrix->n, iterations););
 
 	if (MYTHREAD == 0) {
-	    printf("%lf\n", matrix->nnz * 2.0 / 1000000000 / duration);
+	    printf("%lf\n", matrix->nnz_total * 2.0 / 1000000000 / duration);
 	}
 
 	return EXIT_SUCCESS;

@@ -8,7 +8,8 @@ typedef struct {
 	double *values;
 	size_t *col_indices;
 	size_t *row_indices;
-	size_t nnz;
+	size_t nnz_local;
+	size_t nnz_total;
 	size_t n;
 	size_t m_local; /* The number of local rows. */
 	size_t m_total; /* The total number of rows. */

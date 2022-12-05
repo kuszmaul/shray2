@@ -21,7 +21,7 @@ void csr_free(csr_t *matrix)
 	}
 }
 
-static csr_t *alloc_matrix(size_t m_local, size_t m_total, size_t n, size_t nnz)
+static csr_t *alloc_matrix(size_t m_local, size_t m_total, size_t n, size_t nnz_local, size_t nnz_total)
 {
 	csr_t *matrix = malloc(sizeof(csr_t));
 	if (!matrix) {
@@ -29,12 +29,13 @@ static csr_t *alloc_matrix(size_t m_local, size_t m_total, size_t n, size_t nnz)
 		return NULL;
 	}
 
-	matrix->nnz = nnz;
+	matrix->nnz_local = nnz_local;
+	matrix->nnz_total = nnz_total;
 	matrix->m_local = m_local;
 	matrix->m_total = m_total;
 	matrix->n = n;
-	matrix->values = malloc(sizeof(double) * matrix->nnz);
-	matrix->col_indices = malloc(sizeof(size_t) * matrix->nnz);
+	matrix->values = malloc(sizeof(double) * matrix->nnz_local);
+	matrix->col_indices = malloc(sizeof(size_t) * matrix->nnz_local);
 	matrix->row_indices = malloc(sizeof(size_t) * (matrix->m_local + 1));
 
 	if (!matrix->values || !matrix->col_indices || !matrix->row_indices) {
@@ -105,12 +106,14 @@ csr_t *csr_parse_local(const char *file, int rank)
 	 */
 	size_t m_local = 0;
 	size_t m_total = 0;
-	size_t n = 0;
-	size_t nnz = 0;
-	fscanf(info_file, "%zu %zu %zu", &m_local, &n, &nnz);
-	fscanf(org_file, "%zu", &m_total);
+	size_t n_local = 0;
+	size_t n_total = 0;
+	size_t nnz_local = 0;
+	size_t nnz_total = 0;
+	fscanf(info_file, "%zu %zu %zu", &m_local, &n_local, &nnz_local);
+	fscanf(org_file, "%zu %zu %zu", &m_total, &n_total, &nnz_total);
 
-	result = alloc_matrix(m_local, m_total, n, nnz);
+	result = alloc_matrix(m_local, m_total, n_total, nnz_local, nnz_total);
 	if (!result) {
 		goto cleanup;
 	}
@@ -125,7 +128,7 @@ csr_t *csr_parse_local(const char *file, int rank)
 	while (fscanf(row_file, "%zu", &tmp) != -1) {
 		result->row_indices[i++] = tmp - 1;
 	}
-	result->row_indices[result->m_local] = nnz;
+	result->row_indices[result->m_local] = nnz_local;
 	i = 0;
 	while (fscanf(val_file, "%lf", &result->values[i++]) != -1);
 
@@ -163,12 +166,12 @@ cleanup:
 
 void csr_print(const csr_t *matrix)
 {
-	printf("%zu %zu (%zu)\n", matrix->nnz, matrix->m_total, matrix->m_local);
-	for (size_t i = 0; i < matrix->nnz; ++i) {
+	printf("%zu (%zu) %zu (%zu)\n", matrix->nnz_total, matrix->nnz_local, matrix->m_total, matrix->m_local);
+	for (size_t i = 0; i < matrix->nnz_local; ++i) {
 		printf("%lf ", matrix->values[i]);
 	}
 	printf("\n");
-	for (size_t i = 0; i < matrix->nnz; ++i) {
+	for (size_t i = 0; i < matrix->nnz_local; ++i) {
 		printf("%zu ", matrix->col_indices[i]);
 	}
 	printf("\n");

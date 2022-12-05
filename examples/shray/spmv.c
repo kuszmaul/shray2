@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 	TIME(duration, steady_state(matrix, vector, out, iterations););
 
 	if (ShrayOutput) {
-	    printf("%lf\n", matrix->nnz * 2.0 / 1000000000 / duration);
+	    printf("%lf\n", matrix->nnz_total * 2.0 / 1000000000 / duration);
 	}
 
 	ShrayFree(out);

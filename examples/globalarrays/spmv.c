@@ -115,7 +115,7 @@ int main(int argc, char **argv)
 	TIME(duration, steady_state(matrix, g_vector, g_out, iterations););
 
 	if (GA_Nodeid() == 0) {
-	    printf("%lf\n", matrix->nnz * 2.0 / 1000000000 / duration);
+	    printf("%lf\n", matrix->nnz_total * 2.0 / 1000000000 / duration);
 	}
 
 	GA_Destroy(g_vector);
