@@ -8,6 +8,7 @@
 #include <ga.h>
 #include <mpi.h>
 #include <sys/param.h>
+#include <macdecls.h>
 
 void init(int g_a)
 {

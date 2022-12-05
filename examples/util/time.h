@@ -1,5 +1,5 @@
-#ifndef CSR__GUARD
-#define CSR__GUARD
+#ifndef TIME__GUARD
+#define TIME__GUARD
 
 #include <sys/time.h>
 
