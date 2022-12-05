@@ -16,18 +16,19 @@ foreach(suffix
 
 	foreach(file
 			2dstencil
-            2dstencilAuto
-            bandwidth
+			2dstencilAuto
+			bandwidth
 			matrix
-            matrixAuto
+			matrixAuto
 			matrix_mt
 			nbody
-            nbodyAuto
+			nbodyAuto
 			nbody_mt
 			random
 			reduce
-            segfault
-            sync)
+			segfault
+			sync
+			spmv)
 		set(SHRAY_TARGET "${PROJECT_NAME}${suffix}")
 		set(EXAMPLE_TARGET "${file}${suffix}")
 
