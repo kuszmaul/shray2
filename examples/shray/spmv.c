@@ -45,8 +45,8 @@ int main(int argc, char **argv)
 {
 	ShrayInit(&argc, &argv);
 
-	if (argc != 4) {
-		fprintf(stderr, "Usage: FILE n iterations\n");
+	if (argc != 3) {
+		fprintf(stderr, "Usage: FILE iterations\n");
 		ShrayFinalize(1);
 	}
 
@@ -56,26 +56,17 @@ int main(int argc, char **argv)
 		ShrayFinalize(1);
 	}
 
-	size_t n = atoll(argv[2]);
-	size_t iterations = atoll(argv[3]);
-	if (n != matrix->n) {
-		fprintf(stderr, "Given vector (%zu) and matrix (%zu (%zu) x %zu) differ in size\n",
-				n,
-				matrix->m_total,
-				matrix->m_local,
-				matrix->n);
-		ShrayFinalize(1);
-	}
+	size_t iterations = atoll(argv[2]);
 
-	double *vector = ShrayMalloc(n, n * sizeof(double));
+	double *vector = ShrayMalloc(matrix->n, matrix->n * sizeof(double));
 	double *out = ShrayMalloc(matrix->m_total, matrix->m_total * sizeof(double));
 
-	init(vector, n);
+	init(vector, matrix->n);
 	ShraySync(vector);
 
 	double duration;
 
-	TIME(duration, steady_state(matrix, vector, out, n, iterations););
+	TIME(duration, steady_state(matrix, vector, out, matrix->n, iterations););
 
 	if (ShrayOutput) {
 	    printf("%lf\n", matrix->nnz * 2.0 / 1000000000 / duration);
