@@ -39,7 +39,8 @@ foreach(suffix
 			PRIVATE
 				${SHRAY_TARGET}
 				BLAS::BLAS
-				cinterface)
+				cinterface
+				util)
 		target_compile_definitions("${EXAMPLE_TARGET}"
 			PRIVATE
 				${EXTRA_DEFINES})
