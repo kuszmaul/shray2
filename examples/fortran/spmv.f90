@@ -73,12 +73,12 @@ program main
     use CSR_SPMV
     implicit none
 
-    integer :: iterations
+    integer :: iterations, t
     ! File handles
     integer :: info_io, row_io, column_io, values_io
     ! Timing
     integer :: cpu_count, cpu_count2, count_rate, count_max
-    integer(KIND=8) :: nz
+    integer(KIND=8) :: nz[*], totalNz
     character(len=12), dimension(:), allocatable :: args(:)
     character(len=100) :: numberString, info, row, column, values, filename
     type(CSRMatrix) :: mat
@@ -125,8 +125,13 @@ program main
 
     call system_clock(cpu_count2, count_rate, count_max)
 
-    ! In seconds because the total number of non-zeroes is not known
+    totalNz = 0;
+    do t = 1, num_images()
+        totalNz = totalNz + nz[t]
+    end do
+
     if (this_image() .eq. 1) then
-        write (*, *) 'This took this many seconds: ', real(cpu_count2 - cpu_count) / count_rate
+        write (*, *) 2.0 * real(totalNz) / 1000000000.0 / &
+            (real(cpu_count2 - cpu_count) / count_rate)
     end if
 end program main

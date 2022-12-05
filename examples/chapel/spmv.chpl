@@ -2,7 +2,7 @@ use IO;
 use BlockDist;
 use Time;
 
-config const fileName = "cage3.mtx";
+config const fileName = "cage11.mtx";
 config const iterations = 10;
 
 record CSRMatrix {
@@ -67,6 +67,7 @@ proc main()
   var m: int;
   var n: int;
   var nz: int;
+  var allNzs: [1..numLocales] int;
 
   if (!infoChannel.read(m)) then
     writeln("IO error\n");
@@ -81,6 +82,7 @@ proc main()
   mat.m = m;
   mat.n = n;
   mat.nz = nz;
+  allNzs[here.id + 1] = nz;
 
 
   var valuesName = fileName + "_values" + (here.id + 1) : string;
@@ -139,5 +141,5 @@ proc main()
 
   watch.stop();
 
-  stdout.writeln(watch.elapsed(), '\n');
+  stdout.writeln(2.0 * (+ reduce allNzs) / 1000000000.0 / watch.elapsed(), '\n');
 }
