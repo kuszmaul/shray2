@@ -26,23 +26,19 @@ SHRAYAPPS = $(wildcard examples/shray/*.c)
 SHRAY = $(patsubst examples/shray/%.c, bin/shray/%, $(SHRAYAPPS))
 
 all: $(SHRAY) $(MPI) $(UPC) $(FORTRAN) $(CHAPEL)
-.PHONY: all clean
+.PHONY: all clean cleanShray
 
 release:
 	$(RM) bin/shray/*
 	make $(SHRAY)
 
-debug: FLAGS += -DDEBUG -g -fsanitize=undefined
+debug: CFLAGS += -DDEBUG -g -fsanitize=undefined
 debug: LFLAGS += -g -fsanitize=undefined
-debug:
-	$(RM) bin/shray/*
-	make $(SHRAY)
+debug: cleanShray $(SHRAY)
 
-profile: FLAGS += -DPROFILE -pg
+profile: CFLAGS += -DPROFILE -pg
 profile: LFLAGS += -pg
-profile:
-	$(RM) bin/shray/*
-	make $(SHRAY)
+profile: cleanShray $(SHRAY)
 
 bin/shray/shray.o: src/shray.c include/shray2/shray.h src/shray.h
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(CFLAGS) -c $< -o $@
@@ -51,7 +47,7 @@ bin/shray/queue.o: src/queue.c src/queue.h
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(CFLAGS) -c $< -o $@
 
 bin/shray/%.o: src/%.c src/%.h
-	$(CC) $(FLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: examples/shray/%.c
 	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(CFLAGS) -c $< -o $@
@@ -73,10 +69,13 @@ bin/upc/%: examples/upc/%.c bin/csr.o
 	$(UPCC) -g $^ -o $@ $(BLAS)
 
 bin/csr.o: examples/util/csr.c examples/util/csr.h
-	$(CC) $(FLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 bin/globalarrays/%: examples/globalarrays/%.c bin/csr.o
-	$(MPICC) $(FLAGS) $^ -o $@ $(LFLAGS) $(FORTRANLIB)
+	$(MPICC) $(CFLAGS) $^ -o $@ $(LFLAGS) $(FORTRANLIB)
 
 clean:
 	$(RM) bin/shray/* bin/chapel/* bin/fortran/* bin/mpi/* bin/upc/* *.mod bin/csr.o
+
+cleanShray:
+	$(RM) bin/shray/*
