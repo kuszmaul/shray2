@@ -110,8 +110,8 @@ csr_t *csr_parse_local(const char *file, int rank)
 	size_t n_total = 0;
 	size_t nnz_local = 0;
 	size_t nnz_total = 0;
-	fscanf(info_file, "%zu %zu %zu", &m_local, &n_local, &nnz_local);
-	fscanf(org_file, "%zu %zu %zu", &m_total, &n_total, &nnz_total);
+	if (fscanf(info_file, "%zu %zu %zu", &m_local, &n_local, &nnz_local) != 3) exit(EXIT_FAILURE);
+	if (fscanf(org_file, "%zu %zu %zu", &m_total, &n_total, &nnz_total) != 3) exit(EXIT_FAILURE);
 
 	result = alloc_matrix(m_local, m_total, n_total, nnz_local, nnz_total);
 	if (!result) {

@@ -102,9 +102,6 @@ void random_fill(size_t n, int local_prob, int g_input, int g_output)
 
 int main(int argc, char **argv)
 {
-    int heap = 3000000;
-    int stack = 3000000;
-
     MPI_Init(&argc,&argv);
     GA_Initialize();
 
