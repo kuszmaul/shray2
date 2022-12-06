@@ -153,9 +153,8 @@ static inline void freeRAM(uintptr_t start, uintptr_t end)
 
     DBUG_PRINT("We free [%p, %p[", (void *)start, (void *)end);
 
-    void *dummy;
     MUNMAP_SAFE((void *)start, end - start);
-    MMAP_FIXED_SAFE(dummy, (void *)start, end - start, PROT_NONE);
+    MMAP_FIXED_SAFE((void *)start, end - start, PROT_NONE);
 }
 
 /* Simple binary search, assumes heap.allocs is sorted. Returns the index of the
@@ -313,7 +312,8 @@ static void handlePageFault(void *address)
                (entry->end - alloc->location) / ShrayPagesz);
 
         MREMAP_MOVE(start, toShadow(entry->start, alloc), entry->end - entry->start);
-        MMAP_FIXED_SAFE(start, toShadow(entry->start, alloc), entry->end - entry->start, PROT_WRITE);
+        MMAP_FIXED_SAFE(toShadow(entry->start, alloc), entry->end - entry->start,
+                PROT_READ | PROT_WRITE);
         BitmapSetOnes(alloc->local, (entry->start - alloc->location) / ShrayPagesz,
                 (entry->end - alloc->location) / ShrayPagesz);
     } else {
@@ -332,9 +332,11 @@ static void handlePageFault(void *address)
 
         DBUG_PRINT("Segfault is owned by node %d.", owner);
 
-        MPROTECT_SAFE((void *)roundedAddress, ShrayPagesz, PROT_READ | PROT_WRITE);
+        gasnet_get(alloc->shadowPage, owner, (void *)roundedAddress, ShrayPagesz);
 
-        gasnet_get((void *)roundedAddress, owner, (void *)roundedAddress, ShrayPagesz);
+        MREMAP_MOVE((void *)roundedAddress, alloc->shadowPage, ShrayPagesz);
+        MMAP_FIXED_SAFE(alloc->shadowPage, ShrayPagesz, PROT_READ | PROT_WRITE);
+
 
         DBUG_PRINT("We set page %zu to locally available.", pageNumber);
 
@@ -644,13 +646,16 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
             sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
     if (Shray_rank != 0) {
-        MMAP_FIXED_SAFE(location, location, totalSize + ShrayPagesz, PROT_NONE);
+        MMAP_FIXED_SAFE(location, totalSize + ShrayPagesz, PROT_NONE);
     }
 
     void *shadow;
     MMAP_SAFE(shadow, NULL, totalSize + ShrayPagesz, PROT_WRITE);
     DBUG_PRINT("We allocate shadow [%p, %p[", shadow,
             (void *)((uintptr_t)shadow + totalSize + ShrayPagesz));
+    void *shadowPage;
+    MMAP_SAFE(shadowPage, NULL, ShrayPagesz, PROT_WRITE);
+    DBUG_PRINT("We allocate shadow %p", shadowPage);
 
     /* Insert allocation into the heap, making sure allocs stays sorted. */
     heap.numberOfAllocs++;
@@ -674,6 +679,7 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     alloc->size = totalSize;
     alloc->bytesPerBlock = bytesPerBlock;
     alloc->shadow = shadow;
+    alloc->shadowPage = shadowPage;
 
     size_t segmentLength = endRead(alloc, Shray_rank) - startRead(alloc, Shray_rank);
 
@@ -787,9 +793,8 @@ static void DiscardGet(queue_entry_t *get, size_t index)
         gasnet_wait_syncnb(get->handle);
         uintptr_t start = (uintptr_t)toShadow(get->start, alloc);
         uintptr_t end = start + get->end - get->start;
-        void *dummy;
         MUNMAP_SAFE((void *)start, end - start);
-        MMAP_FIXED_SAFE(dummy, (void *)start, end - start, PROT_READ | PROT_WRITE);
+        MMAP_FIXED_SAFE((void *)start, end - start, PROT_READ | PROT_WRITE);
     }
 
     queue_remove_at(cache.prefetchCaches, index);

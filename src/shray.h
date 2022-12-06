@@ -37,6 +37,8 @@ typedef struct Allocation {
     Bitmap *prefetched;
     /* We put all the prefetched stuff here until it is remapped to the proper position. */
     void *shadow;
+    /* We put all the blocking fetched stuff here until it is remapped to the proper position. */
+    void *shadowPage;
     /* We need to know this when invalidating the cache for an allocation. */
     size_t usedMemory;
 } Allocation;
@@ -110,14 +112,14 @@ typedef struct PrefetchStruct {
         }                                                                               \
     }
 
-#define MMAP_FIXED_SAFE(variable, address, length, prot)                                \
+#define MMAP_FIXED_SAFE(address, length, prot)                                          \
     {                                                                                   \
-        variable = mmap(address, length, prot,                                          \
+        void *success = mmap(address, length, prot,                                     \
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);                        \
         DBUG_PRINT("%p = mmap(%p, %zu, %s, "                                            \
                 "MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);",                     \
-                variable, address, length, #prot);                                      \
-        if (variable == MAP_FAILED) {                                                   \
+                success, address, length, #prot);                                       \
+        if (success == MAP_FAILED) {                                                    \
             fprintf(stderr, "Line %d, [node %d]: ", __LINE__, Shray_rank);              \
             perror("mmap failed");                                                      \
             ShrayFinalize(1);                                                           \
