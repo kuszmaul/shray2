@@ -40,11 +40,11 @@ typedef struct
     uintptr_t address;
     size_t thread_index;
     int request;
-    enum WorkerState state;
+    volatile enum WorkerState state;
     shray_fn handler;
     worker_info_t info;
     pthread_t id;
-    int work;
+    volatile int work;
 } shray_worker_t;
 
 // TODO: move threading to its own file? */
@@ -860,6 +860,8 @@ void ShrayRunWorker(shray_fn handler, size_t n, void *args)
         worker->info.args = args;
         worker->info.start = start + i * workPerThread;
         worker->info.end = i == workerThreadCount - 1 ? end : worker->info.start + workPerThread;
+        DBUG_PRINT("Thread %zu does work on slabs [%zu, %zu[\n", i,
+                worker->info.start, worker->info.end);
         worker->state = WORKER_STATE_BUSY;
         worker->request = 0;
         worker->address = 0;

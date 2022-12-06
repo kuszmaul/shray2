@@ -28,9 +28,7 @@ SHRAY = $(patsubst examples/shray/%.c, bin/shray/%, $(SHRAYAPPS))
 all: $(SHRAY) $(MPI) $(UPC) $(FORTRAN) $(CHAPEL)
 .PHONY: all clean cleanShray
 
-release:
-	$(RM) bin/shray/*
-	make $(SHRAY)
+release: cleanShray $(SHRAY)
 
 debug: CFLAGS += -DDEBUG -g -fsanitize=undefined
 debug: LFLAGS += -g -fsanitize=undefined
