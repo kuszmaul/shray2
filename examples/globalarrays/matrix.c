@@ -68,25 +68,6 @@ void matmul(int g_a, int g_b, int g_c, size_t n)
 	NGA_Release(g_c, lo_C, hi_C);
 }
 
-void init_2d(int g_a, double val)
-{
-	int rank = GA_Nodeid();
-	int lo[2], hi[2], ld[2];
-	double *a;
-
-	NGA_Distribution(g_a, rank, lo, hi);
-	NGA_Access(g_a, lo, hi, &a, ld);
-
-	for (int i = lo[0]; i <= hi[0]; ++i) {
-		for (int j = lo[1]; j <= hi[1]; ++j) {
-			int k = i * ld[0] + j;
-			a[k] = val;
-		}
-	}
-
-	NGA_Release(g_a, lo, hi);
-}
-
 int main(int argc, char **argv)
 {
 	int heap = 400000000;
@@ -122,13 +103,14 @@ int main(int argc, char **argv)
 		GA_Error("Could not allocate matrix C", 1);
 	}
 
-	init_2d(g_a, 1);
-	init_2d(g_b, 1);
-	init_2d(g_c, 0);
+	double one = 1.0;
+	NGA_Fill(g_a, &one);
+	NGA_Fill(g_b, &one);
+	NGA_Zero(g_c);
 	GA_Sync();
 
 	double duration;
-	TIME(duration, matmul(g_a, g_b, g_c, n););
+	TIME(duration, matmul(g_a, g_b, g_c, n); GA_Sync(););
 
 	if (GA_Nodeid() == 0) {
 	    printf("%lf\n", 2.0 * n * n * n / 1000000000 / duration);
