@@ -63,13 +63,7 @@ void matmul(double *A, shared double *B, double *C, size_t n)
     for (int t = 0; t < p; t++) {
         /* This is where the memory scalability comes from. We grab one block of
          * B at a time, overwriting the block we are done with every time. */
-        upc_memget(Bt, &B[t * n / p * n], n / p * n);
-        for (size_t i = 0; i < n / p; i++) {
-            for (size_t j = 0; j < n; j++) {
-                if (B[i * n + j] != 1.0) exit(EXIT_FAILURE);
-                if (A[i * n + j] != 1.0) exit(EXIT_FAILURE);
-            }
-        }
+        upc_memget(Bt, &B[t], n / p * n * sizeof(double));
 
         /* blas can operate on subarrays, so no need to pack A[s][t].
          * A[s][t] is an n / p x n / p matrix, and a submatrix of A which
@@ -77,7 +71,6 @@ void matmul(double *A, shared double *B, double *C, size_t n)
          * an n / p x n matrix. */
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                 n / p, n, n / p, 1.0, &A[t * n / p], n, Bt, n, 1.0, C, n);
-        printf("Iteration %d: %lf\n", t, C[0]);
     }
 
     free(Bt);
@@ -132,6 +125,12 @@ int main(int argc, char **argv)
 	} else {
 	    fprintf(stderr, "Failure!\n");
 	}
+
+    free(A);
+    free(C);
+    if (MYTHREAD == 0) {
+        upc_free(B);
+    }
 
 	exit(EXIT_SUCCESS);
 }

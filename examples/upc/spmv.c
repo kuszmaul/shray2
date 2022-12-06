@@ -94,5 +94,10 @@ int main(int argc, char **argv)
 	    printf("%lf\n", matrix->nnz_total * 2.0 / 1000000000 / duration);
 	}
 
+    if (MYTHREAD == 0) {
+        upc_free(vector);
+        upc_free(out);
+    }
+
 	return EXIT_SUCCESS;
 }

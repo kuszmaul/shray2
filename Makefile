@@ -1,4 +1,4 @@
-include SLmake.inc
+include SHRAYmake.inc
 include $(GASNET_CONDUIT)
 
 CFLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic \
@@ -27,6 +27,10 @@ SHRAY = $(patsubst examples/shray/%.c, bin/shray/%, $(SHRAYAPPS))
 
 all: $(SHRAY) $(MPI) $(UPC) $(FORTRAN) $(CHAPEL)
 .PHONY: all clean
+
+release:
+	$(RM) bin/shray/*
+	make $(SHRAY)
 
 debug: FLAGS += -DDEBUG -g -fsanitize=undefined
 debug: LFLAGS += -g -fsanitize=undefined
