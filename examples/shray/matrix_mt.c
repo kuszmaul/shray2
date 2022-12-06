@@ -39,15 +39,6 @@ void matmul_mt(worker_info_t *info)
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
             end - start, n, n / p, 1.0, &A[start * n + t * n / p], n,
             &B[t * n / p * n], n, 1.0, &C[start * n], n);
-
-    for (size_t i = 0; i < n / p; i++) {
-        for (size_t j = 0; j < n; j++) {
-            if (B[t * n / p * n + i * n + j] != 1.0) {
-                printf("Bt[%zu][%zu] != 1.0", i, j);
-                ShrayFinalize(1);
-            }
-        }
-    }
 }
 
 void matmul(double *A, double *B, double *C, size_t n)
