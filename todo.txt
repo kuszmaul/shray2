@@ -1,2 +1,2 @@
-1. GA matrix-multiplication
+1. Find out why a write using NGA_Access on large arrays fails (GA)
 2. Update benchmark script
