@@ -72,12 +72,6 @@ void matmul(double *A, double *B, double *C, size_t n)
         matrixInfo.t = t;
         ShrayRunWorker(matmul_mt, n, &matrixInfo);
 
-        for (size_t i = 0; i < n; i++) {
-            for (size_t j = 0; j < n; j++) {
-
-            }
-        }
-
         ShrayDiscard(B + n / p * n * t, n / p * n * sizeof(double));
     }
 }

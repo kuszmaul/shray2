@@ -14,18 +14,15 @@ const BlockSpace = Space dmapped Block(boundingBox=Space);
 var A: [BlockSpace] real = 1;
 var B: [BlockSpace] real = 1;
 var C: [BlockSpace] real;
-var Al: [1..n / numLocales, 1..n / numLocales] real;
-var Bl: [1..n / numLocales, 1..n] real;
 
 var watch: Timer;
 watch.start();
 
-for l in 1..numLocales do
-    Al = A[A.localSubdomain()](.., 1..n / numLocales);
-    Bl = B[B.localSubdomain()];
-    C[C.localSubdomain()] += dot(Al, Bl);
+for l in 1..numLocales {
+    C[C.localSubdomain()] += dot(A[A.localSubdomain()](.., 1..n / numLocales),
+        B[B.localSubdomain(Locales[l])]);
+}
 
 watch.stop();
-stderr.writeln('Anti-optimisation number: ', + reduce C, '\n');
 
 stdout.writeln(2.0 * n * n * n / watch.elapsed() / 1000000000, '\n');
