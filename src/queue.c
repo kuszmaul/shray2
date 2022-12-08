@@ -37,6 +37,7 @@ queue_t *queue_alloc(size_t size)
 	}
 
 	queue->size = size;
+    queue->actualSize = 0;
 	queue_clear(queue);
 	return queue;
 }
@@ -50,6 +51,14 @@ void queue_free(queue_t *queue)
 void queue_queue(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, gasnet_handle_t handle)
 {
 	queue_entry_t *free_entry = &queue->data[queue->free_start];
+    queue->actualSize++;
+    if (queue->actualSize > queue->size) {
+        queue->size *= 2;
+        queue->data = realloc(queue->data, queue->size * sizeof(queue_entry_t));
+        if (queue->data == NULL) {
+            fprintf(stderr, "Increasing the queue size failed\n");
+        };
+    }
 
 	free_entry->alloc = alloc;
 	free_entry->start = start;
@@ -95,11 +104,6 @@ queue_entry_t *queue_find(const queue_t *queue, uintptr_t address)
 	return NULL;
 }
 
-queue_entry_t queue_dequeue(queue_t *queue)
-{
-	return queue_remove_at(queue, queue->data_start);
-}
-
 queue_entry_t queue_remove_at(queue_t *queue, size_t index)
 {
 	queue_entry_t *entry = &queue->data[index];
@@ -133,11 +137,6 @@ queue_entry_t queue_remove_at(queue_t *queue, size_t index)
 	}
 
 	return *entry;
-}
-
-int queue_empty(const queue_t *queue)
-{
-	return queue->data_start == NOLINK;
 }
 
 void queue_reset(queue_t *queue)

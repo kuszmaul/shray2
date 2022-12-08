@@ -22,7 +22,10 @@ typedef struct
 typedef struct
 {
 	queue_entry_t *data;
+    /* We have room for this many elements in the queue. */
 	size_t size;
+    /* This many elements are actually present in the queue. */
+    size_t actualSize;
 	size_t data_start;
 	size_t data_end;
 
@@ -39,11 +42,7 @@ void queue_queue(queue_t *queue, void *alloc, uintptr_t start,
 
 queue_entry_t *queue_find(const queue_t *queue, uintptr_t address);
 
-queue_entry_t queue_dequeue(queue_t *queue);
-
 queue_entry_t queue_remove_at(queue_t *queue, size_t index);
-
-int queue_empty(const queue_t *queue);
 
 void queue_reset(queue_t *queue);
 

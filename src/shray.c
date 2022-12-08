@@ -611,7 +611,7 @@ void ShrayInit(int *argc, char ***argv)
 
     cache.usedMemory = 0;
     cache.autoCaches = ringbuffer_alloc(cache.maximumMemory / ShrayPagesz);
-    cache.prefetchCaches = queue_alloc(cache.maximumMemory / ShrayPagesz);
+    cache.prefetchCaches = queue_alloc(5);
     if (!cache.autoCaches || !cache.prefetchCaches) {
         fprintf(stderr, "Could not allocate cache buffers\n");
         gasnet_exit(1);
