@@ -30,8 +30,8 @@ all: $(SHRAY) $(MPI) $(UPC) $(FORTRAN) $(CHAPEL)
 
 release: cleanShray $(SHRAY)
 
-debug: CFLAGS += -DDEBUG -g -fsanitize=undefined
-debug: LFLAGS += -g -fsanitize=undefined
+debug: CFLAGS += -DDEBUG -g -fsanitize=undefined -fbounds-check -fsanitize=address
+debug: LFLAGS += -g -fsanitize=undefined -fbounds-check -fsanitize=address
 debug: cleanShray $(SHRAY)
 
 profile: CFLAGS += -DPROFILE -pg

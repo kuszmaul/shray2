@@ -15,6 +15,7 @@ typedef struct
     gasnet_handle_t handle;
     /* True iff gasnet_wait_syncnb(handle) has been called. */
     int gottem;
+    /* Index of the previous / next entry in the linked list. */
 	size_t prev;
 	size_t next;
 } queue_entry_t;
@@ -26,9 +27,12 @@ typedef struct
 	size_t size;
     /* This many elements are actually present in the queue. */
     size_t actualSize;
+
+    /* data contains two linked lists: one for the data, and one for the free
+     * entries. The first data element is stored at data[data_start], the first free
+     * at data[free_start], etc. The data queue is circular. */
 	size_t data_start;
 	size_t data_end;
-
 	size_t free_start;
 	size_t free_end;
 } queue_t;

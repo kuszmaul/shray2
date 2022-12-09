@@ -48,17 +48,35 @@ void queue_free(queue_t *queue)
 	free(queue);
 }
 
+static void double_size(queue_t *queue)
+{
+    queue->size *= 2;
+    queue->data = realloc(queue->data, queue->size * sizeof(queue_entry_t));
+    if (queue->data == NULL) {
+        fprintf(stderr, "Increasing the queue size failed\n");
+    };
+
+    /* Append the new space to the free list. */
+    queue->data[queue->free_end].next = queue->size / 2 - 1;
+    queue->data[queue->size / 2 - 1].prev = queue->free_end;
+    queue->data[queue->size / 2 - 1].next = queue->size / 2;
+    for (size_t i = queue->size / 2; i < queue->size - 1; ++i) {
+        queue->data[i].prev = i - 1;
+        queue->data[i].next = i + 1;
+    }
+    queue->data[queue->size - 1].prev = queue->size - 2;
+    queue->data[queue->size - 1].next = NOLINK;
+    queue->free_end = queue->size - 1;
+}
+
 void queue_queue(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, gasnet_handle_t handle)
 {
-	queue_entry_t *free_entry = &queue->data[queue->free_start];
     queue->actualSize++;
-    if (queue->actualSize > queue->size) {
-        queue->size *= 2;
-        queue->data = realloc(queue->data, queue->size * sizeof(queue_entry_t));
-        if (queue->data == NULL) {
-            fprintf(stderr, "Increasing the queue size failed\n");
-        };
-    }
+    /* + 1 so the free list can never be empty */
+    if (queue->actualSize + 1 > queue->size) double_size(queue);
+
+    /* We canibalise the first free entry */
+	queue_entry_t *free_entry = &queue->data[queue->free_start];
 
 	free_entry->alloc = alloc;
 	free_entry->start = start;
@@ -81,10 +99,6 @@ void queue_queue(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, ga
 
 	queue->data_end = queue->free_start;
 	queue->free_start = free_entry->next;
-
-	if (queue->free_start == NOLINK) {
-		queue->free_end = NOLINK;
-	}
 
 	free_entry->next = NOLINK;
 }
