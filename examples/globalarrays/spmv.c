@@ -10,22 +10,6 @@
 #include <sys/param.h>
 #include <macdecls.h>
 
-void init(int g_a)
-{
-	int rank = GA_Nodeid();
-	int lo[1], hi[1], ld[1];
-	double *a;
-
-	NGA_Distribution(g_a, rank, lo, hi);
-	NGA_Access(g_a, lo, hi, &a, ld);
-
-	for (int i = lo[0]; i <= hi[0]; ++i) {
-		a[i] = i;
-	}
-
-	NGA_Release(g_a, lo, hi);
-}
-
 void spmv(csr_t *matrix, int g_vector, int g_out)
 {
 	int rank = GA_Nodeid();
@@ -108,7 +92,8 @@ int main(int argc, char **argv)
 		GA_Error("Could not allocate output array", 1);
 	}
 
-	init(g_vector);
+	double one = 1.0;
+	GA_Fill(g_vector, &one);
 	GA_Sync();
 
 	double duration;
