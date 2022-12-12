@@ -1,9 +1,11 @@
 # example fortran binaries
 foreach(file
+		2dstencil
 		matrix
 		nbody
-		2dstencil
-        random)
+		nbodyUnblocked
+		random
+		spmv)
 	set(EXAMPLE_TARGET "${file}_fortran")
 
 	add_executable("${EXAMPLE_TARGET}"
@@ -14,8 +16,8 @@ foreach(file
 		PRIVATE
 			${PROJECT_FLAGS}
 			-fcoarray=lib)
-	target_link_options("${EXAMPLE_TARGET}"
+	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
-			${PROJECT_FLAGS}
+			${PROJECT_LINKER_FLAGS}
 			-lcaf_openmpi)
 endforeach(file)
