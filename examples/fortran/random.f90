@@ -93,8 +93,7 @@ program main
         write (*, *) real(cpu_count2 - cpu_count) / count_rate
     end if
 
-
-    if (res .eq. n) then
+    if (abs(res - n) .lt. 1.0) then
         write (0, *) "Success!"
     else
         write (0, *) "Failure!"
