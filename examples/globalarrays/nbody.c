@@ -126,12 +126,10 @@ void accelerateAll(int g_accel, int g_pos, int g_masses, int n)
 		for (int j = 0; j < mass_elems; ++j) {
 			int local_offset = j * ld_accel[0];
 			/* Go through the bodies in the retrieved chunk */
-			double *tmp = pos_local + local_offset;
 
 			for (int k = 0; k < mass_elems; ++k) {
 				int remote_offset = k * ld_remote_pos[0];
 
-				tmp = pos_remote + remote_offset;
 
 				accelerate(accel_local + local_offset,
 					   pos_local + local_offset,
@@ -140,7 +138,6 @@ void accelerateAll(int g_accel, int g_pos, int g_masses, int n)
 			}
 		}
 	}
-fin:
 
 	NGA_Put(g_pos, lo_pos, hi_pos, pos_local, ld_pos);
 	NGA_Put(g_accel, lo_accel, hi_accel, accel_local, ld_accel);

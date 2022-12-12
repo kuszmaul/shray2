@@ -364,6 +364,8 @@ static void handleWorkerFault(void *address)
 
 static void SegvHandler(int sig, siginfo_t *si, void *unused)
 {
+    (void)sig;
+    (void)unused;
     SEGFAULTCOUNT
     if (pthread_self() == memoryThread) {
         /* Single-threaded case */
@@ -376,13 +378,15 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
 
 static void Usr1Handler(int sig, siginfo_t *si, void *unused)
 {
+    (void)sig;
+    (void)si;
+    (void)unused;
     if (pthread_self() == memoryThread) {
         fprintf(stderr, "Memory thread received unexpected USR1");
         ShrayFinalize(1);
     }
 
-    shray_worker_t *worker = pthread_getspecific(key);
-    DBUG_PRINT("Received SIGUSR1 (worker %zu)", worker->thread_index);
+    DBUG_PRINT("Received SIGUSR1 (worker %zu)", ((shray_worker_t*)pthread_getspecific(key))->thread_index);
 }
 
 static void registerHandlers(void)
