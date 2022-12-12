@@ -11,5 +11,8 @@ add_subdirectory(chapel)
 # fortran examples
 add_subdirectory(fortran)
 
+# global arrays examples
+add_subdirectory(globalarrays)
+
 # shray examples
 add_subdirectory(shray)

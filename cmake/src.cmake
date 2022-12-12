@@ -36,7 +36,9 @@ if(${SANITISE})
 	include(sanitise)
 endif()
 
-include(gasnet)
+set(MPI_EXECUTABLE_SUFFIX ".openmpi")
+find_package(MPI REQUIRED COMPONENTS C)
+find_package(GASNet REQUIRED)
 
 # create the common C target
 add_library(cinterface INTERFACE)

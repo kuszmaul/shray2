@@ -18,6 +18,8 @@
 # necessary interface properties.  The following options determine which
 # GASNet backend configuration get's used:
 #
+# Assumes MPI::MPI_C interface is available.
+#
 # GASNet_CONDUIT   - Communication conduit to use
 # GASNet_THREADING - Threading mode to use
 #
@@ -157,7 +159,6 @@ function(_GASNet_create_component_target _GASNet_MAKEFILE COMPONENT_NAME)
   endforeach()
   if(_GASNet_LD MATCHES "^(/.*/)?mpi[^/]*" AND NOT (_GASNet_LD STREQUAL CMAKE_C_COMPILER))
     set(MPI_C_COMPILER ${_GASNet_LD})
-    find_package(MPI REQUIRED COMPONENTS C)
     list(APPEND COMPONENT_DEPS ${MPI_C_LIBRARIES})
   endif()
   add_library(GASNet::${COMPONENT_NAME} UNKNOWN IMPORTED)
