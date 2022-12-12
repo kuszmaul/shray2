@@ -1,5 +1,3 @@
-find_package(BLAS REQUIRED)
-
 # example binaries
 foreach(suffix
 		""

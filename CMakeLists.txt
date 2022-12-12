@@ -21,7 +21,7 @@ option(TEST "Build tests." OFF)
 unset(PROJECT_LANGUAGES)
 
 if(${SRC})
-	set(PROJECT_LANGUAGES ${PROJECT_LANGUAGES} C Fortran)
+	set(PROJECT_LANGUAGES ${PROJECT_LANGUAGES} C Fortran Chapel)
 endif()
 
 project(shray2
