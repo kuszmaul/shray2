@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-/* FIXME I vaguely remember using __USE_GNU was wrong, but not why. */
-#define __USE_GNU
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -44,7 +42,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    size_t numberOfPages = atol(argv[1]) / 2 * 2;
+    size_t numberOfPages = atoll(argv[1]) / 2 * 2;
 
     int pagesz = sysconf(_SC_PAGE_SIZE);
     if (pagesz == -1) {
@@ -52,7 +50,7 @@ int main(int argc, char **argv)
     }
 
     void *buffer;
-    MMAP_SAFE(buffer, mmap(NULL, numberOfPages * pagesz, PROT_READ | PROT_WRITE, 
+    MMAP_SAFE(buffer, mmap(NULL, numberOfPages * pagesz, PROT_READ | PROT_WRITE,
                 MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
 
     double duration1;
@@ -65,17 +63,17 @@ int main(int argc, char **argv)
                     -1, 0));
     });
 
-    TIME(duration2, 
+    TIME(duration2,
     for (size_t i = 0; i < numberOfPages; i++) {
         MUNMAP_SAFE(buffer,  numberOfPages * pagesz);
-        MMAP_SAFE(buffer, mmap(buffer, pagesz * numberOfPages, PROT_NONE, 
+        MMAP_SAFE(buffer, mmap(buffer, pagesz * numberOfPages, PROT_NONE,
                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
     });
 
-    printf("mmap/munmap freeing one page %zu times took %lf ns. per page (%d bytes).\n", 
+    printf("mmap/munmap freeing one page %zu times took %lf ns. per page (%d bytes).\n",
             numberOfPages, 1000000000.0 * duration1 / numberOfPages, pagesz);
-    printf("mmap/munmap freeing %zu pages %zu times took %lf ns. per page (%d bytes).\n", 
-            numberOfPages, numberOfPages, 
+    printf("mmap/munmap freeing %zu pages %zu times took %lf ns. per page (%d bytes).\n",
+            numberOfPages, numberOfPages,
             1000000000.0 * duration2 / numberOfPages / numberOfPages, pagesz);
 
     return EXIT_SUCCESS;

@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-/* FIXME I vaguely remember using __USE_GNU was wrong, but not why. */
-#define __USE_GNU
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -24,7 +22,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    size_t size = atol(argv[1]) * 1000 * 1000 / sizeof(double) * sizeof(double);
+    size_t size = atoll(argv[1]) * 1000 * 1000 / sizeof(double) * sizeof(double);
 
     double *numbers = malloc(size);
     for (size_t i = 0; i < size / sizeof(double); i++) {
@@ -33,13 +31,13 @@ int main(int argc, char **argv)
 
     double duration;
 
-    TIME(duration, 
+    TIME(duration,
     for (size_t i = 0; i < size / sizeof(double); i++) {
         numbers[i] *= 2;
     }
     );
 
-    printf("We have a bandwidth of %lf GB/s (%lf ns per page)\n", 
+    printf("We have a bandwidth of %lf GB/s (%lf ns per page)\n",
             size / 1000000000.0 / duration, 1000000000.0 * duration / size * 4096);
 
     return EXIT_SUCCESS;

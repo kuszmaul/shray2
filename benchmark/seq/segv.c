@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-/* FIXME I vaguely remember using __USE_GNU was wrong, but not why. */
-#define __USE_GNU
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -51,8 +49,9 @@ size_t counter = 0;
 
 void SegvHandler(int sig, siginfo_t *si, void *unused)
 {
+    (void)sig;
+    (void)unused;
     void *address = si->si_addr;
-    void *roundedAddress = (void *)((uintptr_t)address / 4096 * 4096);
 
     MPROTECT_SAFE(address, 4096, PROT_READ | PROT_WRITE);
 
@@ -79,7 +78,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    size_t numberOfPages = atol(argv[1]) / 2 * 2;
+    size_t numberOfPages = atoll(argv[1]) / 2 * 2;
 
     registerHandler();
 

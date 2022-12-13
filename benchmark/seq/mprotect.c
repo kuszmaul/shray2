@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-/* FIXME I vaguely remember using __USE_GNU was wrong, but not why. */
-#define __USE_GNU
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -48,7 +46,7 @@ int main(int argc, char **argv)
         perror("Querying system page size failed.");
     }
 
-    size_t numberOfPages = atol(argv[1]);
+    size_t numberOfPages = atoll(argv[1]);
 
     void *buffer;
 
@@ -60,7 +58,7 @@ int main(int argc, char **argv)
 
     TIME(duration1,
             for (size_t i = 0; i < numberOfPages; i++) {
-                MPROTECT_SAFE((void *)((uintptr_t)buffer + i * pagesz), 
+                MPROTECT_SAFE((void *)((uintptr_t)buffer + i * pagesz),
                         pagesz, PROT_READ | PROT_WRITE);
             }
         );
@@ -73,10 +71,10 @@ int main(int argc, char **argv)
             }
         );
 
-    printf("Protecting one page %zu times took %lf ns. per page (%d bytes).\n", 
+    printf("Protecting one page %zu times took %lf ns. per page (%d bytes).\n",
             numberOfPages, 1000000000.0 * duration1 / numberOfPages, pagesz);
-    printf("Remapping %zu pages %zu times took %lf ns. per page (%d bytes).\n", 
-            numberOfPages, numberOfPages, 
+    printf("Remapping %zu pages %zu times took %lf ns. per page (%d bytes).\n",
+            numberOfPages, numberOfPages,
             1000000000.0 * duration2 / numberOfPages / numberOfPages, pagesz);
 
     return EXIT_SUCCESS;
