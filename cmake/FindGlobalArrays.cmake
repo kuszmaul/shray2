@@ -18,6 +18,7 @@
 # SCALAPCK_TYPE             - Directory to use when searching for SCALAPCK libs.
 #                             if specified then this search path will be used.
 
+find_package(LAPACK REQUIRED)
 find_package(BLAS REQUIRED)
 
 if(NOT GlobalArrays_FOUND)
@@ -79,6 +80,7 @@ target_link_libraries(GlobalArrays::GlobalArrays
 		${LIBGA_PATH}
 		BLAS::BLAS
 		MPI::MPI_C
+		LAPACK::LAPACK
 		m
 		${LIBARMCI_PATH}
 		${LIBGFORTRAN_PATH}

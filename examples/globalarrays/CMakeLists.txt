@@ -5,7 +5,6 @@ foreach(file
 		matrix
 		nbody
 		spmv)
-	set(SHRAY_TARGET "${PROJECT_NAME}")
 	set(EXAMPLE_TARGET "${file}_globalarrays")
 
 	add_executable("${EXAMPLE_TARGET}"
