@@ -63,7 +63,7 @@ bin/chapel/%: examples/chapel/%.chpl
 bin/mpi/%: examples/mpi/%.c
 	$(MPICC) $< $(CFLAGS) -o $@ $(LFLAGS)
 
-bin/upc/%: examples/upc/%.c bin/csr.o
+bin/upc/%: examples/upc/%.upc bin/csr.o
 	$(UPCC) -g $^ -o $@ $(BLAS)
 
 bin/csr.o: examples/util/csr.c examples/util/csr.h

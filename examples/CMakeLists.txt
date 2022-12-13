@@ -19,3 +19,6 @@ add_subdirectory(mpi)
 
 # shray examples
 add_subdirectory(shray)
+
+# upc examples
+add_subdirectory(upc)
