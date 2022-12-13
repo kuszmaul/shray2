@@ -57,6 +57,7 @@ endif()
 
 if(${EXAMPLES})
 	add_subdirectory(examples)
+	add_subdirectory(benchmark)
 endif()
 
 if(${TEST})
