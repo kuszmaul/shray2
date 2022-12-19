@@ -12,6 +12,7 @@ set(PROJECT_FLAGS
 	-ffast-math
 	-fno-math-errno
 	-O3
+	-fno-unswitch-loops
 	)
 
 # set warning flags for debug
