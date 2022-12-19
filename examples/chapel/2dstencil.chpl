@@ -45,4 +45,5 @@ watch.start();
 input = stencil(input);
 watch.stop();
 
-stdout.writeln(9.0 * (n - 2) * (n - 2) * iterations / watch.elapsed() / 1000000000.0, '\n');
+if (here.id == 0) then
+    stdout.writeln(9.0 * (n - 2) * (n - 2) * iterations / watch.elapsed() / 1000000000.0, '\n');

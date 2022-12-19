@@ -25,4 +25,5 @@ for l in 1..numLocales {
 
 watch.stop();
 
-stdout.writeln(2.0 * n * n * n / watch.elapsed() / 1000000000, '\n');
+if (here.id == 0) then
+  stdout.writeln(2.0 * n * n * n / watch.elapsed() / 1000000000, '\n');

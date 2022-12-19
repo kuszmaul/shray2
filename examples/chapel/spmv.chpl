@@ -141,5 +141,6 @@ proc main()
 
   watch.stop();
 
-  stdout.writeln(2.0 * (+ reduce allNzs) / 1000000000.0 / watch.elapsed(), '\n');
+  if (here.id == 0) then
+    stdout.writeln(2.0 * (+ reduce allNzs) / 1000000000.0 / watch.elapsed(), '\n');
 }

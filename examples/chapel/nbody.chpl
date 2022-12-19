@@ -51,6 +51,7 @@ watch.start();
 positions = advance(positions, velocities, masses, 0.1, iterations);
 
 watch.stop();
-stderr.writeln('Anti-optimisation number: ', + reduce velocities, '\n');
 
-stdout.writeln(3.0 * 16 * n * n / 1000000000.0 / watch.elapsed(), '\n');
+if (here.id == 0) then
+    stderr.writeln('Anti-optimisation number: ', + reduce velocities, '\n');
+    stdout.writeln(3.0 * 16 * n * n / 1000000000.0 / watch.elapsed(), '\n');
