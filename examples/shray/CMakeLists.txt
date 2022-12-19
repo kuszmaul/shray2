@@ -23,7 +23,8 @@ foreach(suffix
 			reduce
 			segfault
 			sync
-			spmv)
+			spmv
+			spmv_mt)
 		set(SHRAY_TARGET "${PROJECT_NAME}${suffix}")
 		set(EXAMPLE_TARGET "${file}${suffix}_shray")
 
