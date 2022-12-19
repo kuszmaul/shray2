@@ -44,7 +44,6 @@ if [ "$#" -lt 2 ]; then
 fi
 
 export SHRAY_CACHELINE=1
-export SHRAY_WORKERTHREADS=0
 
 bindir="$1"
 outputdir="$2"
@@ -137,6 +136,15 @@ runtest()
 			-n "$nproc" \
 			"$bindir/examples/$test_type/${example}_profile_${test_type}" \
 			"$args"
+	elif [ "$test_type" = shraymt ]; then
+		# TODO: -n 1 is not correct for multi-cpu systems, we still want
+		# multiple nodes over multiple clusters
+		runtest_wrapper "$outfile" "$gflopsfile" \
+			mpirun \
+			--bind-to none \
+			-n 1 \
+			"$bindir/examples/shray/${example}_mt_profile_shray" \
+			"$args"
 	elif [ "$test_type" = chapel ]; then
 		# TODO: must call the executable itself and use -nl for the
 		# number of locales, but this requires a proper setup.
@@ -177,7 +185,7 @@ runtest()
 }
 
 # Run all tests.
-for nproc in 2 4 8; do
+for nproc in 1 2 4 8; do
 	# Matrix.
 	for size in 2000 4000 8000; do
 		printf '\nBenchmark matrix multiplication (%s nodes, %s x %s)\n' \
@@ -191,8 +199,12 @@ for nproc in 2 4 8; do
 		runtest upc "$nproc" matrix "$size" "$size"
 
 		cachesize=$((2 * size * size * 3 * 8 / nproc))
+		export SHRAY_WORKERTHREADS=0
 		export SHRAY_CACHESIZE="$cachesize"
 		runtest shray "$nproc" matrix "$size" "$size"
+
+		export SHRAY_WORKERTHREADS="$nproc"
+		runtest shraymt "$nproc" matrix "$size" "$size"
 	done
 
 	# Sparse matrix-vector multiplication
@@ -248,6 +260,7 @@ for exp in "$datadir"/*; do
 			"$paramsdir/fortran/graph.data" \
 			"$paramsdir/globalarrays/graph.data" \
 			"$paramsdir/shray/graph.data" \
+			"$paramsdir/shraymt/graph.data" \
 			"$paramsdir/upc/graph.data"
 	done
 done
