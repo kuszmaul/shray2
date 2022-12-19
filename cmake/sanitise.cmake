@@ -25,7 +25,7 @@ current compiler")
 	endif()
 endif()
 
-foreach(flag -fsanitize=undefined ${EXTRA_SAN_FLAGS})
+foreach(flag -fsanitize=undefined -fsanitize=address ${EXTRA_SAN_FLAGS})
 	set(PROJECT_FLAGS ${PROJECT_FLAGS} ${flag})
 	set(PROJECT_LINKER_FLAGS ${PROJECT_LINKER_FLAGS} ${flag})
 endforeach(flag)
