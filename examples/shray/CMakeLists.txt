@@ -25,7 +25,7 @@ foreach(suffix
 			sync
 			spmv)
 		set(SHRAY_TARGET "${PROJECT_NAME}${suffix}")
-		set(EXAMPLE_TARGET "${file}${suffix}")
+		set(EXAMPLE_TARGET "${file}${suffix}_shray")
 
 		add_executable("${EXAMPLE_TARGET}"
 			"${file}.c")
