@@ -1,4 +1,4 @@
-1. With too many packets, bandwidth segfaults outside the designated area.
-   We should decouple the queue size from the number of prefetches, so make it grow dynamically.
-   mpirun -n 2 bin/shray/bandwidth 1000000000 10000 1
-2. Update benchmark script
+1. shray matrix 8000 fails with 4 nodes (Line 337, [node 3]: mremap failed:
+   Cannot allocate memory) but works with 2 nodes
+2. upc fails for matrices of size 8000 (notes 64MB per-thread limit)
+3. set up proper chapel multilocale environment
