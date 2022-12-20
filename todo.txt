@@ -1,4 +1,5 @@
 1. shray matrix 8000 fails with 4 nodes (Line 337, [node 3]: mremap failed:
    Cannot allocate memory) but works with 2 nodes
+      -> happens in check()
 2. upc fails for matrices of size 8000 (notes 64MB per-thread limit)
 3. set up proper chapel multilocale environment
