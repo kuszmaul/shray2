@@ -929,21 +929,22 @@ static void terminateWorkers()
          * working. In case of a crash gasnet_exit will terminate the process
          * anyway.
          */
-        if (!worker->work) {
-            pthread_join(worker->id, NULL);
-        }
+        pthread_join(worker->id, NULL);
     }
 }
 
 void ShrayFinalize(int exit_code)
 {
     DBUG_PRINT("Terminating with code %d", exit_code);
-    if (workerThreadCount > 0) {
-        terminateWorkers();
-        pthread_barrier_destroy(&workerBarrier);
+    if (exit_code == 0) {
+        if (workerThreadCount > 0) {
+            terminateWorkers();
+            pthread_barrier_destroy(&workerBarrier);
+        }
+
+        free(workerThreads);
+        ringbuffer_free(cache.autoCaches);
+        queue_free(cache.prefetchCaches);
     }
-    free(workerThreads);
-    ringbuffer_free(cache.autoCaches);
-    queue_free(cache.prefetchCaches);
     gasnet_exit(exit_code);
 }
