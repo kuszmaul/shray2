@@ -1,17 +1,23 @@
-# Usage: file name, number of processors
-
 #!/bin/bash
 
-if [ "$#" -lt 2 ]; then
-	printf "Usage: filename number of processors\n" >&2
+set -eu
+
+# Usage: file name, number of processors
+
+if [ "$#" -lt 3 ]; then
+	printf "Usage: [FILENAME] [NUMBER OF PROCESSORS] [PARSER BINARY]\n" >&2
 	exit 1
 fi
 
-make
+#make
 
-sed -i '/^%/d' $1
+filename="$1"
+nproc="$2"
+parser="$3"
 
-(head -n 1 $1; tail -n +2 $1 | sort -n -k 1) > temp
-mv temp $1
+sed -i '/^%/d' "$filename"
 
-./parser $1 $2
+(head -n 1 "$filename"; tail -n +2 "$filename" | sort -n -k 1) >temp
+mv temp "$filename"
+
+"$parser" "$filename" "$nproc"
