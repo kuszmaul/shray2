@@ -16,4 +16,5 @@ plot ARG3 with linespoints title 'Chapel', \
 	ARG5 with linespoints title 'GlobalArrays', \
 	ARG6 with linespoints title 'Shray', \
 	ARG7 with linespoints title 'Shray MT', \
-	ARG8 with linespoints title 'UPC'
+	ARG8 with linespoints title 'Scalapack', \
+	ARG9 with linespoints title 'UPC'

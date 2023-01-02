@@ -787,7 +787,7 @@
                      WFLOPS = 0.0D+0
                   END IF
 
-                  WRITE(*, *) WFLOPS
+                  WRITE(*, '(g0)') WFLOPS
 *
 *                 Print CPU time if machine supports it
 *

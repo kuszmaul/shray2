@@ -338,6 +338,7 @@ for exp in "$datadir"/*; do
 			"$paramsdir/globalarrays/graph.data" \
 			"$paramsdir/shray/graph.data" \
 			"$paramsdir/shraymt/graph.data" \
+			"$paramsdir/scala/graph.data" \
 			"$paramsdir/upc/graph.data"
 	done
 done
