@@ -332,11 +332,18 @@ static void handlePageFault(void *address)
 
         DBUG_PRINT("Segfault is owned by node %d.", owner);
 
-        gasnet_get(alloc->shadowPage, owner, (void *)roundedAddress, ShrayPagesz);
+        // XXX: The reason why we do an mprotect call in the single threaded
+        // case is because otherwise we can potentially get a very large number
+        // of mappings which causes future mremap calls to fail.
+        if (workerThreadCount == 0) {
+            MPROTECT_SAFE((void *)roundedAddress, ShrayPagesz, PROT_READ | PROT_WRITE);
+            gasnet_get((void *)roundedAddress, owner, (void *)roundedAddress, ShrayPagesz);
+        } else {
+            gasnet_get(alloc->shadowPage, owner, (void *)roundedAddress, ShrayPagesz);
 
-        MREMAP_MOVE((void *)roundedAddress, alloc->shadowPage, ShrayPagesz);
-        MMAP_FIXED_SAFE(alloc->shadowPage, ShrayPagesz, PROT_READ | PROT_WRITE);
-
+            MREMAP_MOVE((void *)roundedAddress, alloc->shadowPage, ShrayPagesz);
+            MMAP_FIXED_SAFE(alloc->shadowPage, ShrayPagesz, PROT_READ | PROT_WRITE);
+        }
 
         DBUG_PRINT("We set page %zu to locally available.", pageNumber);
 
