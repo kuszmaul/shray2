@@ -782,15 +782,17 @@
 *                 Print WALL time if machine supports it
 *
                   IF( WTIME( 1 ).GT.0.0D+0 ) THEN
-                     WFLOPS = NOPS / ( WTIME( 1 ) * 1.0D+6 )
+                     WFLOPS = NOPS / ( WTIME( 1 ) * 1.0D+9 )
                   ELSE
                      WFLOPS = 0.0D+0
                   END IF
+
+                  WRITE(*, *) WFLOPS
 *
 *                 Print CPU time if machine supports it
 *
                   IF( CTIME( 1 ).GT.0.0D+0 ) THEN
-                     CFLOPS = NOPS / ( CTIME( 1 ) * 1.0D+6 )
+                     CFLOPS = NOPS / ( CTIME( 1 ) * 1.0D+9 )
                   ELSE
                      CFLOPS = 0.0D+0
                   END IF
@@ -853,8 +855,8 @@
  9982 FORMAT( 2X, '   ***** Operation not supported, error code: ',
      $        I5, ' *****' )
  9981 FORMAT( 2X, '|  ', A, 2X, F13.3, 2X, F13.3, 2X, F13.3, 2X, F13.3 )
- 9980 FORMAT( 2X, '            WALL time (s)    WALL Mflops ',
-     $        '  CPU time (s)     CPU Mflops' )
+ 9980 FORMAT( 2X, '            WALL time (s)    WALL Gflops ',
+     $        '  CPU time (s)     CPU Gflops' )
 *
       STOP
 *
