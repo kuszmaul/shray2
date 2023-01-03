@@ -14,17 +14,17 @@ mmdir="$3"
 wd=${PWD}
 targetdir=${mmdir}/${nproc}/${filename}
 
-mkdir -p ${targetdir}
+mkdir -p "${targetdir}"
 
 sed -i '/^%/d' "$filename"
 
 (head -n 1 "$filename"; tail -n +2 "$filename" | sort -n -k 1) >temp
 mv temp "$filename"
 
-if ! [ -e ${targetdir}/${filename} ]; then
-    ln -s ${wd}/${filename} ${targetdir}/${filename}
+if ! [ -e "${targetdir}/${filename}" ]; then
+    ln -s "${wd}/${filename}" "${targetdir}/${filename}"
 fi
 
-cd ${targetdir}
+cd "${targetdir}"
 
 "${wd}/parser" "$filename" "$nproc"

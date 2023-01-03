@@ -5,10 +5,10 @@ repeatEcho()
     k=$1
     identifier="$2"
     shift; shift;
-    message="$@"
+    message=$*
 
-    for ((i = 0; i < $k; i++)); do
-        printf "${message}\t" >> PDBLAS3TIM.dat
+    for ((i = 0; i < k; i++)); do
+        printf "%s\t" "${message}" >> PDBLAS3TIM.dat
     done
 
     echo "values of ${identifier}" >> PDBLAS3TIM.dat
@@ -27,7 +27,7 @@ fi
 nproc="$1"
 block="$2"
 shift; shift;
-n="$@"
+n=$*
 numberOfExperiments=$#
 
 echo "'Level 3 PBLAS, Timing input file'" > PDBLAS3TIM.dat
@@ -48,11 +48,13 @@ repeatEcho ${numberOfExperiments} "TRANSA" "'N'"
 repeatEcho ${numberOfExperiments} "TRANSB" "'N'"
 repeatEcho ${numberOfExperiments} "UPLO" "'U'"
 
-echo "${n} values of M" >> PDBLAS3TIM.dat
-echo "${n} values of N" >> PDBLAS3TIM.dat
-echo "${n} values of K" >> PDBLAS3TIM.dat
-echo "${n} values of M_A" >> PDBLAS3TIM.dat
-echo "${n} values of N_A" >> PDBLAS3TIM.dat
+{
+    echo "${n} values of M";
+    echo "${n} values of N";
+    echo "${n} values of K";
+    echo "${n} values of M_A";
+    echo "${n} values of N_A";
+} >> PDBLAS3TIM.dat
 
 repeatEcho ${numberOfExperiments} "IMB_A" "1"
 repeatEcho ${numberOfExperiments} "INB_A" "1"
@@ -63,8 +65,10 @@ repeatEcho ${numberOfExperiments} "CSRC_A" "0"
 repeatEcho ${numberOfExperiments} "IA" "1"
 repeatEcho ${numberOfExperiments} "JA" "1"
 
-echo "${n} values of M_B" >> PDBLAS3TIM.dat
-echo "${n} values of N_B" >> PDBLAS3TIM.dat
+{
+    echo "${n} values of M_B";
+    echo "${n} values of N_B";
+} >> PDBLAS3TIM.dat
 
 repeatEcho ${numberOfExperiments} "IMB_B" "1"
 repeatEcho ${numberOfExperiments} "INB_B" "1"
@@ -75,8 +79,10 @@ repeatEcho ${numberOfExperiments} "CSRC_B" "0"
 repeatEcho ${numberOfExperiments} "IB" "1"
 repeatEcho ${numberOfExperiments} "JB" "1"
 
-echo "${n} values of M_C" >> PDBLAS3TIM.dat
-echo "${n} values of N_C" >> PDBLAS3TIM.dat
+{
+    echo "${n} values of M_C";
+    echo "${n} values of N_C";
+} >> PDBLAS3TIM.dat
 
 repeatEcho ${numberOfExperiments} "IMB_C" "1"
 repeatEcho ${numberOfExperiments} "INB_C" "1"

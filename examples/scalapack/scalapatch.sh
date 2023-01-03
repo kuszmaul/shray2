@@ -12,11 +12,11 @@ fi
 
 scaladir="$1"
 
-cp SLmake.inc ${scaladir}
-cp pdtrord.f ${scaladir}/SRC
-cp Makefile ${scaladir}
-cp pdblas3tim.f ${scaladir}/PBLAS/TIMING
-cd ${scaladir}
+cp SLmake.inc "${scaladir}"
+cp pdtrord.f "${scaladir}/SRC"
+cp Makefile "${scaladir}"
+cp pdblas3tim.f "${scaladir}/PBLAS/TIMING"
+cd "${scaladir}"
 make
 cd PBLAS/TIMING
 make xdpblas3tim
