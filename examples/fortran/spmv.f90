@@ -79,18 +79,15 @@ program main
     ! Timing
     integer :: cpu_count, cpu_count2, count_rate, count_max
     integer(KIND=8) :: nz[*], totalNz
-    character(len=12), dimension(:), allocatable :: args(:)
+    character(len=12) :: iterationArg
     character(len=100) :: numberString, info, row, column, values, filename
     type(CSRMatrix) :: mat
     real(KIND=8), allocatable :: res(:)
 
     ! Parse the distributed array
-    allocate(args(2))
-    call get_command_argument(1, args(1))
-    read (unit=args(1), fmt=*) filename
-
-    call get_command_argument(2, args(2))
-    read (unit=args(2), fmt=*) iterations
+    call get_command_argument(1, filename)
+    call get_command_argument(2, iterationArg)
+    read (iterationArg, *) iterations
 
     write(numberString, fmt='(I0)') this_image()
     info = trim(filename) // trim("_info") // trim(numberString)
