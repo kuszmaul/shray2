@@ -1,3 +1,2 @@
 1. upc fails for matrices of size 8000 (notes 64MB per-thread limit)
    -> check if there is a way to set larger amount of memory per-thread
-2. spmv globalarrays sometimes fails and some node (8 nodes, cage9.mtx, 20 iter)
