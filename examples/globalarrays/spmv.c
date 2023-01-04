@@ -33,12 +33,13 @@ void spmv(csr_t *matrix, int g_vector, int g_out)
 			int lo_val[1] = { col };
 			int hi_val[1] = { col };
 			int ld_val[1] = { 0 };
+
 			NGA_Get(g_vector, lo_val, hi_val, &value, ld_val);
 
 			outval += v * value;
 		}
 
-		out[i] = outval;
+		out[offset] = outval;
 	}
 
 	NGA_Release(g_out, lo_out, hi_out);
@@ -78,11 +79,9 @@ int main(int argc, char **argv)
 	}
 
 	size_t iterations = atoll(argv[2]);
-	int nprocs = GA_Nnodes();
 
 	int v_dimensions[1] = { matrix->n };
-	int v_chunks[1] = { matrix->n / nprocs };
-	int g_vector = NGA_Create(C_DBL, 1, v_dimensions, "input vector", v_chunks);
+	int g_vector = NGA_Create(C_DBL, 1, v_dimensions, "input vector", NULL);
 	if (!g_vector) {
 		GA_Error("Could not allocate input array", 1);
 	}
