@@ -232,6 +232,7 @@ runtest()
 		runtest_wrapper "$outfile" "$gflopsfile" \
 			upcrun \
 			-n "$nproc" \
+			-shared-heap 1G \
 			-bind-threads \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
