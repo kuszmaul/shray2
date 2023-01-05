@@ -27,6 +27,8 @@ foreach(suffix
 		PRIVATE
 			cinterface)
 	target_compile_definitions("${LIB_TARGET}"
+		PUBLIC
+			_GNU_SOURCE=1
 		PRIVATE
 			${EXTRA_DEFINES})
 endforeach(suffix)

@@ -166,6 +166,9 @@ function(_GASNet_create_component_target _GASNet_MAKEFILE COMPONENT_NAME)
     IMPORTED_LOCATION "${GASNet_gasnet-${COMPONENT_NAME}_LIBRARY}"
   )
   if(DEFS)
+    # XXX: Filter out _GNU_SOURCE=1, we add this manually due to the definition
+    # messing up other compiler invocations.
+    string(REPLACE "_GNU_SOURCE=1;" "" DEFS "${DEFS}")
     set_target_properties(GASNet::${COMPONENT_NAME} PROPERTIES
       INTERFACE_COMPILE_DEFINITIONS "${DEFS}"
     )
