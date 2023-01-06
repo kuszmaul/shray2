@@ -30,8 +30,7 @@ foreach(suffix
 		PRIVATE
 			cinterface)
 	target_compile_definitions("${LIB_TARGET}"
-		PUBLIC
-			_GNU_SOURCE=1
 		PRIVATE
+			_GNU_SOURCE=1
 			${EXTRA_DEFINES})
 endforeach(suffix)
