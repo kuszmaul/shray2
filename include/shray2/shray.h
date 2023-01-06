@@ -192,6 +192,22 @@ typedef void (*shray_fn)(worker_info_t *info);
 
 void ShrayRunWorker(shray_fn fn, size_t n, void *args);
 
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayBroadcast(void *address, size_t size, int root);
+ *
+ *   @brief Lets node 'root' broadcast information to all other nodes,
+ *          mainly useful if root gets some input that other nodes need.
+ *
+ *   @param buffer
+ *          size
+ *          root     Node 'root' communicates [buffer, buffer + size[ to
+ *                   buffer on all other nodes.
+ *
+ ******************************************************************************/
+
+void ShrayBroadcast(void *buffer, size_t size, int root);
+
 /* Example
  *
  * double duration;

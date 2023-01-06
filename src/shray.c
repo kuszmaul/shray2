@@ -955,3 +955,11 @@ void ShrayFinalize(int exit_code)
     }
     gasnet_exit(exit_code);
 }
+
+void ShrayBroadcast(void *buffer, size_t size, int root)
+{
+    DBUG_PRINT("We broadcast [%p, %p[ from node %d.", buffer,
+            (void *)((uintptr_t)buffer + size), root);
+    gasnet_coll_broadcast(gasnete_coll_team_all, buffer, root, buffer, size,
+            GASNET_COLL_DST_IN_SEGMENT);
+}
