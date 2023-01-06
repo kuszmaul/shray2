@@ -17,6 +17,9 @@ foreach(suffix
 		queue.c
 		ringbuffer.c
 		shray.c)
+	target_compile_options("${LIB_TARGET}"
+		PRIVATE
+			-fPIC)
 	target_include_directories("${LIB_TARGET}"
 		PUBLIC
 			$<INSTALL_INTERFACE:include>
