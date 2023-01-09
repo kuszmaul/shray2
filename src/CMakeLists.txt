@@ -12,7 +12,7 @@ foreach(suffix
 	endif()
 
 	set(LIB_TARGET "${PROJECT_NAME}${suffix}")
-	add_library("${LIB_TARGET}" STATIC
+    add_library("${LIB_TARGET}" SHARED
 		bitmap.c
 		queue.c
 		ringbuffer.c
