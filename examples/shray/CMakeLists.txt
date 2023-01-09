@@ -39,6 +39,7 @@ foreach(suffix
 				util)
 		target_compile_definitions("${EXAMPLE_TARGET}"
 			PRIVATE
+				_GNU_SOURCE=1
 				${EXTRA_DEFINES})
 	endforeach(file)
 endforeach(suffix)
