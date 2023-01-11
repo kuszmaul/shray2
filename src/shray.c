@@ -756,6 +756,8 @@ void ShraySync(void *array)
 
 void ShrayFree(void *address)
 {
+    DBUG_PRINT("ShrayFree: we free %p.", address);
+
     /* So everyone has finished reading before we free the array. */
     gasnetBarrier();
     BARRIERCOUNT
