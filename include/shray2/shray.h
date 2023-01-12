@@ -14,8 +14,7 @@ typedef struct {
 extern bool ShrayOutput;
 typedef void (*shray_fn)(worker_info_t *info);
 
-#ifdef DEBUG
-
+/* Debug declarations */
 void ShrayInit_debug(int *argc, char ***argv);
 void *ShrayMalloc_debug(size_t firstDimension, size_t totalSize);
 size_t ShrayStart_debug(size_t firstDimension);
@@ -30,6 +29,40 @@ void ShrayPrefetch_debug(void *address, size_t size);
 void ShrayDiscard_debug(void *address, size_t size);
 void ShrayRunWorker_debug(shray_fn fn, size_t n, void *args);
 void ShrayBroadcast_debug(void *buffer, size_t size, int root);
+
+/* Profile declarations */
+void ShrayInit_profile(int *argc, char ***argv);
+void *ShrayMalloc_profile(size_t firstDimension, size_t totalSize);
+size_t ShrayStart_profile(size_t firstDimension);
+size_t ShrayEnd_profile(size_t firstDimension);
+void ShraySync_profile(void *array);
+void ShrayFree_profile(void *address);
+void ShrayReport_profile(void);
+unsigned int ShrayRank_profile(void);
+unsigned int ShraySize_profile(void);
+void ShrayFinalize_profile(int exit_code);
+void ShrayPrefetch_profile(void *address, size_t size);
+void ShrayDiscard_profile(void *address, size_t size);
+void ShrayRunWorker_profile(shray_fn fn, size_t n, void *args);
+void ShrayBroadcast_profile(void *buffer, size_t size, int root);
+
+/* Normal declarations */
+void ShrayInit_normal(int *argc, char ***argv);
+void *ShrayMalloc_normal(size_t firstDimension, size_t totalSize);
+size_t ShrayStart_normal(size_t firstDimension);
+size_t ShrayEnd_normal(size_t firstDimension);
+void ShraySync_normal(void *array);
+void ShrayFree_normal(void *address);
+void ShrayReport_normal(void);
+unsigned int ShrayRank_normal(void);
+unsigned int ShraySize_normal(void);
+void ShrayFinalize_normal(int exit_code);
+void ShrayPrefetch_normal(void *address, size_t size);
+void ShrayDiscard_normal(void *address, size_t size);
+void ShrayRunWorker_normal(shray_fn fn, size_t n, void *args);
+void ShrayBroadcast_normal(void *buffer, size_t size, int root);
+
+#ifdef DEBUG
 
 #define ShrayInit(argc, argv) ShrayInit_debug(argc, argv)
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_debug(firstDimension, totalSize)
@@ -47,23 +80,7 @@ void ShrayBroadcast_debug(void *buffer, size_t size, int root);
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_debug(buffer, size, root)
 
 #else
-
 #ifdef PROFILE
-
-void ShrayInit_profile(int *argc, char ***argv);
-void *ShrayMalloc_profile(size_t firstDimension, size_t totalSize);
-size_t ShrayStart_profile(size_t firstDimension);
-size_t ShrayEnd_profile(size_t firstDimension);
-void ShraySync_profile(void *array);
-void ShrayFree_profile(void *address);
-void ShrayReport_profile(void);
-unsigned int ShrayRank_profile(void);
-unsigned int ShraySize_profile(void);
-void ShrayFinalize_profile(int exit_code);
-void ShrayPrefetch_profile(void *address, size_t size);
-void ShrayDiscard_profile(void *address, size_t size);
-void ShrayRunWorker_profile(shray_fn fn, size_t n, void *args);
-void ShrayBroadcast_profile(void *buffer, size_t size, int root);
 
 #define ShrayInit(argc, argv) ShrayInit_profile(argc, argv)
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_profile(firstDimension, totalSize)
@@ -81,21 +98,6 @@ void ShrayBroadcast_profile(void *buffer, size_t size, int root);
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_profile(buffer, size, root)
 
 #else
-void ShrayInit_normal(int *argc, char ***argv);
-void *ShrayMalloc_normal(size_t firstDimension, size_t totalSize);
-size_t ShrayStart_normal(size_t firstDimension);
-size_t ShrayEnd_normal(size_t firstDimension);
-void ShraySync_normal(void *array);
-void ShrayFree_normal(void *address);
-void ShrayReport_normal(void);
-unsigned int ShrayRank_normal(void);
-unsigned int ShraySize_normal(void);
-void ShrayFinalize_normal(int exit_code);
-void ShrayPrefetch_normal(void *address, size_t size);
-void ShrayDiscard_normal(void *address, size_t size);
-void ShrayRunWorker_normal(shray_fn fn, size_t n, void *args);
-void ShrayBroadcast_normal(void *buffer, size_t size, int root);
-
 #define ShrayInit(argc, argv) ShrayInit_normal(argc, argv)
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_normal(firstDimension, totalSize)
 #define ShrayStart(firstDimension) ShrayStart_normal(firstDimension)
