@@ -5,6 +5,114 @@
 #include <stdbool.h>
 #include <sys/time.h>
 
+typedef struct {
+    void *args;
+    size_t start;
+    size_t end;
+} worker_info_t;
+
+extern bool ShrayOutput;
+typedef void (*shray_fn)(worker_info_t *info);
+
+#ifdef DEBUG
+
+void ShrayInit_debug(int *argc, char ***argv);
+void *ShrayMalloc_debug(size_t firstDimension, size_t totalSize);
+size_t ShrayStart_debug(size_t firstDimension);
+size_t ShrayEnd_debug(size_t firstDimension);
+void ShraySync_debug(void *array);
+void ShrayFree_debug(void *address);
+void ShrayReport_debug(void);
+unsigned int ShrayRank_debug(void);
+unsigned int ShraySize_debug(void);
+void ShrayFinalize_debug(int exit_code);
+void ShrayPrefetch_debug(void *address, size_t size);
+void ShrayDiscard_debug(void *address, size_t size);
+void ShrayRunWorker_debug(shray_fn fn, size_t n, void *args);
+void ShrayBroadcast_debug(void *buffer, size_t size, int root);
+
+#define ShrayInit(argc, argv) ShrayInit_debug(argc, argv)
+#define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_debug(firstDimension, totalSize)
+#define ShrayStart(firstDimension) ShrayStart_debug(firstDimension)
+#define ShrayEnd(firstDimension) ShrayEnd_debug(firstDimension)
+#define ShraySync(array) ShraySync_debug(array)
+#define ShrayFree(address) ShrayFree_debug(address)
+#define ShrayReport() ShrayReport_debug()
+#define ShrayRank() ShrayRank_debug()
+#define ShraySize() ShraySize_debug()
+#define ShrayFinalize(exit_code) ShrayFinalize_debug(exit_code)
+#define ShrayPrefetch(address, size) ShrayPrefetch_debug(address, size)
+#define ShrayDiscard(address, size) ShrayDiscard_debug(address, size)
+#define ShrayRunWorker(fn, n, args) ShrayRunWorker_debug(fn, n, args)
+#define ShrayBroadcast(buffer, size, root) ShrayBroadcast_debug(buffer, size, root)
+
+#else
+
+#ifdef PROFILE
+
+void ShrayInit_profile(int *argc, char ***argv);
+void *ShrayMalloc_profile(size_t firstDimension, size_t totalSize);
+size_t ShrayStart_profile(size_t firstDimension);
+size_t ShrayEnd_profile(size_t firstDimension);
+void ShraySync_profile(void *array);
+void ShrayFree_profile(void *address);
+void ShrayReport_profile(void);
+unsigned int ShrayRank_profile(void);
+unsigned int ShraySize_profile(void);
+void ShrayFinalize_profile(int exit_code);
+void ShrayPrefetch_profile(void *address, size_t size);
+void ShrayDiscard_profile(void *address, size_t size);
+void ShrayRunWorker_profile(shray_fn fn, size_t n, void *args);
+void ShrayBroadcast_profile(void *buffer, size_t size, int root);
+
+#define ShrayInit(argc, argv) ShrayInit_profile(argc, argv)
+#define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_profile(firstDimension, totalSize)
+#define ShrayStart(firstDimension) ShrayStart_profile(firstDimension)
+#define ShrayEnd(firstDimension) ShrayEnd_profile(firstDimension)
+#define ShraySync(array) ShraySync_profile(array)
+#define ShrayFree(address) ShrayFree_profile(address)
+#define ShrayReport() ShrayReport_profile()
+#define ShrayRank() ShrayRank_profile()
+#define ShraySize() ShraySize_profile()
+#define ShrayFinalize(exit_code) ShrayFinalize_profile(exit_code)
+#define ShrayPrefetch(address, size) ShrayPrefetch_profile(address, size)
+#define ShrayDiscard(address, size) ShrayDiscard_profile(address, size)
+#define ShrayRunWorker(fn, n, args) ShrayRunWorker_profile(fn, n, args)
+#define ShrayBroadcast(buffer, size, root) ShrayBroadcast_profile(buffer, size, root)
+
+#else
+void ShrayInit_normal(int *argc, char ***argv);
+void *ShrayMalloc_normal(size_t firstDimension, size_t totalSize);
+size_t ShrayStart_normal(size_t firstDimension);
+size_t ShrayEnd_normal(size_t firstDimension);
+void ShraySync_normal(void *array);
+void ShrayFree_normal(void *address);
+void ShrayReport_normal(void);
+unsigned int ShrayRank_normal(void);
+unsigned int ShraySize_normal(void);
+void ShrayFinalize_normal(int exit_code);
+void ShrayPrefetch_normal(void *address, size_t size);
+void ShrayDiscard_normal(void *address, size_t size);
+void ShrayRunWorker_normal(shray_fn fn, size_t n, void *args);
+void ShrayBroadcast_normal(void *buffer, size_t size, int root);
+
+#define ShrayInit(argc, argv) ShrayInit_normal(argc, argv)
+#define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_normal(firstDimension, totalSize)
+#define ShrayStart(firstDimension) ShrayStart_normal(firstDimension)
+#define ShrayEnd(firstDimension) ShrayEnd_normal(firstDimension)
+#define ShraySync(array) ShraySync_normal(array)
+#define ShrayFree(address) ShrayFree_normal(address)
+#define ShrayReport() ShrayReport_normal()
+#define ShrayRank() ShrayRank_normal()
+#define ShraySize() ShraySize_normal()
+#define ShrayFinalize(exit_code) ShrayFinalize_normal(exit_code)
+#define ShrayPrefetch(address, size) ShrayPrefetch_normal(address, size)
+#define ShrayDiscard(address, size) ShrayDiscard_normal(address, size)
+#define ShrayRunWorker(fn, n, args) ShrayRunWorker_normal(fn, n, args)
+#define ShrayBroadcast(buffer, size, root) ShrayBroadcast_normal(buffer, size, root)
+#endif /* PROFILE */
+#endif /* DEBUG */
+
 /** <!--********************************************************************-->
  *
  * @var bool ShrayOutput
@@ -12,8 +120,6 @@
  *   @brief       True for exactly one node, useful to output only once.
  *
  ******************************************************************************/
-
-extern bool ShrayOutput;
 
 /** <!--********************************************************************-->
  *
@@ -25,8 +131,6 @@ extern bool ShrayOutput;
  *   @param argv  Pointer to the command line arguments.
  *
  ******************************************************************************/
-
-void ShrayInit(int *argc, char ***argv);
 
 /** <!--********************************************************************-->
  *
@@ -40,8 +144,6 @@ void ShrayInit(int *argc, char ***argv);
  *   @return Pointer to the allocation.
  *
  ******************************************************************************/
-
-void *ShrayMalloc(size_t firstDimension, size_t totalSize);
 
 /** <!--********************************************************************-->
  *
@@ -57,8 +159,6 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize);
  *
  ******************************************************************************/
 
-size_t ShrayStart(size_t firstDimension);
-
 /** <!--********************************************************************-->
  *
  * @fn size_t ShrayEnd(size_t firstDimension)
@@ -73,8 +173,6 @@ size_t ShrayStart(size_t firstDimension);
  *
  ******************************************************************************/
 
-size_t ShrayEnd(size_t firstDimension);
-
 /** <!--********************************************************************-->
  *
  * @fn void ShraySync(void *array)
@@ -86,8 +184,6 @@ size_t ShrayEnd(size_t firstDimension);
  *
  ******************************************************************************/
 
-void ShraySync(void *array);
-
 /** <!--********************************************************************-->
  *
  * @fn void ShrayFree(void *array)
@@ -98,8 +194,6 @@ void ShraySync(void *array);
  *
  ******************************************************************************/
 
-void ShrayFree(void *address);
-
 /** <!--********************************************************************-->
  *
  * @fn void ShrayReport(void)
@@ -109,8 +203,6 @@ void ShrayFree(void *address);
  *
  ******************************************************************************/
 
-void ShrayReport(void);
-
 /** <!--********************************************************************-->
  *
  * @fn size_t ShrayRank(void)
@@ -118,8 +210,6 @@ void ShrayReport(void);
  *   @brief         Returns the current Shray rank.
  *
  ******************************************************************************/
-
-unsigned int ShrayRank(void);
 
 /** <!--********************************************************************-->
  *
@@ -129,8 +219,6 @@ unsigned int ShrayRank(void);
  *
  ******************************************************************************/
 
-unsigned int ShraySize(void);
-
 /** <!--********************************************************************-->
  *
  * @fn size_t ShrayFinalize(int exit_code)
@@ -138,8 +226,6 @@ unsigned int ShraySize(void);
  *   @brief         Last statement to be called in an application.
  *
  ******************************************************************************/
-
-void ShrayFinalize(int exit_code);
 
 /** <!--********************************************************************-->
  *
@@ -152,8 +238,6 @@ void ShrayFinalize(int exit_code);
  *
  ******************************************************************************/
 
-void ShrayPrefetch(void *address, size_t size);
-
 /** <!--********************************************************************-->
  *
  * @fn void ShrayDiscard(void *address, size_t size);
@@ -164,16 +248,6 @@ void ShrayPrefetch(void *address, size_t size);
  *          size     number of bytes starting from address to free.
  *
  ******************************************************************************/
-
-void ShrayDiscard(void *address, size_t size);
-
-typedef struct {
-    void *args;
-    size_t start;
-    size_t end;
-} worker_info_t;
-
-typedef void (*shray_fn)(worker_info_t *info);
 
 /** <!--********************************************************************-->
  *
@@ -190,8 +264,6 @@ typedef void (*shray_fn)(worker_info_t *info);
  *
  ******************************************************************************/
 
-void ShrayRunWorker(shray_fn fn, size_t n, void *args);
-
 /** <!--********************************************************************-->
  *
  * @fn void ShrayBroadcast(void *address, size_t size, int root);
@@ -205,8 +277,6 @@ void ShrayRunWorker(shray_fn fn, size_t n, void *args);
  *                   buffer on all other nodes.
  *
  ******************************************************************************/
-
-void ShrayBroadcast(void *buffer, size_t size, int root);
 
 /* Example
  *

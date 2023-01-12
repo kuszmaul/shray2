@@ -510,7 +510,7 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 }
 
 /* Is linear in the number of allocations when we do not prefetch. */
-void ShrayResetCache()
+static void ShrayResetCache()
 {
     cache.usedMemory = 0;
 
@@ -568,9 +568,11 @@ static void startShrayWorkers()
  * Shray functionality
  *****************************************************/
 
+#if !(DEBUG || PROFILE)
 bool ShrayOutput;
+#endif
 
-void ShrayInit(int *argc, char ***argv)
+void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
 {
     GASNET_SAFE(gasnet_init(argc, argv));
     /* Must be built with GASNET_SEGMENT_EVERYTHING, so these arguments are ignored. */
@@ -637,7 +639,7 @@ void ShrayInit(int *argc, char ***argv)
     registerHandlers();
 }
 
-void *ShrayMalloc(size_t firstDimension, size_t totalSize)
+void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
 {
     void *location;
 
@@ -712,18 +714,18 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     return location;
 }
 
-size_t ShrayStart(size_t firstDimension)
+size_t ShrayStart@SHRAY_SUFFIX@(size_t firstDimension)
 {
     return Shray_rank * roundUp(firstDimension, Shray_size);
 }
 
-size_t ShrayEnd(size_t firstDimension)
+size_t ShrayEnd@SHRAY_SUFFIX@(size_t firstDimension)
 {
     return (Shray_rank == Shray_size - 1) ? firstDimension :
         (Shray_rank + 1) * roundUp(firstDimension, Shray_size);
 }
 
-void ShraySync(void *array)
+void ShraySync@SHRAY_SUFFIX@(void *array)
 {
     /* So the other processors have finished writing before we get their parts of the pages. */
     gasnetBarrier();
@@ -754,7 +756,7 @@ void ShraySync(void *array)
     BARRIERCOUNT
 }
 
-void ShrayFree(void *address)
+void ShrayFree@SHRAY_SUFFIX@(void *address)
 {
     DBUG_PRINT("ShrayFree: we free %p.", address);
 
@@ -776,7 +778,7 @@ void ShrayFree(void *address)
     }
 }
 
-void ShrayPrefetch(void *address, size_t size)
+void ShrayPrefetch@SHRAY_SUFFIX@(void *address, size_t size)
 {
     PrefetchStruct prefetch = GetPrefetchStruct(address, size);
 
@@ -819,7 +821,7 @@ static int IsSubset(uintptr_t subStart, uintptr_t subEnd, uintptr_t start, uintp
     return (subStart >= start && subStart < end && subEnd <= end && subEnd > subStart);
 }
 
-void ShrayDiscard(void *address, size_t size)
+void ShrayDiscard@SHRAY_SUFFIX@(void *address, size_t size)
 {
     PrefetchStruct prefetch = GetPrefetchStruct(address, size);
 
@@ -860,7 +862,7 @@ static void handleWorkerRequest(shray_worker_t *worker)
     pthread_kill(worker->id, SIGUSR1);
 }
 
-void ShrayRunWorker(shray_fn handler, size_t n, void *args)
+void ShrayRunWorker@SHRAY_SUFFIX@(shray_fn handler, size_t n, void *args)
 {
     DBUG_PRINT("Starting threaded workload (%zu workers)", workerThreadCount);
     if (workerThreadCount == 0) {
@@ -909,7 +911,7 @@ void ShrayRunWorker(shray_fn handler, size_t n, void *args)
     DBUG_PRINT("Finished threaded workload (%zu workers)", workerThreadCount);
 }
 
-void ShrayReport(void)
+void ShrayReport@SHRAY_SUFFIX@(void)
 {
     fprintf(stderr,
             "Shray report P(%d): %zu segfaults, %zu barriers, "
@@ -917,12 +919,12 @@ void ShrayReport(void)
             segfaultCounter * ShrayPagesz);
 }
 
-unsigned int ShrayRank(void)
+unsigned int ShrayRank@SHRAY_SUFFIX@(void)
 {
     return Shray_rank;
 }
 
-unsigned int ShraySize(void)
+unsigned int ShraySize@SHRAY_SUFFIX@(void)
 {
     return Shray_size;
 }
@@ -942,7 +944,7 @@ static void terminateWorkers()
     }
 }
 
-void ShrayFinalize(int exit_code)
+void ShrayFinalize@SHRAY_SUFFIX@(int exit_code)
 {
     DBUG_PRINT("Terminating with code %d", exit_code);
     if (exit_code == 0) {
@@ -958,7 +960,7 @@ void ShrayFinalize(int exit_code)
     gasnet_exit(exit_code);
 }
 
-void ShrayBroadcast(void *buffer, size_t size, int root)
+void ShrayBroadcast@SHRAY_SUFFIX@(void *buffer, size_t size, int root)
 {
     DBUG_PRINT("We broadcast [%p, %p[ from node %d.", buffer,
             (void *)((uintptr_t)buffer + size), root);

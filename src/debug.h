@@ -5,7 +5,7 @@
 //-DBUG_OFF
 #ifdef DEBUG
     #define DBUG_PRINT(fmt, ...)                                                        \
-        fprintf(stderr, "\t[node %d]: " fmt "\n", Shray_rank, __VA_ARGS__);
+        fprintf(stderr, "\t[node %d] (%s): " fmt "\n", Shray_rank, __func__, __VA_ARGS__);
 #else
     #define DBUG_PRINT(fmt, ...)
 #endif

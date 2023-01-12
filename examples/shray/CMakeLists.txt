@@ -1,6 +1,6 @@
 # example binaries
 foreach(suffix
-		""
+		_normal
 		_debug
 		_profile)
 	if(suffix STREQUAL "_debug")
@@ -25,7 +25,7 @@ foreach(suffix
 			sync
 			spmv
 			spmv_mt)
-		set(SHRAY_TARGET "${PROJECT_NAME}${suffix}")
+		set(SHRAY_TARGET "${PROJECT_NAME}")
 		set(EXAMPLE_TARGET "${file}${suffix}_shray")
 
 		add_executable("${EXAMPLE_TARGET}"

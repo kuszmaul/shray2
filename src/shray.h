@@ -1,3 +1,5 @@
+#pragma once
+
 #include "bitmap.h"
 #include "ringbuffer.h"
 #include "queue.h"
@@ -76,8 +78,8 @@ typedef struct PrefetchStruct {
 
 #define MPROTECT_SAFE(addr, len, prot)                                                  \
     {                                                                                   \
-        DBUG_PRINT("Protected [%p, %p[ to %s", addr, (void *)((uintptr_t)addr + len),   \
-            #prot);                                                                     \
+        DBUG_PRINT("mprotect: protected [%p, %p[ to %s", addr,                          \
+                (void *)((uintptr_t)addr + len), #prot);                                \
         if (mprotect(addr, len, prot) != 0) {                                           \
             fprintf(stderr, "Line %d, [node %d]: ", __LINE__, Shray_rank);              \
             perror("mprotect failed");                                                  \
@@ -88,7 +90,7 @@ typedef struct PrefetchStruct {
 /* Moves [source, source + size[ to [dest, dest + size[ */
 #define MREMAP_MOVE(dest, source, size)                                                 \
     {                                                                                   \
-        DBUG_PRINT("Moved [%p, %p[ to [%p, %p[", source,                                \
+        DBUG_PRINT("mremap: Moved [%p, %p[ to [%p, %p[", source,                        \
                 (void *)((uintptr_t)source + size), dest,                               \
                 (void *)((uintptr_t)dest + size));                                      \
         void *dummy;                                                                    \
@@ -103,7 +105,7 @@ typedef struct PrefetchStruct {
 #define MMAP_SAFE(variable, address, length, prot)                                      \
     {                                                                                   \
         variable = mmap(address, length, prot, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);     \
-        DBUG_PRINT("%p = mmap(%p, %zu, %s, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);",       \
+        DBUG_PRINT("mmap: %p = mmap(%p, %zu, %s, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);", \
                 variable, address, length, #prot);                                      \
         if (variable == MAP_FAILED) {                                                   \
             fprintf(stderr, "Line %d, [node %d]: ", __LINE__, Shray_rank);              \
@@ -116,7 +118,7 @@ typedef struct PrefetchStruct {
     {                                                                                   \
         void *success = mmap(address, length, prot,                                     \
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);                        \
-        DBUG_PRINT("%p = mmap(%p, %zu, %s, "                                            \
+        DBUG_PRINT("mmap: %p = mmap(%p, %zu, %s, "                                      \
                 "MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);",                     \
                 success, address, length, #prot);                                       \
         if (success == MAP_FAILED) {                                                    \
