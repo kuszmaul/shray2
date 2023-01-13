@@ -39,6 +39,12 @@ endif()
 
 set(MPI_EXECUTABLE_SUFFIX ".openmpi")
 find_package(MPI REQUIRED COMPONENTS C)
+
+if(NOT DEFINED ENV{GASNet_ROOT})
+    MESSAGE(FATAL_ERROR "Please set environment variable GASNet_ROOT "
+        "to your gasnet installation path")
+endif()
+
 find_package(GASNet REQUIRED)
 
 # create the common C target
