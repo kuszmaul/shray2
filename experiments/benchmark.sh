@@ -265,9 +265,8 @@ for nproc in 1 2 4 8; do
 		runtest upc "$nproc" matrix "$size" "$size"
 		runtest scala "$nproc" matrix "$size" "$size"
 
-		cachesize=$((2 * size * size * 3 * 8 / nproc))
 		export SHRAY_WORKERTHREADS=0
-		export SHRAY_CACHESIZE="$cachesize"
+		export SHRAY_CACHEFACTOR=2
 		runtest shray "$nproc" matrix "$size" "$size"
 
 		export SHRAY_WORKERTHREADS="$nproc"
@@ -288,9 +287,7 @@ for nproc in 1 2 4 8; do
 			runtest globalarrays "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
 			runtest upc "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
 
-			# TODO: use proper cache size
-			cachesize=$((2 * 5154859 / nproc))
-			export SHRAY_CACHESIZE="$cachesize"
+			export SHRAY_CACHESIZE=2
 			export SHRAY_WORKERTHREADS=0
 			runtest shray "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
 

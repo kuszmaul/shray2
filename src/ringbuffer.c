@@ -20,6 +20,7 @@ ringbuffer_t *ringbuffer_alloc(size_t size)
 	ring->start = NOENTRY;
 	ring->end = NOENTRY;
 	ring->size = size;
+	ring->entries = 0;
 	return ring;
 }
 
@@ -45,6 +46,7 @@ void ringbuffer_add(ringbuffer_t *ring, void *alloc, void *start)
 
 	entry->alloc = alloc;
 	entry->start = start;
+	++ring->entries;
 }
 
 cache_entry_t *ringbuffer_front(const ringbuffer_t *ring)
@@ -60,6 +62,7 @@ void ringbuffer_del(ringbuffer_t *ring)
 	} else {
 		ring->start = (ring->start + 1) % ring->size;
 	}
+	--ring->entries;
 }
 
 int ringbuffer_empty(const ringbuffer_t *ring)
@@ -67,8 +70,14 @@ int ringbuffer_empty(const ringbuffer_t *ring)
 	return ring->start == NOENTRY;
 }
 
+int ringbuffer_full(const ringbuffer_t *ring)
+{
+	return ring->size == ring->entries;
+}
+
 void ringbuffer_reset(ringbuffer_t *ring)
 {
 	ring->start = NOENTRY;
 	ring->end = NOENTRY;
+	ring->entries = 0;
 }

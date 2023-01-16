@@ -23,9 +23,6 @@
  **************************************************/
 
 typedef struct {
-    size_t usedMemory;
-    size_t maximumMemory;
-    ringbuffer_t *autoCaches;
     queue_t *prefetchCaches;
 } Cache;
 
@@ -41,8 +38,8 @@ typedef struct Allocation {
     void *shadow;
     /* We put all the blocking fetched stuff here until it is remapped to the proper position. */
     void *shadowPage;
-    /* We need to know this when invalidating the cache for an allocation. */
-    size_t usedMemory;
+    /* Cache for non-prefetch segfaults. */
+    ringbuffer_t *autoCaches;
 } Allocation;
 
 typedef struct Heap {

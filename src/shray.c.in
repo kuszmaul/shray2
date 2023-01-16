@@ -26,6 +26,7 @@ static size_t segfaultCounter;
 static size_t barrierCounter;
 static size_t ShrayPagesz;
 static size_t cacheLineSize;
+static size_t cacheAllocFactor;
 
 // TODO: this is not really necessary anymore
 enum WorkerState
@@ -226,59 +227,12 @@ static void evictCacheEntry(Allocation *alloc, uintptr_t start, size_t pages)
 
     DBUG_PRINT("evictCacheEntry: we free page %zu", index);
     freeRAM(start, start + size);
-    cache.usedMemory -= pages * ShrayPagesz;
-    alloc->usedMemory -= pages * ShrayPagesz;
 }
 
 /* Assumes both pages are page-aligned. */
 static inline int isNextPage(void *x, void *y)
 {
     return (uintptr_t)y - (uintptr_t)x == ShrayPagesz;
-}
-
-/*
- * Evicts at least size bytes from the cache.
- */
-static void evict(size_t size)
-{
-    cache_entry_t *next, *entry;
-    size_t evicted = 0;
-    size_t chain = 1;
-    size_t size_pages = roundUp(size, ShrayPagesz);
-
-    /* First try to evict automatically retrieved pages. */
-    while (!ringbuffer_empty(cache.autoCaches)) {
-        chain = 1;
-        entry = ringbuffer_front(cache.autoCaches);
-        ringbuffer_del(cache.autoCaches);
-
-        /* Check how many we can evict in one go. */
-        while (!ringbuffer_empty(cache.autoCaches)) {
-            if (chain >= size_pages) {
-                break;
-            }
-
-            next = ringbuffer_front(cache.autoCaches);
-            if (!isNextPage(entry->alloc, next->alloc)) {
-                break;
-            }
-
-            ringbuffer_del(cache.autoCaches);
-            ++chain;
-        }
-
-        evictCacheEntry(entry->alloc, (uintptr_t)entry->start, chain);
-        /* Only evict as much as needed */
-        evicted += chain;
-        if (evicted >= size_pages) {
-            return;
-        }
-    }
-
-    if (evicted < size_pages) {
-        DBUG_PRINT("Was only able to evict %zu pages (requested %zu) SHOULD NEVER HAPPEN",
-                evicted, size_pages);
-    }
 }
 
 static void handlePageFault(void *address)
@@ -318,14 +272,11 @@ static void handlePageFault(void *address)
                 (entry->end - alloc->location) / ShrayPagesz);
     } else {
         DBUG_PRINT("%p is not being prefetched, perform blocking fetch.", address);
-        if (cache.usedMemory + ShrayPagesz > cache.maximumMemory) {
-            DBUG_PRINT("We free up %zu bytes of cache memory",
-                    min(cache.maximumMemory / 10, cache.usedMemory));
-            evict(min(cache.maximumMemory / 10, cache.usedMemory));
+        if (ringbuffer_full(alloc->autoCaches)) {
+            cache_entry_t *entry = ringbuffer_front(alloc->autoCaches);
+            DBUG_PRINT("Cache buffer is full, evicting %p", entry->start);
+            evictCacheEntry(alloc, (uintptr_t)entry->start, 1);
         }
-
-        cache.usedMemory += ShrayPagesz;
-        alloc->usedMemory += ShrayPagesz;
 
         uintptr_t difference = roundedAddress - alloc->location;
         unsigned int owner = difference / alloc->bytesPerBlock;
@@ -348,7 +299,7 @@ static void handlePageFault(void *address)
         DBUG_PRINT("We set page %zu to locally available.", pageNumber);
 
         BitmapSetOnes(alloc->local, pageNumber, pageNumber + 1);
-        ringbuffer_add(cache.autoCaches, alloc, (void*)roundedAddress);
+        ringbuffer_add(alloc->autoCaches, alloc, (void*)roundedAddress);
     }
 }
 
@@ -512,8 +463,6 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 /* Is linear in the number of allocations when we do not prefetch. */
 static void ShrayResetCache()
 {
-    cache.usedMemory = 0;
-
     /* Finish the prefetches */
     size_t next_index = cache.prefetchCaches->data_start;
     while (next_index != NOLINK) {
@@ -527,8 +476,8 @@ static void ShrayResetCache()
     /* Reset the protections and bitmaps. */
     for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
         Allocation *alloc = heap.allocs + i;
-        alloc->usedMemory = 0;
 
+        ringbuffer_reset(alloc->autoCaches);
         BitmapReset(alloc->local);
         BitmapReset(alloc->prefetched);
         freeRAM(alloc->location, startRead(alloc, Shray_rank));
@@ -536,7 +485,6 @@ static void ShrayResetCache()
     }
 
     /* Free the cache data structures. */
-    ringbuffer_reset(cache.autoCaches);
     queue_reset(cache.prefetchCaches);
 }
 
@@ -588,8 +536,7 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
 
     char *cacheLineEnv = getenv("SHRAY_CACHELINE");
     if (cacheLineEnv == NULL) {
-        fprintf(stderr, "Please set the cacheline environment variable SHRAY_CACHELINE\n");
-        gasnet_exit(1);
+        cacheLineSize = 1;
     } else {
         cacheLineSize = atol(cacheLineEnv);
     }
@@ -597,8 +544,7 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
     // TODO: use macro to check whether or not multi-threading is supported
     char *workerThreadsEnv = getenv("SHRAY_WORKERTHREADS");
     if (workerThreadsEnv == NULL) {
-        fprintf(stderr, "Please set the worker threads environment variable SHRAY_WORKERTHREADS, use 0 for single threaded\n");
-        gasnet_exit(1);
+        workerThreadCount = 0;
     } else {
         workerThreadCount = atol(workerThreadsEnv);
     }
@@ -614,18 +560,15 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
     heap.numberOfAllocs = 0;
     MALLOC_SAFE(heap.allocs, sizeof(Allocation));
 
-    char *cacheSizeEnv = getenv("SHRAY_CACHESIZE");
+    char *cacheSizeEnv = getenv("SHRAY_CACHEFACTOR");
     if (cacheSizeEnv == NULL) {
-        fprintf(stderr, "Please set the cache size environment variable SHRAY_CACHESIZE\n");
-        gasnet_exit(1);
+        cacheAllocFactor = 1;
     } else {
-        cache.maximumMemory = atol(cacheSizeEnv);
+        cacheAllocFactor = atol(cacheSizeEnv);
     }
 
-    cache.usedMemory = 0;
-    cache.autoCaches = ringbuffer_alloc(cache.maximumMemory / ShrayPagesz);
     cache.prefetchCaches = queue_alloc(5);
-    if (!cache.autoCaches || !cache.prefetchCaches) {
+    if (!cache.prefetchCaches) {
         fprintf(stderr, "Could not allocate cache buffers\n");
         gasnet_exit(1);
     }
@@ -708,6 +651,14 @@ void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
     alloc->local = BitmapCreate(roundUp(totalSize, ShrayPagesz));
     alloc->prefetched = BitmapCreate(roundUp(totalSize, ShrayPagesz));
 
+    size_t cacheEntries = segmentLength / ShrayPagesz * cacheAllocFactor;
+    alloc->autoCaches = ringbuffer_alloc(cacheEntries);
+    if (!alloc->autoCaches) {
+        fprintf(stderr, "[node %d]: Could not allocate autocache", Shray_rank);
+        ShrayFinalize(1);
+    }
+    DBUG_PRINT("Allocated %zu automatic cache entries (%zu)", cacheEntries, totalSize / ShrayPagesz);
+
     gasnetBarrier();
     BARRIERCOUNT;
 
@@ -766,6 +717,7 @@ void ShrayFree@SHRAY_SUFFIX@(void *address)
 
     int index = findAlloc(address);
     Allocation *alloc = heap.allocs + index;
+    ringbuffer_reset(alloc->autoCaches);
     /* We leave potentially two pages mapped due to the alignment in ShrayMalloc, but
      * who cares. */
     MUNMAP_SAFE((void *)alloc->location, alloc->size);
@@ -954,7 +906,6 @@ void ShrayFinalize@SHRAY_SUFFIX@(int exit_code)
         }
 
         free(workerThreads);
-        ringbuffer_free(cache.autoCaches);
         queue_free(cache.prefetchCaches);
     }
     gasnet_exit(exit_code);

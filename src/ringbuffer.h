@@ -21,6 +21,7 @@ typedef struct
 	size_t size;
 	size_t start;
 	size_t end;
+	size_t entries;
 } ringbuffer_t;
 
 /**
@@ -52,6 +53,11 @@ void ringbuffer_del(ringbuffer_t *ring);
  * Check if the ringbuffer is empty.
  */
 int ringbuffer_empty(const ringbuffer_t *ring);
+
+/**
+ * Check if the ringbuffer is full.
+ */
+int ringbuffer_full(const ringbuffer_t *ring);
 
 /**
  * Reset the ringbuffer, removing all entries.
