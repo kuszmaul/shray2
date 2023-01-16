@@ -22,10 +22,6 @@
  * Data structures
  **************************************************/
 
-typedef struct {
-    queue_t *prefetchCaches;
-} Cache;
-
 /* A single allocation in the heap. */
 typedef struct Allocation {
     uintptr_t location;
@@ -40,6 +36,8 @@ typedef struct Allocation {
     void *shadowPage;
     /* Cache for non-prefetch segfaults. */
     ringbuffer_t *autoCaches;
+    /* Prefetches for this array */
+    queue_t *prefetchCaches;
 } Allocation;
 
 typedef struct Heap {

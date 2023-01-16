@@ -17,7 +17,6 @@
  *****************************************************/
 
 /* TODO: move cache stuff to its own file */
-static Cache cache;
 static Heap heap;
 
 static unsigned int Shray_rank;
@@ -26,7 +25,7 @@ static size_t segfaultCounter;
 static size_t barrierCounter;
 static size_t ShrayPagesz;
 static size_t cacheLineSize;
-static size_t cacheAllocFactor;
+static double cacheAllocFactor;
 
 // TODO: this is not really necessary anymore
 enum WorkerState
@@ -248,7 +247,7 @@ static void handlePageFault(void *address)
 
     if (BitmapCheck(alloc->prefetched, pageNumber)) {
         /* Find the prefetch. */
-        queue_entry_t *entry = queue_find(cache.prefetchCaches, roundedAddress);
+        queue_entry_t *entry = queue_find(alloc->prefetchCaches, roundedAddress);
 
         if (entry == NULL) {
             DBUG_PRINT("%p set to prefetched, but was not in the prefetch queue",
@@ -452,7 +451,7 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
             DBUG_PRINT("We set this to prefetched (pages [%zu, %zu[)",
                 (start_r - location) / ShrayPagesz, (end_r - location) / ShrayPagesz);
 
-            queue_queue(cache.prefetchCaches, alloc, start_r, end_r, handle);
+            queue_queue(alloc->prefetchCaches, alloc, start_r, end_r, handle);
 
             BitmapSetOnes(alloc->prefetched, (start_r - location) / ShrayPagesz,
                 (end_r - location) / ShrayPagesz);
@@ -461,31 +460,25 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 }
 
 /* Is linear in the number of allocations when we do not prefetch. */
-static void ShrayResetCache()
+static void ShrayResetCache(Allocation *alloc)
 {
     /* Finish the prefetches */
-    size_t next_index = cache.prefetchCaches->data_start;
+    size_t next_index = alloc->prefetchCaches->data_start;
     while (next_index != NOLINK) {
-    	queue_entry_t *entry = &cache.prefetchCaches->data[next_index];
+    	queue_entry_t *entry = &alloc->prefetchCaches->data[next_index];
 
         if (!entry->gottem) gasnet_wait_syncnb(entry->handle);
 
         next_index = entry->next;
     }
 
-    /* Reset the protections and bitmaps. */
-    for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
-        Allocation *alloc = heap.allocs + i;
+    freeRAM(alloc->location, startRead(alloc, Shray_rank));
+    freeRAM(endRead(alloc, Shray_rank), alloc->location + alloc->size);
 
-        ringbuffer_reset(alloc->autoCaches);
-        BitmapReset(alloc->local);
-        BitmapReset(alloc->prefetched);
-        freeRAM(alloc->location, startRead(alloc, Shray_rank));
-        freeRAM(endRead(alloc, Shray_rank), alloc->location + alloc->size);
-    }
-
-    /* Free the cache data structures. */
-    queue_reset(cache.prefetchCaches);
+    ringbuffer_reset(alloc->autoCaches);
+    BitmapReset(alloc->local);
+    BitmapReset(alloc->prefetched);
+    queue_reset(alloc->prefetchCaches);
 }
 
 static void startShrayWorkers()
@@ -564,13 +557,7 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
     if (cacheSizeEnv == NULL) {
         cacheAllocFactor = 1;
     } else {
-        cacheAllocFactor = atol(cacheSizeEnv);
-    }
-
-    cache.prefetchCaches = queue_alloc(5);
-    if (!cache.prefetchCaches) {
-        fprintf(stderr, "Could not allocate cache buffers\n");
-        gasnet_exit(1);
+        cacheAllocFactor = strtod(cacheSizeEnv, NULL);
     }
 
     memoryThread = pthread_self();
@@ -659,6 +646,12 @@ void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
     }
     DBUG_PRINT("Allocated %zu automatic cache entries (%zu)", cacheEntries, totalSize / ShrayPagesz);
 
+    alloc->prefetchCaches = queue_alloc(5);
+    if (!alloc->prefetchCaches) {
+        fprintf(stderr, "Could not allocate cache buffers\n");
+        ShrayFinalize(1);
+    }
+
     gasnetBarrier();
     BARRIERCOUNT;
 
@@ -692,12 +685,7 @@ void ShraySync@SHRAY_SUFFIX@(void *array)
     UpdatePage(firstPage, index);
     if (firstPage != lastPage) UpdatePage(lastPage, index);
 
-    /* Technically this is not necessary after every sync, but the call is cheap, and it makes
-     * the consistency easier. A reuse of buffers is now always allowed for the following reason:
-     * Suppose we use the same buffer for A and B. We can only read old data of A when reading B
-     * if the same location was read of A. But that is only allowed after a ShraySync(A), which
-     * resets the cache. */
-    ShrayResetCache();
+    ShrayResetCache(alloc);
 
     gasnet_wait_syncnbi_gets();
     DBUG_PRINT("We are done updating pages for %p", array);
@@ -764,7 +752,7 @@ static void DiscardGet(queue_entry_t *get, size_t index)
         MMAP_FIXED_SAFE((void *)start, end - start, PROT_READ | PROT_WRITE);
     }
 
-    queue_remove_at(cache.prefetchCaches, index);
+    queue_remove_at(alloc->prefetchCaches, index);
 }
 
 /* Returns true iff [subStart, subEnd[ \subseteq [start, end[. */
@@ -779,9 +767,10 @@ void ShrayDiscard@SHRAY_SUFFIX@(void *address, size_t size)
 
     /* Walk through the prefetch-queue, and delete everything prefetched by the
      * issue [address, address + size[. */
-    size_t next_index = cache.prefetchCaches->data_start;
+    Allocation *alloc = heap.allocs + findAlloc(address);
+    size_t next_index = alloc->prefetchCaches->data_start;
     while (next_index != NOLINK) {
-        queue_entry_t *entry = &(cache.prefetchCaches->data[next_index]);
+        queue_entry_t *entry = &(alloc->prefetchCaches->data[next_index]);
 
         if (IsSubset(entry->start, entry->end, prefetch.start1, prefetch.end1) ||
             IsSubset(entry->start, entry->end, prefetch.start2, prefetch.end2))
@@ -906,7 +895,10 @@ void ShrayFinalize@SHRAY_SUFFIX@(int exit_code)
         }
 
         free(workerThreads);
-        queue_free(cache.prefetchCaches);
+        for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
+            Allocation *alloc = heap.allocs + i;
+            queue_free(alloc->prefetchCaches);
+        }
     }
     gasnet_exit(exit_code);
 }
