@@ -40,9 +40,10 @@ endif()
 set(MPI_EXECUTABLE_SUFFIX ".openmpi")
 find_package(MPI REQUIRED COMPONENTS C)
 
-if(NOT DEFINED ENV{GASNet_ROOT})
-    MESSAGE(FATAL_ERROR "Please set environment variable GASNet_ROOT "
-        "to your gasnet installation path")
+if(NOT DEFINED ENV{GASNet_ROOT} AND NOT GASNet_ROOT_DIR)
+	MESSAGE(FATAL_ERROR "Please set environment variable GASNet_ROOT "
+		"to your gasnet installation path OR set the CMake "
+		"GASNet_ROOT_DIR variable")
 endif()
 
 find_package(GASNet REQUIRED)
