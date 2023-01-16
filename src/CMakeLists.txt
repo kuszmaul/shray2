@@ -19,9 +19,9 @@ add_library("${LIB_TARGET}" SHARED
 	bitmap.c
 	queue.c
 	ringbuffer.c
-    ${CMAKE_CURRENT_BINARY_DIR}/shray_debug.c
-    ${CMAKE_CURRENT_BINARY_DIR}/shray_normal.c
-    ${CMAKE_CURRENT_BINARY_DIR}/shray_profile.c)
+	"${CMAKE_CURRENT_BINARY_DIR}/shray_debug.c"
+	"${CMAKE_CURRENT_BINARY_DIR}/shray_normal.c"
+	"${CMAKE_CURRENT_BINARY_DIR}/shray_profile.c")
 target_compile_options("${LIB_TARGET}"
 	PRIVATE
 		-fPIC)
