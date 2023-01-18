@@ -29,6 +29,7 @@ void ShrayPrefetch_debug(void *address, size_t size);
 void ShrayDiscard_debug(void *address, size_t size);
 void ShrayRunWorker_debug(shray_fn fn, size_t n, void *args);
 void ShrayBroadcast_debug(void *buffer, size_t size, int root);
+void ShrayBarrier_debug(void);
 
 /* Profile declarations */
 void ShrayInit_profile(int *argc, char ***argv);
@@ -45,6 +46,7 @@ void ShrayPrefetch_profile(void *address, size_t size);
 void ShrayDiscard_profile(void *address, size_t size);
 void ShrayRunWorker_profile(shray_fn fn, size_t n, void *args);
 void ShrayBroadcast_profile(void *buffer, size_t size, int root);
+void ShrayBarrier_profile(void);
 
 /* Normal declarations */
 void ShrayInit_normal(int *argc, char ***argv);
@@ -61,6 +63,7 @@ void ShrayPrefetch_normal(void *address, size_t size);
 void ShrayDiscard_normal(void *address, size_t size);
 void ShrayRunWorker_normal(shray_fn fn, size_t n, void *args);
 void ShrayBroadcast_normal(void *buffer, size_t size, int root);
+void ShrayBarrier_normal(void);
 
 #ifdef DEBUG
 
@@ -78,6 +81,7 @@ void ShrayBroadcast_normal(void *buffer, size_t size, int root);
 #define ShrayDiscard(address, size) ShrayDiscard_debug(address, size)
 #define ShrayRunWorker(fn, n, args) ShrayRunWorker_debug(fn, n, args)
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_debug(buffer, size, root)
+#define ShrayBarrier() ShrayBarrier_debug()
 
 #else
 #ifdef PROFILE
@@ -96,6 +100,7 @@ void ShrayBroadcast_normal(void *buffer, size_t size, int root);
 #define ShrayDiscard(address, size) ShrayDiscard_profile(address, size)
 #define ShrayRunWorker(fn, n, args) ShrayRunWorker_profile(fn, n, args)
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_profile(buffer, size, root)
+#define ShrayBarrier() ShrayBarrier_profile()
 
 #else
 #define ShrayInit(argc, argv) ShrayInit_normal(argc, argv)
@@ -112,6 +117,7 @@ void ShrayBroadcast_normal(void *buffer, size_t size, int root);
 #define ShrayDiscard(address, size) ShrayDiscard_normal(address, size)
 #define ShrayRunWorker(fn, n, args) ShrayRunWorker_normal(fn, n, args)
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_normal(buffer, size, root)
+#define ShrayBarrier() ShrayBarrier_normal()
 #endif /* PROFILE */
 #endif /* DEBUG */
 

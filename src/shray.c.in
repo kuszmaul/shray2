@@ -910,3 +910,9 @@ void ShrayBroadcast@SHRAY_SUFFIX@(void *buffer, size_t size, int root)
     gasnet_coll_broadcast(gasnete_coll_team_all, buffer, root, buffer, size,
             GASNET_COLL_DST_IN_SEGMENT);
 }
+
+void ShrayBarrier@SHRAY_SUFFIX@(void)
+{
+    gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS);
+    gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);
+}
