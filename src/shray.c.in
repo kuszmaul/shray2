@@ -29,6 +29,7 @@ size_t ShrayBarrierCounter;
 size_t ShrayPagesz;
 size_t ShrayCacheLineSize;
 double ShrayCacheAllocFactor;
+Heap heap;
 
 bool ShrayOutput;
 #endif
@@ -61,7 +62,6 @@ static pthread_barrier_t workerBarrier;
 
 static pthread_key_t key;
 /* FIXME why does it give an error when making this global? */
-static Heap heap;
 
 /*****************************************************
  * Helper functions
