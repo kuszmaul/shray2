@@ -15,9 +15,9 @@
  **************************************************/
 
 #ifdef PROFILE
-    #define BARRIERCOUNT barrierCounter++;
-    #define SEGFAULTCOUNT segfaultCounter++;
-    #define PREFETCHMISS prefetchMissCounter++;
+    #define BARRIERCOUNT ShrayBarrierCounter++;
+    #define SEGFAULTCOUNT ShraySegfaultCounter++;
+    #define PREFETCHMISS ShrayPrefetchMissCounter++;
 #else
     #define BARRIERCOUNT
     #define SEGFAULTCOUNT

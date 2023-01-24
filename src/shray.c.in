@@ -16,16 +16,22 @@
  * Global variable declarations.
  *****************************************************/
 
-/* TODO: move cache stuff to its own file */
-static Heap heap;
+/* We need this global in cases functions with different
+ * SHRAY_SUFFIX'es are called in one program. */
 
-static unsigned int Shray_rank;
-static unsigned int Shray_size;
-static size_t segfaultCounter;
-static size_t barrierCounter;
-static size_t ShrayPagesz;
-static size_t cacheLineSize;
-static double cacheAllocFactor;
+#if !(DEBUG || PROFILE)
+/* TODO: move cache stuff to its own file */
+
+unsigned int Shray_rank;
+unsigned int Shray_size;
+size_t ShraySegfaultCounter;
+size_t ShrayBarrierCounter;
+size_t ShrayPagesz;
+size_t ShrayCacheLineSize;
+double ShrayCacheAllocFactor;
+
+bool ShrayOutput;
+#endif
 
 // TODO: this is not really necessary anymore
 enum WorkerState
@@ -54,6 +60,8 @@ static pthread_t memoryThread;
 static pthread_barrier_t workerBarrier;
 
 static pthread_key_t key;
+/* FIXME why does it give an error when making this global? */
+static Heap heap;
 
 /*****************************************************
  * Helper functions
@@ -509,10 +517,6 @@ static void startShrayWorkers()
  * Shray functionality
  *****************************************************/
 
-#if !(DEBUG || PROFILE)
-bool ShrayOutput;
-#endif
-
 void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
 {
     GASNET_SAFE(gasnet_init(argc, argv));
@@ -524,14 +528,14 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
 
     ShrayOutput = (Shray_rank == 0);
 
-    segfaultCounter = 0;
-    barrierCounter = 0;
+    ShraySegfaultCounter = 0;
+    ShrayBarrierCounter = 0;
 
     char *cacheLineEnv = getenv("SHRAY_CACHELINE");
     if (cacheLineEnv == NULL) {
-        cacheLineSize = 1;
+        ShrayCacheLineSize = 1;
     } else {
-        cacheLineSize = atol(cacheLineEnv);
+        ShrayCacheLineSize = atol(cacheLineEnv);
     }
 
     // TODO: use macro to check whether or not multi-threading is supported
@@ -547,7 +551,7 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
         perror("Querying system page size failed.");
     }
 
-    ShrayPagesz = (size_t)pagesz * cacheLineSize;
+    ShrayPagesz = (size_t)pagesz * ShrayCacheLineSize;
 
     heap.size = sizeof(Allocation);
     heap.numberOfAllocs = 0;
@@ -555,9 +559,9 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
 
     char *cacheSizeEnv = getenv("SHRAY_CACHEFACTOR");
     if (cacheSizeEnv == NULL) {
-        cacheAllocFactor = 1;
+        ShrayCacheAllocFactor = 1;
     } else {
-        cacheAllocFactor = strtod(cacheSizeEnv, NULL);
+        ShrayCacheAllocFactor = strtod(cacheSizeEnv, NULL);
     }
 
     memoryThread = pthread_self();
@@ -638,7 +642,7 @@ void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
     alloc->local = BitmapCreate(roundUp(totalSize, ShrayPagesz));
     alloc->prefetched = BitmapCreate(roundUp(totalSize, ShrayPagesz));
 
-    size_t cacheEntries = segmentLength / ShrayPagesz * cacheAllocFactor;
+    size_t cacheEntries = segmentLength / ShrayPagesz * ShrayCacheAllocFactor;
     alloc->autoCaches = ringbuffer_alloc(cacheEntries);
     if (!alloc->autoCaches) {
         fprintf(stderr, "[node %d]: Could not allocate autocache", Shray_rank);
@@ -856,8 +860,8 @@ void ShrayReport@SHRAY_SUFFIX@(void)
 {
     fprintf(stderr,
             "Shray report P(%d): %zu segfaults, %zu barriers, "
-            "%zu bytes communicated.\n", Shray_rank, segfaultCounter, barrierCounter,
-            segfaultCounter * ShrayPagesz);
+            "%zu bytes communicated.\n", Shray_rank, ShraySegfaultCounter, ShrayBarrierCounter,
+            ShraySegfaultCounter * ShrayPagesz);
 }
 
 unsigned int ShrayRank@SHRAY_SUFFIX@(void)

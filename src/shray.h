@@ -19,6 +19,18 @@
 #include "debug.h"
 
 /**************************************************
+ * Global variables
+ **************************************************/
+
+extern unsigned int Shray_rank;
+extern unsigned int Shray_size;
+extern size_t ShraySegfaultCounter;
+extern size_t ShrayBarrierCounter;
+extern size_t ShrayPagesz;
+extern size_t ShrayCacheLineSize;
+extern double ShrayCacheAllocFactor;
+
+/**************************************************
  * Data structures
  **************************************************/
 
