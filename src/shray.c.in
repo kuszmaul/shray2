@@ -61,7 +61,6 @@ static pthread_t memoryThread;
 static pthread_barrier_t workerBarrier;
 
 static pthread_key_t key;
-/* FIXME why does it give an error when making this global? */
 
 /*****************************************************
  * Helper functions
