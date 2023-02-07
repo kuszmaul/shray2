@@ -5,16 +5,16 @@
 #include <stdlib.h>
 #include <errno.h>
 
-void init(double *a, size_t n)
+void init(double *a)
 {
-	for (size_t i = ShrayStart(n); i < ShrayEnd(n); ++i) {
+	for (size_t i = ShrayStart(a); i < ShrayEnd(a); ++i) {
 		a[i] = i;
 	}
 }
 
 void spmv(csr_t *matrix, double *vector, double *out)
 {
-	for (size_t i = ShrayStart(matrix->n), k = 0; i < ShrayEnd(matrix->n); ++i, ++k) {
+	for (size_t i = ShrayStart(out), k = 0; i < ShrayEnd(out); ++i, ++k) {
 		double outval = 0;
 
 		size_t row_start = matrix->row_indices[k];
@@ -67,7 +67,7 @@ int main(int argc, char **argv)
 	double *vector = ShrayMalloc(matrix->n, matrix->n * sizeof(double));
 	double *out = ShrayMalloc(matrix->n, matrix->n * sizeof(double));
 
-	init(vector, matrix->n);
+	init(vector);
 	ShraySync(vector);
 
 	double duration;

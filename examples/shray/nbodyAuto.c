@@ -12,9 +12,9 @@ typedef struct {
     double z;
 } Point;
 
-void init(Point *positions, size_t n)
+void init(Point *positions)
 {
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(positions); i < ShrayEnd(positions); i++) {
         positions[i].x = i;
         positions[i].y = i;
         positions[i].z = i;
@@ -45,8 +45,8 @@ Point accelerate(Point pos1, Point pos2, double mass)
 
 void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
-    size_t localStart = ShrayStart(n);
-    size_t localEnd = ShrayEnd(n);
+    size_t localStart = ShrayStart(accel);
+    size_t localEnd = ShrayEnd(accel);
 
     for (size_t i = localStart; i < localEnd; i++) {
         accel[i].x = 0.0;
@@ -68,7 +68,7 @@ void advance(Point *positions, Point *velocities, double *masses,
     accelerateAll(accel, positions, masses, n);
     ShraySync(accel);
 
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(velocities); i < ShrayEnd(velocities); i++) {
         velocities[i].x += accel[i].x * dt;
         velocities[i].y += accel[i].y * dt;
         velocities[i].z += accel[i].z * dt;
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
     double *masses = (double *)ShrayMalloc(n, n * sizeof(double));
     Point *accel = (Point *)ShrayMalloc(n, n * sizeof(Point));
 
-    init(positions, n);
+    init(positions);
     ShraySync(positions);
 
     double duration;

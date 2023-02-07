@@ -14,9 +14,9 @@ typedef struct {
     double z;
 } Point;
 
-void init(Point *positions, size_t n)
+void init(Point *positions)
 {
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(positions); i < ShrayEnd(positions); i++) {
         positions[i].x = i;
         positions[i].y = i;
         positions[i].z = i;
@@ -47,11 +47,11 @@ Point accelerate(Point pos1, Point pos2, double mass)
 
 /* Calculates the acceleration of all locally owned bodies with respect to bodies
  * [start, end[. Blocks the loops with factor block. */
-void accelerateHelp(Point *accel, Point *positions, double *masses, size_t n,
+void accelerateHelp(Point *accel, Point *positions, double *masses,
         size_t start, size_t end, size_t block)
 {
-    size_t localStart = ShrayStart(n);
-    size_t localEnd = ShrayEnd(n);
+    size_t localStart = ShrayStart(accel);
+    size_t localEnd = ShrayEnd(accel);
 
     for (size_t Ib = localStart; Ib < localEnd; Ib += block) {
         for (size_t Jb = start; Jb < end; Jb += block) {
@@ -69,8 +69,8 @@ void accelerateHelp(Point *accel, Point *positions, double *masses, size_t n,
 
 void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 {
-    size_t localStart = ShrayStart(n);
-    size_t localEnd = ShrayEnd(n);
+    size_t localStart = ShrayStart(accel);
+    size_t localEnd = ShrayEnd(accel);
     unsigned int p = ShraySize();
     unsigned int s = ShrayRank();
 
@@ -85,7 +85,7 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
     ShrayPrefetch(&positions[(s + 1) % p * n / p], n / p * sizeof(Point));
     ShrayPrefetch(&masses[(s + 1) % p * n / p], n / p * sizeof(double));
 
-    accelerateHelp(accel, positions, masses, n, localStart, localEnd, block);
+    accelerateHelp(accel, positions, masses, localStart, localEnd, block);
 
     /* Accelerate with respect to P(t) and prefetch the next block (we pretend we have a loop, so
      * P(0) comes after P(p - 1)). */
@@ -99,7 +99,7 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
             ShrayPrefetch(&masses[startNext], n / p * sizeof(double));
         }
 
-        accelerateHelp(accel, positions, masses, n, startT, endT, block);
+        accelerateHelp(accel, positions, masses, startT, endT, block);
 
         ShrayDiscard(&positions[startT], n / p * sizeof(Point));
         ShrayDiscard(&masses[startT], n / p * sizeof(double));
@@ -113,7 +113,7 @@ void advance(Point *positions, Point *velocities, double *masses,
     accelerateAll(accel, positions, masses, n);
     ShraySync(accel);
 
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(velocities); i < ShrayEnd(velocities); i++) {
         velocities[i].x += accel[i].x * dt;
         velocities[i].y += accel[i].y * dt;
         velocities[i].z += accel[i].z * dt;
@@ -146,7 +146,7 @@ int main(int argc, char **argv)
     double *masses = (double *)ShrayMalloc(n, n * sizeof(double));
     Point *accel = (Point *)ShrayMalloc(n, n * sizeof(Point));
 
-    init(positions, n);
+    init(positions);
     ShraySync(positions);
 
     double duration;

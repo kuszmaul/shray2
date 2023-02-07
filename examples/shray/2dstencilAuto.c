@@ -22,7 +22,7 @@ const double e = 0.25;
 
 void init(size_t n, double *arr)
 {
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(arr); i < ShrayEnd(arr); i++) {
         for (size_t j = 0; j < n; j++) {
             arr[i * n + j] = i + j;
         }
@@ -31,8 +31,8 @@ void init(size_t n, double *arr)
 
 void relax(size_t n, double **in, double **out)
 {
-    size_t start = MAX(ShrayStart(n), 1);
-    size_t end = MIN(ShrayEnd(n), n - 1);
+    size_t start = MAX(ShrayStart(*in), 1);
+    size_t end = MIN(ShrayEnd(*in), n - 1);
 
     for (size_t i = start; i < end; i++) {
         for (size_t j = 1; j < n - 1; j++) {
@@ -48,20 +48,20 @@ void relax(size_t n, double **in, double **out)
 void stencil(size_t n, double **in, double **out, int iterations)
 {
     /* First and last row. */
-    if (ShrayStart(n) == 0) {
+    if (ShrayStart(*in) == 0) {
         for (size_t j = 0; j < n; j++) {
             (*out)[j] = (*in)[j];
         }
     }
 
-    if (ShrayEnd(n) == n - 1) {
+    if (ShrayEnd(*in) == n - 1) {
         for (size_t j = 0; j < n; j++) {
             (*out)[(n - 1) * n + j] = (*in)[(n - 1) * n + j];
         }
     }
 
     /* First and last column */
-    for (size_t i = MAX(ShrayStart(n), 1); i < MIN(ShrayEnd(n), n - 1); i++) {
+    for (size_t i = MAX(ShrayStart(*in), 1); i < MIN(ShrayEnd(*in), n - 1); i++) {
         (*out)[i * n] = (*in)[i * n];
         (*out)[i * n + n - 1] = (*in)[i * n + n - 1];
     }

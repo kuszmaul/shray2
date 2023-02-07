@@ -6,7 +6,7 @@
 /* Initializes n x n matrix to value. */
 void init(double *matrix, size_t n, double value)
 {
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(matrix); i < ShrayEnd(matrix); i++) {
         for (size_t j = 0; j < n; j++) {
             matrix[i * n + j] = value;
         }

@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void init(double *arr, size_t n)
+void init(double *arr)
 {
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(arr); i < ShrayEnd(arr); i++) {
         arr[i] = 1;
     }
 }
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
     size_t n = atoll(argv[1]);
 
     double *A = ShrayMalloc(n, n * sizeof(double));
-    init(A, n);
+    init(A);
     ShraySync(A);
 
     double duration;

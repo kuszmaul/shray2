@@ -6,7 +6,7 @@
 /* Initializes n x n matrix to value. */
 void init(double *matrix, size_t n, double value)
 {
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(matrix); i < ShrayEnd(matrix); i++) {
         for (size_t j = 0; j < n; j++) {
             matrix[i * n + j] = value;
         }
@@ -16,8 +16,8 @@ void init(double *matrix, size_t n, double value)
 void matmul(double *A, double *B, double *C, size_t n)
 {
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-            ShrayEnd(n) - ShrayStart(n), n, n, 1.0, A + ShrayStart(n) * n, n,
-            B, n, 0.0, C + ShrayStart(n) * n, n);
+            ShrayEnd(C) - ShrayStart(C), n, n, 1.0, A + ShrayStart(C) * n, n,
+            B, n, 0.0, C + ShrayStart(C) * n, n);
 }
 
 /* If A, B are all one's, C should be n at every entry. */

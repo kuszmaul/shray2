@@ -15,7 +15,7 @@ typedef struct {
 /* Initializes n x n matrix to value. */
 void init(double *matrix, size_t n, double value)
 {
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(matrix); i < ShrayEnd(matrix); i++) {
         for (size_t j = 0; j < n; j++) {
             matrix[i * n + j] = value;
         }
@@ -61,7 +61,7 @@ void matmul(double *A, double *B, double *C, size_t n)
     matrixInfo.C = C;
     matrixInfo.t = s;
 
-    ShrayRunWorker(matmul_mt, n, &matrixInfo);
+    ShrayRunWorker(matmul_mt, C, &matrixInfo);
 
     for (unsigned int t = (s + 1) % p; t != s; t = (t + 1) % p) {
         /* Get the next block */
@@ -70,7 +70,7 @@ void matmul(double *A, double *B, double *C, size_t n)
         }
 
         matrixInfo.t = t;
-        ShrayRunWorker(matmul_mt, n, &matrixInfo);
+        ShrayRunWorker(matmul_mt, C, &matrixInfo);
 
         ShrayDiscard(B + n / p * n * t, n / p * n * sizeof(double));
     }
