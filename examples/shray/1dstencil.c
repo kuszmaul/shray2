@@ -11,11 +11,12 @@ const double a = 0.50;
 const double b = 0.33;
 const double c = 0.25;
 
-void init(size_t n, double *arr)
+void init(double *arr)
 {
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(arr); i < ShrayEnd(arr); i++) {
             arr[i] = i;
     }
+    ShraySync(arr);
 }
 
 /* Computes a stencil on inBuffer of size n + 2 * iterations, writing the result to outBuffer,
@@ -81,24 +82,24 @@ void right(size_t n, int iterations, double **in, double **out)
  * factor 2. */
 void StencilBlocked(size_t n, double **in, double **out, int iterations)
 {
-    double *inBuffer = malloc((iterations + 2 * iterations) * sizeof(double));
-    double *outBuffer = malloc((iterations + 2 * iterations) * sizeof(double));
+    double *inBuffer = malloc((BLOCK + 2 * iterations) * sizeof(double));
+    double *outBuffer = malloc((BLOCK + 2 * iterations) * sizeof(double));
 
-    for (size_t row = ShrayStart(n / iterations); row < ShrayEnd(n / iterations); row++) {
+    for (size_t row = ShrayStart(*in); row < ShrayEnd(*in); row++) {
         if (row == 0) {
-            memcpy(inBuffer, *in, (iterations + iterations) * sizeof(double));
-            left(iterations, iterations, &inBuffer, &outBuffer);
+            memcpy(inBuffer, *in, (BLOCK + iterations) * sizeof(double));
+            left(BLOCK, iterations, &inBuffer, &outBuffer);
         } else if (row == n / iterations - 1) {
-            memcpy(inBuffer, *in + row * iterations - iterations,
-                    (iterations + iterations) * sizeof(double));
-            right(iterations, iterations, &inBuffer, &outBuffer);
+            memcpy(inBuffer, *in + row * BLOCK - iterations,
+                    (BLOCK + iterations) * sizeof(double));
+            right(BLOCK, iterations, &inBuffer, &outBuffer);
         } else {
-            memcpy(inBuffer, *in + row * iterations - iterations,
-                    (iterations + 2 * iterations) * sizeof(double));
-            middle(iterations, iterations, &inBuffer, &outBuffer);
+            memcpy(inBuffer, *in + row * BLOCK - iterations,
+                    (BLOCK + 2 * iterations) * sizeof(double));
+            middle(BLOCK, iterations, &inBuffer, &outBuffer);
         }
 
-        memcpy(*out + row * iterations, outBuffer + iterations, iterations * sizeof(double));
+        memcpy(*out + row * BLOCK, outBuffer + iterations, BLOCK * sizeof(double));
     }
 
     ShraySync(*out);
@@ -139,8 +140,7 @@ int main(int argc, char **argv)
     double *in = ShrayMalloc(n / BLOCK, n * sizeof(double));
     double *out = ShrayMalloc(n / BLOCK, n * sizeof(double));
 
-    init(n, in);
-    ShraySync(in);
+    init(in);
 
     double duration;
     TIME(duration, Stencil(n, &in, &out, iterations););
