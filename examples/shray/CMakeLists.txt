@@ -10,6 +10,7 @@ foreach(suffix
 	endif()
 
 	foreach(file
+			1dstencil
 			2dstencil
 			2dstencilAuto
 			bandwidth
