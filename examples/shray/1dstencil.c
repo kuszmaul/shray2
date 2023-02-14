@@ -112,9 +112,17 @@ void Stencil(size_t n, double **in, double **out, int iterations)
 {
     for (int t = 0; t < iterations; t += BLOCK) {
         StencilBlocked(n, in, out, BLOCK);
+        double *temp = *out;
+        *out = *in;
+        *in = temp;
     }
     if (iterations % BLOCK != 0) {
         StencilBlocked(n, in, out, iterations % BLOCK);
+    } else {
+        /* We did one buffer swap too many */
+        double *temp = *out;
+        *out = *in;
+        *in = temp;
     }
 }
 
