@@ -18,9 +18,9 @@
          (double) (tv2.tv_sec - tv1.tv_sec);                           \
     }
 
-void init(size_t n, double *input)
+void init(double *input)
 {
-    for (size_t i = ShrayStart(n); i < ShrayEnd(n); i++) {
+    for (size_t i = ShrayStart(input); i < ShrayEnd(input); i++) {
         input[i] = 1.0;
     }
 }
@@ -49,8 +49,8 @@ double random_reduce(size_t n, int local_prob, double *input, size_t size)
 {
     double result = 0.0;
 
-    size_t shray_start = ShrayStart(size);
-    size_t shray_end = ShrayEnd(size);
+    size_t shray_start = ShrayStart(input);
+    size_t shray_end = ShrayEnd(input);
 
     for (size_t i = 0; i < n; i++) {
         size_t r = rand_n_prob(shray_start, shray_end, local_prob, size);
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 
     double *input = ShrayMalloc(size, size * sizeof(double));
 
-    init(size, input);
+    init(input);
     ShraySync(input);
 
     double duration;

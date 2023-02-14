@@ -26,6 +26,7 @@
 typedef struct Allocation {
     uintptr_t location;
     size_t size;
+    size_t firstDimension;
     /* The number of bytes owned by each node except the last one. */
     size_t bytesPerBlock;
     Bitmap *local;

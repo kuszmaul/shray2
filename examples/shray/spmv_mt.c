@@ -11,9 +11,9 @@ typedef struct {
     double *out;
 } matrix_t;
 
-void init(double *a, size_t n)
+void init(double *a)
 {
-	for (size_t i = ShrayStart(n); i < ShrayEnd(n); ++i) {
+	for (size_t i = ShrayStart(a); i < ShrayEnd(a); ++i) {
 		a[i] = i;
 	}
 }
@@ -49,7 +49,7 @@ void steady_state(csr_t *matrix, double *vector, double *out, size_t iterations)
     matrixInfo.out = out;
 
 	for (size_t i = 0; i < iterations; ++i) {
-		ShrayRunWorker(spmv_mt, matrix->n, &matrixInfo);
+		ShrayRunWorker(spmv_mt, out, &matrixInfo);
 		ShraySync(matrixInfo.out);
 		double *tmp = matrixInfo.vector;
 		matrixInfo.vector = matrixInfo.out;
@@ -77,7 +77,7 @@ int main(int argc, char **argv)
 	double *vector = ShrayMalloc(matrix->n, matrix->n * sizeof(double));
 	double *out = ShrayMalloc(matrix->m_total, matrix->m_total * sizeof(double));
 
-	init(vector, matrix->n);
+	init(vector);
 	ShraySync(vector);
 
 	double duration;

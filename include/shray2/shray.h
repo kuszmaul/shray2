@@ -17,8 +17,8 @@ typedef void (*shray_fn)(worker_info_t *info);
 /* Debug declarations */
 void ShrayInit_debug(int *argc, char ***argv);
 void *ShrayMalloc_debug(size_t firstDimension, size_t totalSize);
-size_t ShrayStart_debug(size_t firstDimension);
-size_t ShrayEnd_debug(size_t firstDimension);
+size_t ShrayStart_debug(void *array);
+size_t ShrayEnd_debug(void *array);
 void ShraySync_debug(void *array);
 void ShrayFree_debug(void *address);
 void ShrayReport_debug(void);
@@ -27,15 +27,15 @@ unsigned int ShraySize_debug(void);
 void ShrayFinalize_debug(int exit_code);
 void ShrayPrefetch_debug(void *address, size_t size);
 void ShrayDiscard_debug(void *address, size_t size);
-void ShrayRunWorker_debug(shray_fn fn, size_t n, void *args);
+void ShrayRunWorker_debug(shray_fn fn, void *array, void *args);
 void ShrayBroadcast_debug(void *buffer, size_t size, int root);
 void ShrayBarrier_debug(void);
 
 /* Profile declarations */
 void ShrayInit_profile(int *argc, char ***argv);
 void *ShrayMalloc_profile(size_t firstDimension, size_t totalSize);
-size_t ShrayStart_profile(size_t firstDimension);
-size_t ShrayEnd_profile(size_t firstDimension);
+size_t ShrayStart_profile(void *array);
+size_t ShrayEnd_profile(void *array);
 void ShraySync_profile(void *array);
 void ShrayFree_profile(void *address);
 void ShrayReport_profile(void);
@@ -44,15 +44,15 @@ unsigned int ShraySize_profile(void);
 void ShrayFinalize_profile(int exit_code);
 void ShrayPrefetch_profile(void *address, size_t size);
 void ShrayDiscard_profile(void *address, size_t size);
-void ShrayRunWorker_profile(shray_fn fn, size_t n, void *args);
+void ShrayRunWorker_profile(shray_fn fn, void *array, void *args);
 void ShrayBroadcast_profile(void *buffer, size_t size, int root);
 void ShrayBarrier_profile(void);
 
 /* Normal declarations */
 void ShrayInit_normal(int *argc, char ***argv);
 void *ShrayMalloc_normal(size_t firstDimension, size_t totalSize);
-size_t ShrayStart_normal(size_t firstDimension);
-size_t ShrayEnd_normal(size_t firstDimension);
+size_t ShrayStart_normal(void *array);
+size_t ShrayEnd_normal(void *array);
 void ShraySync_normal(void *array);
 void ShrayFree_normal(void *address);
 void ShrayReport_normal(void);
@@ -61,7 +61,7 @@ unsigned int ShraySize_normal(void);
 void ShrayFinalize_normal(int exit_code);
 void ShrayPrefetch_normal(void *address, size_t size);
 void ShrayDiscard_normal(void *address, size_t size);
-void ShrayRunWorker_normal(shray_fn fn, size_t n, void *args);
+void ShrayRunWorker_normal(shray_fn fn, void *array, void *args);
 void ShrayBroadcast_normal(void *buffer, size_t size, int root);
 void ShrayBarrier_normal(void);
 
@@ -69,8 +69,8 @@ void ShrayBarrier_normal(void);
 
 #define ShrayInit(argc, argv) ShrayInit_debug(argc, argv)
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_debug(firstDimension, totalSize)
-#define ShrayStart(firstDimension) ShrayStart_debug(firstDimension)
-#define ShrayEnd(firstDimension) ShrayEnd_debug(firstDimension)
+#define ShrayStart(array) ShrayStart_debug(array)
+#define ShrayEnd(array) ShrayEnd_debug(array)
 #define ShraySync(array) ShraySync_debug(array)
 #define ShrayFree(address) ShrayFree_debug(address)
 #define ShrayReport() ShrayReport_debug()
@@ -88,8 +88,8 @@ void ShrayBarrier_normal(void);
 
 #define ShrayInit(argc, argv) ShrayInit_profile(argc, argv)
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_profile(firstDimension, totalSize)
-#define ShrayStart(firstDimension) ShrayStart_profile(firstDimension)
-#define ShrayEnd(firstDimension) ShrayEnd_profile(firstDimension)
+#define ShrayStart(array) ShrayStart_profile(array)
+#define ShrayEnd(array) ShrayEnd_profile(array)
 #define ShraySync(array) ShraySync_profile(array)
 #define ShrayFree(address) ShrayFree_profile(address)
 #define ShrayReport() ShrayReport_profile()
@@ -105,8 +105,8 @@ void ShrayBarrier_normal(void);
 #else
 #define ShrayInit(argc, argv) ShrayInit_normal(argc, argv)
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_normal(firstDimension, totalSize)
-#define ShrayStart(firstDimension) ShrayStart_normal(firstDimension)
-#define ShrayEnd(firstDimension) ShrayEnd_normal(firstDimension)
+#define ShrayStart(array) ShrayStart_normal(array)
+#define ShrayEnd(array) ShrayEnd_normal(array)
 #define ShraySync(array) ShraySync_normal(array)
 #define ShrayFree(address) ShrayFree_normal(address)
 #define ShrayReport() ShrayReport_normal()
@@ -155,12 +155,12 @@ void ShrayBarrier_normal(void);
 
 /** <!--********************************************************************-->
  *
- * @fn size_t ShrayStart(size_t firstDimension)
+ * @fn size_t ShrayStart(void *array)
  *
  *   @brief       Determines the start of the first dimension of a distributed
  *                array we write to.
  *
- *   @param firstDimension Extent of the first dimension of the array.
+ *   @param array Array to compute the start index for.
  *
  *   @return start such that we are allowed to write to (i1, ..., id) for
  *           start <= i1 < end.
@@ -169,12 +169,12 @@ void ShrayBarrier_normal(void);
 
 /** <!--********************************************************************-->
  *
- * @fn size_t ShrayEnd(size_t firstDimension)
+ * @fn size_t ShrayEnd(void *array)
  *
  *   @brief       Determines the end of the first dimension of a distributed
  *                array we write to.
  *
- *   @param firstDimension Extent of the first dimension of the array.
+ *   @param array Array to compute the end index for.
  *
  *   @return end such that we are allowed to write to (i1, ..., id) for
  *           start <= i1 < end.
@@ -259,10 +259,10 @@ void ShrayBarrier_normal(void);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayRunWorker(shray_fn fn, size_t n, void *args);
+ * @fn void ShrayRunWorker(shray_fn fn, void *array, void *args);
  *
- *   @brief          Executes fn on args with args->start = ShrayStart(n),
- *                   args->end = ShrayEnd(n) using multithreading.
+ *   @brief          Executes fn on args with args->start = ShrayStart(A),
+ *                   args->end = ShrayEnd(A) using multithreading.
  *
  *   @param fn       Function that writes to distributed array A only on
  *                   indices (i1, ..., id) satisfying

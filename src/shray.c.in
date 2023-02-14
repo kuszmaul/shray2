@@ -621,6 +621,7 @@ void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
     size_t bytesPerLatterDimensions = totalSize / firstDimension;
     size_t bytesPerBlock = roundUp(firstDimension, Shray_size) * bytesPerLatterDimensions;
 
+    alloc->firstDimension = firstDimension;
     alloc->location = (uintptr_t)location;
     alloc->size = totalSize;
     alloc->bytesPerBlock = bytesPerBlock;
@@ -661,13 +662,18 @@ void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
     return location;
 }
 
-size_t ShrayStart@SHRAY_SUFFIX@(size_t firstDimension)
+size_t ShrayStart@SHRAY_SUFFIX@(void *array)
 {
-    return Shray_rank * roundUp(firstDimension, Shray_size);
+    int index = findAlloc(array);
+    Allocation *alloc = &heap.allocs[index];
+    return Shray_rank * roundUp(alloc->firstDimension, Shray_size);
 }
 
-size_t ShrayEnd@SHRAY_SUFFIX@(size_t firstDimension)
+size_t ShrayEnd@SHRAY_SUFFIX@(void *array)
 {
+    int index = findAlloc(array);
+    Allocation *alloc = &heap.allocs[index];
+    size_t firstDimension = alloc->firstDimension;
     return (Shray_rank == Shray_size - 1) ? firstDimension :
         (Shray_rank + 1) * roundUp(firstDimension, Shray_size);
 }
@@ -806,7 +812,7 @@ static void handleWorkerRequest(shray_worker_t *worker)
     pthread_kill(worker->id, SIGUSR1);
 }
 
-void ShrayRunWorker@SHRAY_SUFFIX@(shray_fn handler, size_t n, void *args)
+void ShrayRunWorker@SHRAY_SUFFIX@(shray_fn handler, void *array, void *args)
 {
     DBUG_PRINT("Starting threaded workload (%zu workers)", workerThreadCount);
     if (workerThreadCount == 0) {
@@ -815,8 +821,8 @@ void ShrayRunWorker@SHRAY_SUFFIX@(shray_fn handler, size_t n, void *args)
     }
 
     /* Start the worker threads */
-    size_t start = ShrayStart(n);
-    size_t end = ShrayEnd(n);
+    size_t start = ShrayStart(array);
+    size_t end = ShrayEnd(array);
     size_t workPerThread = (end - start) / workerThreadCount;
     for (size_t i = 0; i < workerThreadCount; ++i) {
         shray_worker_t *worker = &workerThreads[i];
