@@ -1,60 +1,29 @@
+#include "../util/time.h"
+
+#include <upc.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
-#include <shray2/shray.h>
 
 #define T float
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define MAX(a, b) (((a) < (b)) ? (b) : (a))
 
 #define BLOCK 10000
 #define TIMEBLOCK 100
-#define CHECK
 
 /* The coefficients of the five-point stencil. */
 const T a = 0.50;
 const T b = 0.33;
 const T c = 0.25;
 
-void init2d(T *arr, size_t n2)
+void init(shared T *arr, size_t n)
 {
-    for (size_t i = ShrayStart(arr); i < ShrayEnd(arr); i++) {
-        for (size_t j = 0; j < n2; j++) {
-            arr[i * n2 + j] = i * n2 + j;
-        }
-    }
-    ShraySync(arr);
-}
-
-void init(T *arr)
-{
-    for (size_t i = ShrayStart(arr); i < ShrayEnd(arr); i++) {
+    for (size_t i = MYTHREAD * n / THREADS; i < (MYTHREAD + 1) * n / THREADS; i++) {
             arr[i] = i;
     }
-    ShraySync(arr);
-}
-
-void naive(size_t n, int iterations, T **in, T **out)
-{
-    (*out)[0] = (*in)[0];
-    (*out)[n - 1] = (*in)[n - 1];
-
-    for (int t = 0; t < iterations; t++) {
-        for (size_t i = MAX(ShrayStart(*in), 1); i < MIN(ShrayEnd(*in), n - 1); i++) {
-            (*out)[i] = a * (*in)[i - 1] + b * (*in)[i] + c * (*in)[i + 1];
-        }
-
-        ShraySync(*out);
-
-        /* Buffer swap to save memory. */
-        if (t != iterations - 1) {
-            T *temp = *in;
-            *in = *out;
-            *out = temp;
-        }
-    }
+    upc_barrier;
 }
 
 void left(size_t n, int iterations, T **in, T **out)
@@ -113,40 +82,45 @@ void right(size_t n, int iterations, T **in, T **out)
 
 /* We use iterations as blocksize. This increases the number of flops performed by a
  * factor 2. */
-void StencilBlocked(size_t n, T **in, T **out, int iterations)
+void StencilBlocked(size_t n, shared T **in, shared T **out, int iterations)
 {
     T *inBuffer = malloc((BLOCK + 2 * iterations) * sizeof(T));
     T *outBuffer = malloc((BLOCK + 2 * iterations) * sizeof(T));
 
-    for (size_t row = ShrayStart(*in); row < ShrayEnd(*in); row++) {
+    /* We have n / BLOCK blocks, that are distributed blockwise (I know, unfortunate naming)
+     * over THREADS threads. */
+    size_t distributionBlockSize = (n / BLOCK + THREADS - 1) / THREADS;
+    size_t start = distributionBlockSize * MYTHREAD;
+    size_t end = MIN(distributionBlockSize * (MYTHREAD + 1), n / BLOCK);
+    for (size_t row = start; row < end; row++) {
         if (row == 0) {
-            memcpy(inBuffer, *in, (BLOCK + iterations) * sizeof(T));
+            memcpy(inBuffer, (T *)*in, (BLOCK + iterations) * sizeof(T));
             left(BLOCK, iterations, &inBuffer, &outBuffer);
-            memcpy(*out, outBuffer, BLOCK * sizeof(T));
+            memcpy((T *)*out, outBuffer, BLOCK * sizeof(T));
         } else if (row == n / BLOCK - 1) {
-            memcpy(inBuffer, *in + row * BLOCK - iterations,
+            memcpy(inBuffer, (T *)*in + row * BLOCK - iterations,
                     (BLOCK + iterations) * sizeof(T));
             right(BLOCK, iterations, &inBuffer, &outBuffer);
-            memcpy(*out + row * BLOCK, outBuffer + iterations, BLOCK * sizeof(T));
+            memcpy((T *)*out + row * BLOCK, outBuffer + iterations, BLOCK * sizeof(T));
         } else {
-            memcpy(inBuffer, *in + row * BLOCK - iterations,
+            memcpy(inBuffer, (T *)*in + row * BLOCK - iterations,
                     (BLOCK + 2 * iterations) * sizeof(T));
             middle(BLOCK, iterations, &inBuffer, &outBuffer);
-            memcpy(*out + row * BLOCK, outBuffer + iterations, BLOCK * sizeof(T));
+            memcpy((T *)*out + row * BLOCK, outBuffer + iterations, BLOCK * sizeof(T));
         }
     }
 
-    ShraySync(*out);
+    upc_barrier;
 
     free(inBuffer);
     free(outBuffer);
 }
 
-void Stencil(size_t n, T **in, T **out, int iterations)
+void Stencil(size_t n, shared T **in, shared T **out, int iterations)
 {
     for (int t = TIMEBLOCK; t <= iterations; t += TIMEBLOCK) {
         StencilBlocked(n, in, out, TIMEBLOCK);
-        T *temp = *out;
+        shared T *temp = *out;
         *out = *in;
         *in = temp;
     }
@@ -154,74 +128,49 @@ void Stencil(size_t n, T **in, T **out, int iterations)
         StencilBlocked(n, in, out, iterations % TIMEBLOCK);
     } else {
         /* We did one buffer swap too many */
-        T *temp = *out;
+        shared T *temp = *out;
         *out = *in;
         *in = temp;
     }
 }
 
-bool equal(T *x, T *y, size_t n, T error)
-{
-    for (size_t i = 0; i < n; i++) {
-        if (MAX(x[i], y[i]) / MIN(x[i], y[i]) > error) {
-            printf("Index %zu: %lf != %lf\n", i, x[i], y[i]);
-            return false;
-        }
-    }
-
-    return true;
-}
-
 int main(int argc, char **argv)
 {
-    ShrayInit(&argc, &argv);
-
     if (argc != 3) {
         printf("Please specify 2 arguments (n, iterations).\n");
-        ShrayFinalize(1);
+        exit(EXIT_FAILURE);
     }
 
     size_t n = atoll(argv[1]);
     int iterations = atoi(argv[2]);
 
     if (n % BLOCK != 0) {
-        printf("This is a prototype, please make sure n | %d. Suggestion: n = %zu\n",
-                BLOCK, n / BLOCK * BLOCK);
-        ShrayFinalize(1);
+        printf("This is a prototype, please make sure n divides blocksize %d and "
+                "number of threads. Suggestion: n = %zu\n",
+                BLOCK, n / (BLOCK * THREADS) * (BLOCK * THREADS));
+        exit(EXIT_FAILURE);
+    }
+
+    if (n % THREADS != 0) {
+        printf("Please make sure the number of processors divides n. Suggestion: n = %zu.\n",
+                n / THREADS * THREADS);
     }
 
     /* Easy way to visualize a blocking algorithm is to reshape into
-     * a matrix, and view each row as a block. */
-    T *in = ShrayMalloc(n / BLOCK, n * sizeof(T));
-    T *out = ShrayMalloc(n / BLOCK, n * sizeof(T));
-    init2d(in, BLOCK);
-
-#ifdef CHECK
-    T *in2 = ShrayMalloc(n, n * sizeof(T));
-    T *out2 = ShrayMalloc(n, n * sizeof(T));
-    init(in2);
-#endif
+     * a matrix, and view each row as a block. We take iterations as block size. */
+    shared T *in = upc_all_alloc(THREADS, n / THREADS * sizeof(T));
+    shared T *out = upc_all_alloc(THREADS, n / THREADS * sizeof(T));
+    init(in, n);
 
     double duration;
     TIME(duration, Stencil(n, &in, &out, iterations););
+    Stencil(n, &in, &out, iterations);
 
-    if (ShrayOutput) {
+    if (MYTHREAD == 0) {
         printf("%lf\n", 5.0 * (n - 2) * iterations / 1000000000.0 / duration);
+        upc_free(in);
+        upc_free(out);
     }
 
-#ifdef CHECK
-    naive(n, iterations, &in2, &out2);
-
-    if (equal(out, out2, n, 1.00001)) {
-        printf("SUCCESS on processor %d!\n", ShrayRank());
-    }
-    ShrayFree(in2);
-    ShrayFree(out2);
-#endif
-
-    ShrayFree(in);
-    ShrayFree(out);
-
-    ShrayReport();
-    ShrayFinalize(0);
+    exit(EXIT_SUCCESS);
 }

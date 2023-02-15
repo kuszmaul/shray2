@@ -1,6 +1,7 @@
 foreach(file
 		hello
 		matrix
+        1dstencil
 		spmv)
 	set(EXAMPLE_TARGET "${file}_upc")
 
