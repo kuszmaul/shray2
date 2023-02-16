@@ -1,10 +1,19 @@
-#include "../util/time.h"
-
 #include <upc.h>
+#include <upc_tick.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+
+#define TIME(duration, fncalls)                                        \
+    {                                                                  \
+        upc_barrier;                                                   \
+        upc_tick_t start = upc_ticks_now();                            \
+        fncalls                                                        \
+        upc_barrier;                                                   \
+        upc_tick_t end = upc_ticks_now();                              \
+        duration = upc_ticks_to_ns(end - start) / 1000000000.0;        \
+    }
 
 #define T float
 
