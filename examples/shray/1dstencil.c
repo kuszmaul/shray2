@@ -11,7 +11,7 @@
 
 #define BLOCK 10000
 #define TIMEBLOCK 100
-#define CHECK
+//#define CHECK
 
 /* The coefficients of the five-point stencil. */
 const T a = 0.50;

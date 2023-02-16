@@ -158,8 +158,9 @@ int main(int argc, char **argv)
 
     /* Easy way to visualize a blocking algorithm is to reshape into
      * a matrix, and view each row as a block. We take iterations as block size. */
-    shared T *in = upc_all_alloc(THREADS, n / THREADS * sizeof(T));
-    shared T *out = upc_all_alloc(THREADS, n / THREADS * sizeof(T));
+    /* FIXME don't we want to have blocksize n / THREADS * sizeof(T) ? */
+    shared T *in = upc_all_alloc(THREADS, n * sizeof(T));
+    shared T *out = upc_all_alloc(THREADS, n * sizeof(T));
     init(in, n);
 
     double duration;
