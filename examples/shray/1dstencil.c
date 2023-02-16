@@ -61,8 +61,8 @@ void left(size_t n, int iterations, T **in, T **out)
 {
     (*out)[0] = (*in)[0];
 
-    for (int t = 0; t < iterations; t++) {
-        for (size_t i = 1; i < n + iterations - 1 - t; i++) {
+    for (int t = 1; t <= iterations; t++) {
+        for (size_t i = 1; i < n + iterations - t; i++) {
             (*out)[i] = a * (*in)[i - 1] + b * (*in)[i] + c * (*in)[i + 1];
         }
 
@@ -79,8 +79,8 @@ void left(size_t n, int iterations, T **in, T **out)
  * however only indices iterations, ..., iterations + n - 1 have the proper output. */
 void middle(size_t n, int iterations, T **in, T **out)
 {
-    for (int t = 0; t < iterations; t++) {
-        for (size_t i = 1 + t; i < n + 2 * iterations - 1 - t; i++) {
+    for (int t = 1; t <= iterations; t++) {
+        for (size_t i = t; i < n + 2 * iterations - t; i++) {
             (*out)[i] = a * (*in)[i - 1] + b * (*in)[i] + c * (*in)[i + 1];
         }
 
@@ -97,8 +97,8 @@ void right(size_t n, int iterations, T **in, T **out)
 {
     (*out)[n + iterations - 1] = (*in)[n + iterations - 1];
 
-    for (int t = 0; t < iterations; t++) {
-        for (size_t i = 1 + t; i < n + iterations - 1; i++) {
+    for (int t = 1; t <= iterations; t++) {
+        for (size_t i = t; i < n + iterations - 1; i++) {
             (*out)[i] = a * (*in)[i - 1] + b * (*in)[i] + c * (*in)[i + 1];
         }
 

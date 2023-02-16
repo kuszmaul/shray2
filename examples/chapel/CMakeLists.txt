@@ -5,6 +5,7 @@ get_filename_component(BLAS_TNAME ${BLAS_LIBRARIES} NAME)
 
 foreach(file
 		2dstencil
+		1dstencil
 		matrix
 		nbody
 		spmv)
