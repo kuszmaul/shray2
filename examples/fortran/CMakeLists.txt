@@ -5,6 +5,7 @@ foreach(file
 		nbody
 		nbodyUnblocked
 		random
+        1dstencil
 		spmv)
 	set(EXAMPLE_TARGET "${file}_fortran")
 
@@ -15,6 +16,7 @@ foreach(file
 	target_compile_options("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_FLAGS}
+            -cpp
 			-fcoarray=lib)
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE

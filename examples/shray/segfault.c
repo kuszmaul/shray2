@@ -76,9 +76,9 @@ int main(int argc, char **argv)
     double duration;
     double result;
 
-    if (ShrayOutput) {
-        TIME(duration, result = reduceAuto(A, n););
+    TIME(duration, result = reduceAuto(A, n););
 
+    if (ShrayOutput) {
         double microsPerPage = 1000000.0 * duration / (n / 512);
 
         fprintf(stderr, "We reduced an array on %d processors at %lf microseconds per page:\n"
@@ -89,5 +89,7 @@ int main(int argc, char **argv)
     }
 
     ShrayFree(A);
+
+    ShrayReport();
     ShrayFinalize(0);
 }

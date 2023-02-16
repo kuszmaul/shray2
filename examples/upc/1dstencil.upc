@@ -174,7 +174,6 @@ int main(int argc, char **argv)
 
     double duration;
     TIME(duration, Stencil(n, &in, &out, iterations););
-    Stencil(n, &in, &out, iterations);
 
     if (MYTHREAD == 0) {
         printf("%lf\n", 5.0 * (n - 2) * iterations / 1000000000.0 / duration);
