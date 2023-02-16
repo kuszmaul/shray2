@@ -2,6 +2,7 @@ find_package(GlobalArrays REQUIRED)
 
 foreach(file
 		hello
+        1dstencil
 		matrix
 		nbody
 		spmv)
