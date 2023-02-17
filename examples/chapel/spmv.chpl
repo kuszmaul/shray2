@@ -48,7 +48,7 @@ proc steady_state(m: int, n: int, nz: int, val: [1..nz] real, row_ptr: [1..m + 1
   sync for t in 1..iterations do
     /* As a stochastic matrix is square and we distributed the matrix blockwise along the first
      * dimension, mat.m is precisely the size of the local part of the vector. */
-    vec(here.id * blockSize + 1 .. here.id * blockSize + m + 1) =
+    vec(here.id * blockSize + 1 .. here.id * blockSize + m) =
       spmv(m, n, nz, val, row_ptr, col_ind, vec);
 
   return vec;

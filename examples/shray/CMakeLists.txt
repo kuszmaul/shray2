@@ -11,6 +11,7 @@ foreach(suffix
 
 	foreach(file
 			1dstencil
+			1dstencil_mt
 			2dstencil
 			2dstencilAuto
 			bandwidth
@@ -23,6 +24,7 @@ foreach(suffix
 			random
 			reduce
 			segfault
+			segfault_pair
 			sync
 			spmv
 			spmv_mt)
