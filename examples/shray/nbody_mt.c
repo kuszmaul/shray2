@@ -65,7 +65,7 @@ Point accelerate(Point pos1, Point pos2, double mass)
 
 void reset_accel(worker_info_t *info)
 {
-    Point *accel = info->args;
+    Point *accel = (Point *)info->args;
     for (size_t i = info->start; i < info->end; ++i) {
         accel[i].x = 0.0;
         accel[i].y = 0.0;
@@ -75,7 +75,7 @@ void reset_accel(worker_info_t *info)
 
 void update_accel(worker_info_t *info)
 {
-    update_accel_t *data = info->args;
+    update_accel_t *data = (update_accel_t *)info->args;
 
     size_t node_start = data->Jstart;
     size_t node_end = data->Jstart + data->n / data->p;
@@ -127,7 +127,7 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 
 void update_velocities(worker_info_t *info)
 {
-    update_velocities_t *tmp = info->args;
+    update_velocities_t *tmp = (update_velocities_t *)info->args;
     Point *accel = tmp->accel;
     Point *positions = tmp->positions;
     Point *velocities = tmp->velocities;

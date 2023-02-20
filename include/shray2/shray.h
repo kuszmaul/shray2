@@ -1,6 +1,10 @@
 #ifndef SHRAY__GUARD
 #define SHRAY__GUARD
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdbool.h>
 #include <sys/time.h>
@@ -302,5 +306,9 @@ void ShrayBarrier_normal(void);
         duration = (double) (tv2.tv_usec - tv1.tv_usec) / 1000000 +    \
          (double) (tv2.tv_sec - tv1.tv_sec);                           \
     }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

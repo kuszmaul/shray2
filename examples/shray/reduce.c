@@ -70,7 +70,7 @@ int main(int argc, char **argv)
     size_t n = atol(argv[1]);
     assert(n % ShraySize() == 0);
 
-    double *arr = ShrayMalloc(n, n * sizeof(double));
+    double *arr = (double *)ShrayMalloc(n, n * sizeof(double));
 
     init(arr);
     ShraySync(arr);

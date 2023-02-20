@@ -130,8 +130,8 @@ void StencilBlocked_mt(worker_info_t *info)
     T **out = arguments->out;
     int iterations = arguments->iterations;
 
-    T *inBuffer = malloc((BLOCK + 2 * iterations) * sizeof(T));
-    T *outBuffer = malloc((BLOCK + 2 * iterations) * sizeof(T));
+    T *inBuffer = (T*)malloc((BLOCK + 2 * iterations) * sizeof(T));
+    T *outBuffer = (T*)malloc((BLOCK + 2 * iterations) * sizeof(T));
 
     for (size_t row = start; row < end; row++) {
         if (row == 0) {
@@ -218,13 +218,13 @@ int main(int argc, char **argv)
 
     /* Easy way to visualize a blocking algorithm is to reshape into
      * a matrix, and view each row as a block. */
-    T *in = ShrayMalloc(n / BLOCK, n * sizeof(T));
-    T *out = ShrayMalloc(n / BLOCK, n * sizeof(T));
+    T *in = (T*)ShrayMalloc(n / BLOCK, n * sizeof(T));
+    T *out = (T*)ShrayMalloc(n / BLOCK, n * sizeof(T));
     init2d(in, BLOCK);
 
 #ifdef CHECK
-    T *in2 = ShrayMalloc(n, n * sizeof(T));
-    T *out2 = ShrayMalloc(n, n * sizeof(T));
+    T *in2 = (T*)ShrayMalloc(n, n * sizeof(T));
+    T *out2 = (T*)ShrayMalloc(n, n * sizeof(T));
     init(in2);
 #endif
 

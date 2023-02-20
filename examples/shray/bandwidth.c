@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     size_t arrayElements = 2 * atoll(argv[1]) / packetSize * packetSize / sizeof(double);
     size_t packetElements = packetSize / sizeof(double);
 
-    double *array = ShrayMalloc(2 * arrayElements, 2 * arrayElements * sizeof(double));
+    double *array = (double *)ShrayMalloc(2 * arrayElements, 2 * arrayElements * sizeof(double));
 
     size_t numberOfPackets = arrayElements / 2 / packetElements;
 

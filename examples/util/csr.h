@@ -1,6 +1,10 @@
 #ifndef CSR__GUARD
 #define CSR__GUARD
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 
@@ -34,5 +38,9 @@ csr_t *csr_parse_local(const char *file, int rank);
  * \param matrix Matrix to print.
  */
 void csr_print(const csr_t *matrix);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

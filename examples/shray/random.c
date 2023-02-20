@@ -81,7 +81,7 @@ int main(int argc, char **argv)
 
     srand(time(NULL));
 
-    double *input = ShrayMalloc(size, size * sizeof(double));
+    double *input = (double *)ShrayMalloc(size, size * sizeof(double));
 
     init(input);
     ShraySync(input);

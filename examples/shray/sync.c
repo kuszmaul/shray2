@@ -16,7 +16,7 @@ int main(int argc, char **argv)
     unsigned int p = ShraySize();
     /* The constant does not really matter as long as it is larger than one page, and not
      * a multiple of the page-size. */
-    double *A = ShrayMalloc(100000000 * p, 100000000 * p * sizeof(double));
+    double *A = (double *)ShrayMalloc(100000000 * p, 100000000 * p * sizeof(double));
 
     double duration;
 

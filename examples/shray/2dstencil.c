@@ -117,8 +117,8 @@ int main(int argc, char **argv)
     size_t n = atoll(argv[1]);
     int iterations = atoi(argv[2]);
 
-    double *in = ShrayMalloc(n, n * n * sizeof(double));
-    double *out = ShrayMalloc(n, n * n * sizeof(double));
+    double *in = (double *)ShrayMalloc(n, n * n * sizeof(double));
+    double *out = (double *)ShrayMalloc(n, n * n * sizeof(double));
 
     init(n, in);
     ShraySync(in);

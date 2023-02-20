@@ -50,9 +50,9 @@ int main(int argc, char **argv)
         ShrayFinalize(1);
     }
 
-    double *A = ShrayMalloc(n, n * n * sizeof(double));
-    double *B = ShrayMalloc(n, n * n * sizeof(double));
-    double *C = ShrayMalloc(n, n * n * sizeof(double));
+    double *A = (double *)ShrayMalloc(n, n * n * sizeof(double));
+    double *B = (double *)ShrayMalloc(n, n * n * sizeof(double));
+    double *C = (double *)ShrayMalloc(n, n * n * sizeof(double));
 
     init(A, n, 1);
     init(B, n, 1);

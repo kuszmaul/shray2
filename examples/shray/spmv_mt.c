@@ -74,8 +74,8 @@ int main(int argc, char **argv)
 
 	size_t iterations = atoll(argv[2]);
 
-	double *vector = ShrayMalloc(matrix->n, matrix->n * sizeof(double));
-	double *out = ShrayMalloc(matrix->m_total, matrix->m_total * sizeof(double));
+	double *vector = (double *)ShrayMalloc(matrix->n, matrix->n * sizeof(double));
+	double *out = (double *)ShrayMalloc(matrix->m_total, matrix->m_total * sizeof(double));
 
 	init(vector);
 	ShraySync(vector);
