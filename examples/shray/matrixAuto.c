@@ -1,5 +1,15 @@
 #include <shray2/shray.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <cblas.h>
+
+#ifdef __cplusplus
+}
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 
