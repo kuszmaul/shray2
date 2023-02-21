@@ -88,13 +88,13 @@ subroutine BlockedStencil(n, input, output, iterations)
     real(KIND=8), intent(inout) :: input(n)[*], output(n)[*]
 
     real(KIND=8), allocatable :: inBuffer(:), outBuffer(:)
-    integer :: row, blocksize, ending
+    integer :: row, rowsPerImage, ending
 
-    allocate(inBuffer(n + 2 * iterations))
-    allocate(outBuffer(n + 2 * iterations))
+    allocate(inBuffer(SPACEBLOCK + 2 * iterations))
+    allocate(outBuffer(SPACEBLOCK + 2 * iterations))
 
-    blocksize = (n / SPACEBLOCK + num_images() - 1) / num_images()
-    ending = min(blocksize, n / SPACEBLOCK - (num_images() - 1) * blocksize)
+    rowsPerImage = (n / SPACEBLOCK + num_images() - 1) / num_images()
+    ending = min(rowsPerImage, n / SPACEBLOCK - (num_images() - 1) * rowsPerImage)
 
     do row = 1, ending
         if ((row .eq. 1) .and. (this_image() .eq. 1)) then
@@ -103,23 +103,27 @@ subroutine BlockedStencil(n, input, output, iterations)
             output(1:SPACEBLOCK) = outBuffer(1:SPACEBLOCK)
         else if ((this_image() .eq. num_images()) .and. (row .eq. ending)) then
             inBuffer(1:SPACEBLOCK + iterations) = \
-                input(1 + (row - 1) * SPACEBLOCK - iterations:SPACEBLOCK + iterations)
+                input(1 + (row - 1) * SPACEBLOCK - iterations:row * SPACEBLOCK)
             call right(SPACEBLOCK, iterations, inBuffer(:), outBuffer(:))
-            output(1:SPACEBLOCK) = outBuffer(1:SPACEBLOCK)
+            output((row - 1) * SPACEBLOCK + 1:row * SPACEBLOCK) = outBuffer(1:SPACEBLOCK)
         else
             if (row .eq. 1) then
-                inBuffer(iterations + 1:SPACEBLOCK + 2 * iterations) = \
+                inBuffer(1:iterations) = &
+                    input(rowsPerImage * SPACEBLOCK - iterations + 1: rowsPerImage * SPACEBLOCK)[this_image() - 1]
+                inBuffer(iterations + 1:SPACEBLOCK + 2 * iterations) = &
                     input(1:SPACEBLOCK + iterations)
-                inBuffer(1:iterations) = \
-                    input(blocksize - iterations + 1: blocksize)[this_image() - 1]
             else if (row .eq. ending) then
-                inBuffer(1:SPACEBLOCK + iterations) = input(1:SPACEBLOCK + iterations)
+                inBuffer(1:SPACEBLOCK + iterations) = &
+                    input((row - 1) * SPACEBLOCK - iterations + 1:row * SPACEBLOCK)
+                inBuffer(SPACEBLOCK + iterations + 1:SPACEBLOCK + 2 * iterations) = \
+                    input(1: iterations)[this_image() + 1]
             else
-                inBuffer(1:SPACEBLOCK + 2 * iterations) = \
-                input(1 + row * SPACEBLOCK - iterations : row * SPACEBLOCK + iterations)
+                inBuffer(1:SPACEBLOCK + 2 * iterations) = &
+                input(1 + (row - 1) * SPACEBLOCK - iterations : row * SPACEBLOCK + iterations)
             end if
             call middle(SPACEBLOCK, iterations, inBuffer(:), outBuffer(:))
-            output(1:SPACEBLOCK) = outBuffer(1:SPACEBLOCK)
+            output((row - 1) * SPACEBLOCK + 1:row * SPACEBLOCK) = &
+                   outBuffer(iterations + 1:iterations + SPACEBLOCK)
         end if
     end do
 
@@ -135,21 +139,13 @@ subroutine Stencil(n, input, output, iterations)
     real(KIND=8), intent(inout) :: input(n)[*], output(n)[*]
 
     integer :: t
-    real(KIND=8), allocatable :: temp(:)[:]
 
-    do t = TIMEBLOCK, iterations, TIMEBLOCK
+    do t = TIMEBLOCK, iterations, 2 * TIMEBLOCK
         call BlockedStencil(n, input, output, TIMEBLOCK)
-        temp = output
-        output = input
-        input = temp
+        call BlockedStencil(n, output, input, TIMEBLOCK)
     end do
     if (mod(iterations, TIMEBLOCK) .ne. 0) then
         call BlockedStencil(n, input, output, mod(iterations, TIMEBLOCK))
-    else
-        ! We did one buffer swap too many
-        temp = output
-        output = input
-        input = temp
     end if
 end subroutine Stencil
 end module stencilModule
@@ -171,11 +167,17 @@ program main
     read (unit=args(2), fmt=*) iterations
 
     if (modulo(n, SPACEBLOCK) /= 0) then
-        write (*, *) 'Please make sure n divides ', SPACEBLOCK
+        write (*, *) 'Please make sure n is divisible by ', SPACEBLOCK
     end if
 
-    allocate(input(n)[*])
-    allocate(output(n)[*])
+    if (modulo(iterations, 2) /= 0) then
+        write (*, *) 'Please make sure iterations / TIMEBLOCK is even. Suggestion: ', &
+             iterations / TIMEBLOCK / 2 * 2
+    end if
+
+
+    allocate(input(n / num_images())[*])
+    allocate(output(n / num_images())[*])
 
     input = 1
     output = 1
