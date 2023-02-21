@@ -21,5 +21,5 @@ foreach(file
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_LINKER_FLAGS}
-			-lcaf_openmpi)
+			-lcaf_mpich)
 endforeach(file)
