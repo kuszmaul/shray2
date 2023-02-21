@@ -1,5 +1,11 @@
 #!/bin/sh
 
+#SBATCH --account=csmpi
+#SBATCH --partition=csmpi_long
+#SBATCH --nodes=1
+#SBATCH --time=00:15:00
+#SBATCH --output=build.txt
+
 set -eu
 
 builddir=build
