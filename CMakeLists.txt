@@ -24,7 +24,8 @@ if(${SRC})
 	set(PROJECT_LANGUAGES ${PROJECT_LANGUAGES} C CXX)
 endif()
 if(${EXAMPLES})
-	set(PROJECT_LANGUAGES ${PROJECT_LANGUAGES} Fortran Chapel UPC)
+	set(PROJECT_LANGUAGES ${PROJECT_LANGUAGES} Fortran)
+    set(MPI_C_COMPILER mpicc.mpich)
 endif()
 
 project(shray2
@@ -57,7 +58,7 @@ endif()
 
 if(${EXAMPLES})
 	add_subdirectory(examples)
-	add_subdirectory(benchmark)
+#	add_subdirectory(benchmark)
 endif()
 
 if(${TEST})

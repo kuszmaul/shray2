@@ -4,18 +4,17 @@
 #SBATCH --partition=csmpi_short
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
-#SBATCH --exclusive
 #SBATCH --output=bandwidth.out
 #SBATCH --time=0:10:00
-
-export GASNET_SPAWNFN="C"
-export GASNET_CSPAWN_CMD="srun -n %N %C"
 
 set -eu
 
 # Ensure required programs exist.
 hash time
 hash mpirun.mpich
+
+export GASNET_SPAWNFN="C"
+export GASNET_CSPAWN_CMD="srun -n %N %C"
 
 bindir="../build/examples"
 outputdir="./results"
@@ -44,16 +43,16 @@ mkdir -p "$datadir"
 runbandwidth()
 {
     size="$1"
-    {
-        echo -n "${size}," >> ${outputdir}/bandwidth.csv;
-        "${bindir}/shray/bandwidth_normal_shray" "2 409600000 ${size} 10";
-        echo -n ",";
-        mpirun.mpich -n 2 "${bindir}/mpi/bandwidth_mpi" "409600000 ${size} 10";
-    } >> ${datadir}/bandwidth.csv 2>> ${datadir}/errors.txt
+    printf '%s & ', "${size}";
+    "${bindir}/shray/bandwidth_normal_shray" 2 409600000 "${size}" 10;
+    printf ' & ';
+    mpirun.mpich -n 2 "${bindir}/mpi/bandwidth_mpi" 409600000 "${size}" 10;
+    printf ' \\\n';
 }
 
 {
-    echo "Packet size,Shray,MPI" > ${datadir}/bandwidth.csv
-    runbandwidth 4096
-    runbandwidth 40960000
-}
+printf '\begin{tabular}{c|c|c}\n\hline\nPacket size & Shray & MPI\n';
+runbandwidth 4096;
+runbandwidth 40960000;
+printf '\end{tabular}';
+} > "${datadir}/bandwidth.csv" 2> "${datadir}/errors.txt"
