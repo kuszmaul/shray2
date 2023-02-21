@@ -60,7 +60,7 @@ int main(int argc, char **argv)
         double bandwidth = arrayElements * numberOfRuns * sizeof(double) /
             2 / duration / 1000000000.0;
         fprintf(stderr, "We achieve a bandwidth of %lf GB/s\n", bandwidth);
-        printf("%lf\n", bandwidth);
+        printf("%lf", bandwidth);
     }
 
     ShrayFree(array);

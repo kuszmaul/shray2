@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     if (ShrayOutput) {
         fprintf(stderr, "Average time for a synchronisation on %d processors (in microseconds):\n",
                 p);
-        printf("%lf\n", duration / (double) iterations * 1000000.0);
+        printf("%lf", duration / (double) iterations * 1000000.0);
     }
 
     ShrayFree(A);
