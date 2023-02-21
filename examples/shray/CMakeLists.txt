@@ -18,6 +18,7 @@ foreach(suffix
 			matrix
 			matrixAuto
 			matrix_mt
+			gasnet
 			nbody
 			nbodyAuto
 			nbody_mt
