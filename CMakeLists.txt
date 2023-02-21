@@ -25,7 +25,6 @@ if(${SRC})
 endif()
 if(${EXAMPLES})
 	set(PROJECT_LANGUAGES ${PROJECT_LANGUAGES} Fortran)
-    set(MPI_C_COMPILER mpicc.mpich)
 endif()
 
 project(shray2
