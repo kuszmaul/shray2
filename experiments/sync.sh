@@ -2,22 +2,21 @@
 
 #SBATCH --account=csmpi
 #SBATCH --partition=csmpi_short
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=1
-#SBATCH --output=bandwidth.out
+#SBATCH --nodes=8
+#SBATCH --ntasks-per-node=8
+#SBATCH --output=sync.out
 #SBATCH --time=0:10:00
 
 set -eu
 
 # Ensure required programs exist.
 hash time
-hash mpirun.mpich
 
 export GASNET_SPAWNFN="C"
 export GASNET_CSPAWN_CMD="srun -n %N %C"
 
 bindir="../build/examples"
-outputdir="./results/bandwidth"
+outputdir="./results/sync"
 
 # Create the new data directory.
 curdate=$(date -u '+%Y-%m-%dT%H:%M:%S+00:00')
@@ -40,21 +39,18 @@ mkdir -p "$datadir"
 	fi
 }>"$datadir/system.txt"
 
-runbandwidth()
+runsync()
 {
-    size="$1"
-    printf '%s & ' "${size}";
-    "${bindir}/shray/bandwidth_normal_shray" 2 41943040 "${size}" 10;
-    printf ' & ';
-# Do this with OSU benchmark
-#    mpirun.mpich -n 2 "${bindir}/mpi/bandwidth_mpi" 409600000 "${size}" 10;
+    nproc="$1"
+    printf '%s & ' "${nproc}";
+    "${bindir}/shray/sync_normal_shray" "${nproc}" 1000000;
     printf ' \\\\\n';
 }
 
 {
-printf '\\begin{tabular}{c|c|c}\n\hline\nPacket size & Shray & MPI \\\\\n';
-for packetsize in 4096 16384 65536 262144 1048676 4194304; do
-    runbandwidth ${packetsize};
+printf '\\begin{tabular}{c|c}\n\hline\nProcesses & time (us) \\\\\n';
+for nproc in 8 16 32 64; do
+    runsync "${nproc}"
 done
 printf '\\end{tabular}';
-} > "${datadir}/bandwidth.csv" 2> "${datadir}/errors.txt"
+} > "${datadir}/sync.csv" 2> "${datadir}/errors.txt"

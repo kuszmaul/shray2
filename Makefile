@@ -25,7 +25,7 @@ GA = $(patsubst examples/globalarrays/%.c, bin/globalarrays/%, $(GAAPPS))
 SHRAYAPPS = $(wildcard examples/shray/*.c)
 SHRAY = $(patsubst examples/shray/%.c, bin/shray/%, $(SHRAYAPPS))
 
-all: $(SHRAY) $(MPI) $(UPC) $(FORTRAN) $(CHAPEL)
+all: $(SHRAY) $(MPI) 
 .PHONY: all clean cleanShray
 
 release: cleanShray $(SHRAY)
