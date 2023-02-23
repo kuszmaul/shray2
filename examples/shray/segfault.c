@@ -84,7 +84,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "We reduced an array on %d processors at %lf microseconds per page:\n"
                 "That is a bandwidth of %lf GB/s\n",
                 ShraySize(), microsPerPage, 4096.0 / microsPerPage / 1000.0);
-        printf("%lf\n", microsPerPage);
+        printf("%lf", microsPerPage);
         fprintf(stderr, "%lf\n", result);
     }
 

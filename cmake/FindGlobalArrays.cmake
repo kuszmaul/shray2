@@ -23,7 +23,7 @@ find_package(BLAS REQUIRED)
 
 if(NOT GlobalArrays_FOUND)
 	find_library(LIBGA_PATH
-		NAMES ga
+		NAMES ga-mpich
 		PATHS ${GlobalArrays_LIB_DIR}
 		DOC "Path to libga")
 	if(NOT LIBGA_PATH)
@@ -41,7 +41,7 @@ if(NOT GlobalArrays_FOUND)
 	message(STATUS "Found GA: ${GA_INCLUDE_DIR};${LIBGA_PATH}")
 
 	find_library(LIBARMCI_PATH
-		NAMES armci
+		NAMES armci-mpich
 		PATHS ${ARMCI_LIB_DIR}
 		DOC "Path to libarmci")
 	if(NOT LIBARMCI_PATH)
@@ -59,7 +59,7 @@ if(NOT GlobalArrays_FOUND)
 	message(STATUS "Found gfortran: ${LIBGFORTRAN_PATH}")
 
 	find_library(LIBSCALAPACK_PATH
-		NAMES scalapack-openmpi
+		NAMES scalapack-mpich
 		PATHS ${SCALAPACK_LIB_DIR}
 		DOC "Path to scalapack")
 	if(NOT LIBSCALAPACK_PATH)

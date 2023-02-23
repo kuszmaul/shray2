@@ -2,7 +2,7 @@
 
 #SBATCH --account=csmpi
 #SBATCH --partition=csmpi_short
-#SBATCH --nodes=8
+#SBATCH --nodes=4
 #SBATCH --ntasks-per-node=8
 #SBATCH --output=reduce.out
 #SBATCH --time=0:10:00
@@ -28,7 +28,7 @@ mkdir -p "$datadir"
 	printf 'Benchmark system configuration on %s\n' "$curdate"
 
 	printf '\nMPI:\n'
-	mpirun.mpich --version
+	mpirun --version
 	if hash ompi_info 2>/dev/null; then
 		printf '\nOpenMPI:\n'
 		ompi_info
@@ -43,14 +43,16 @@ runsync()
 {
     nproc="$1"
     printf '%s & ' "${nproc}";
-    "${bindir}/shray/segfault_normal_shray" "${nproc}" 500000000;
+    mpirun -n ${nproc} "${bindir}/shray/segfault_normal_shray" 50000000;
+    printf ' & ';
+    mpirun -n ${nproc} "${bindir}/gasnet/segfault_gasnet" 50000000;
     printf ' \\\\\n';
 }
 
 {
-printf '\\begin{tabular}{c|c}\n\hline\nProcesses & time per page (us) \\\\\n';
-for nproc in 8 16 32 64; do
+printf '\\begin{tabular}{c|c}\n\hline\nProcesses & Shray & GASNet \\\\\n';
+for nproc in 8 16 32; do
     runsync "${nproc}"
 done
 printf '\\end{tabular}';
-} > "${datadir}/sync.csv" 2> "${datadir}/errors.txt"
+} > "${datadir}/reduce.csv" 2> "${datadir}/errors.txt"

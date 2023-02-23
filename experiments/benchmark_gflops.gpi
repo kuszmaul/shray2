@@ -4,6 +4,7 @@ set xlabel 'Number of nodes'
 set ylabel 'Gflops/s'
 
 set format y '%.0f'
+set logscale y 2
 #set ytics autofreq 1
 
 set logscale x 2

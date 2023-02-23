@@ -1,9 +1,12 @@
 #!/bin/sh
 
-#SBATCH -p csedu
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=16
-#SBATCH -t 5:00:00
+#SBATCH --account=csmpi
+#SBATCH --partition=csmpi_long
+#SBATCH --nodes=8
+#SBATCH --ntasks=64
+#SBATCH --ntasks-per-node=8
+#SBATCH --time=08:00:00
+#SBATCH --output=benchmark.txt
 
 # A script to automatically benchmark test programs.
 # For Shray on P processors and problem size n bytes,
@@ -100,8 +103,6 @@ if [ "$#" -lt 4 ]; then
 	exit 1
 fi
 
-export SHRAY_CACHELINE=1
-
 bindir="$1"
 outputdir="$2"
 mmdir="$3"
@@ -140,7 +141,7 @@ printf 'Running benchmarks with output directory '\''%s'\''\n' \
 	fi
 
 	printf '\n----------\nUPC:\n'
-	upcc --network=mpi --version
+	upcc --network=udp --version
 }>"$datadir/system.txt"
 
 # Run the given test, writes 0 to the gflops file if the test fails.
@@ -191,9 +192,8 @@ runtest()
 
 	if [ "$test_type" = shray ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			gasnetrun_mpi \
-			-n "$nproc" \
 			"$bindir/examples/$test_type/${example}_profile_${test_type}" \
+			"$nproc" \
 			"$@"
 	elif [ "$test_type" = shraymt ]; then
 		# TODO: -n 1 is not correct for multi-cpu systems, we still want
@@ -205,26 +205,19 @@ runtest()
 			"$bindir/examples/shray/${example}_mt_profile_shray" \
 			"$@"
 	elif [ "$test_type" = chapel ]; then
-		# TODO: must call the executable itself and use -nl for the
-		# number of locales, but this requires a proper setup.
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun \
-			-n "$nproc" \
 			"$bindir/examples/$test_type/${example}_$test_type" \
+			-nl "$nproc" \
 			"$@"
-		# TODO: since mpirun does not properly spawn multiple nodes for
-		# chapel we get duplicate results. Only grab the first line.
-		head -n 1 -q -- "$gflopsfile" >"$resultdir/tmp"
-		mv -- "$resultdir/tmp" "$gflopsfile"
 	elif [ "$test_type" = fortran ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun \
+			mpirun.mpich \
 			-n "$nproc" \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
 	elif [ "$test_type" = globalarrays ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun \
+			mpirun.mpich \
 			-n "$nproc" \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
@@ -232,7 +225,7 @@ runtest()
 		runtest_wrapper "$outfile" "$gflopsfile" \
 			upcrun \
 			-n "$nproc" \
-			-shared-heap 1G \
+			-shared-heap 4G \
 			-bind-threads \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
@@ -250,52 +243,74 @@ runtest()
 	fi
 }
 
+# Inform GASNet how to start.
+export GASNET_SPAWNFN="C"
+export GASNET_CSPAWN_CMD="srun -n %N %C"
+
 # Run all tests.
-for nproc in 1 2 4 8; do
+for nproc in 1 2 4 8 16 32 64; do
+	# 1D stencil.
+	for size in 20480000 40960000; do
+		for iter in 1000 2000; do 
+			printf '\nBenchmark 1D 3-point stencil (%s nodes, %s size, %s iter)\n' \
+				"$nproc" \
+				"$size" \
+				"$iter"
+			#runtest chapel "$nproc" 1dstencil "$size $iter" "--N=$size" "--ITERATIONS=$iter"
+			#runtest fortran "$nproc" 1dstencil "$size $iter" "$size" "$iter"
+			runtest globalarrays "$nproc" 1dstencil "$size $iter" "$size" "$iter"
+			#runtest upc "$nproc" 1dstencil "$size $iter" "$size" "$iter"
+
+			export SHRAY_WORKERTHREADS=0
+			export SHRAY_CACHEFACTOR=2
+			runtest shray "$nproc" 1dstencil "$size $iter" "$size" "$iter"
+		done
+	done
+
 	# Matrix.
-	for size in 2000 4000 8000; do
+	for size in 2048; do # 4096; do # 8192; do
 		printf '\nBenchmark matrix multiplication (%s nodes, %s x %s)\n' \
 			"$nproc" \
 			"$size" \
 			"$size"
 
-		runtest chapel "$nproc" matrix "$size" "--n=$size"
-		runtest fortran "$nproc" matrix "$size" "$size"
+		#runtest chapel "$nproc" matrix "$size" "--n=$size"
+		#runtest fortran "$nproc" matrix "$size" "$size"
 		runtest globalarrays "$nproc" matrix "$size" "$size"
-		runtest upc "$nproc" matrix "$size" "$size"
-		runtest scala "$nproc" matrix "$size" "$size"
+		#runtest upc "$nproc" matrix "$size" "$size"
+		#runtest scala "$nproc" matrix "$size" "$size"
 
 		export SHRAY_WORKERTHREADS=0
 		export SHRAY_CACHEFACTOR=2
 		runtest shray "$nproc" matrix "$size" "$size"
 
-		export SHRAY_WORKERTHREADS="$nproc"
-		runtest shraymt "$nproc" matrix "$size" "$size"
+		#export SHRAY_WORKERTHREADS="$nproc"
+		#runtest shraymt "$nproc" matrix "$size" "$size"
 	done
 
 	# Sparse matrix-vector multiplication
-	for matrixdir in "$mmdir/$nproc"/*; do
-		matrix=$(basename "$matrixdir")
-		for iterations in 10 20; do
-			printf '\nBenchmark spmv (%s nodes, %s matrix, %s iter)\n' \
-				"$nproc" \
-				"$matrix" \
-				"$iterations"
+	#for matrixdir in "$mmdir/$nproc"/*; do
+	#	matrix=$(basename "$matrixdir")
+	#	for iterations in 50 100; do
+	#		printf '\nBenchmark spmv (%s nodes, %s matrix, %s iter)\n' \
+	#			"$nproc" \
+	#			"$matrix" \
+	#			"$iterations"
 
-			runtest chapel "$nproc" spmv "$matrix $iterations" "--fileName=$matrixdir/$matrix" "--iterations=$iterations"
-			runtest fortran "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
-			runtest globalarrays "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
-			runtest upc "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
+	#		#runtest chapel "$nproc" spmv "$matrix $iterations" "--fileName=$matrixdir/$matrix" "--iterations=$iterations"
+	#		#runtest fortran "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
+	#		runtest globalarrays "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
+	#		#runtest upc "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
 
-			export SHRAY_CACHESIZE=2
-			export SHRAY_WORKERTHREADS=0
-			runtest shray "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
+	#		#export SHRAY_WORKERTHREADS=0
+	#		#export SHRAY_CACHEFACTOR=2
+	#		#runtest shray "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
 
-			# TODO: shray MT doesnt work properly since the node
-			# count actually matters due to the pre-processing that
-			# is done on the MM file.
-		done
-	done
+	#		# TODO: shray MT doesnt work properly since the node
+	#		# count actually matters due to the pre-processing that
+	#		# is done on the MM file.
+	#	done
+	#done
 done
 
 # Generate plots.
