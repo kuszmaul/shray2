@@ -24,3 +24,6 @@ add_subdirectory(shray)
 
 # upc examples
 #add_subdirectory(upc)
+
+# gasnet examples
+add_subdirectory(gasnet)

@@ -16,7 +16,7 @@ int main(int argc, char **argv)
     }
 
     if (ShraySize() != 2) {
-        printf("Please run on two processors\n");
+        printf("Please run on two processors instead of %d\n", ShraySize());
         ShrayFinalize(1);
     }
 
