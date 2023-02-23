@@ -1,5 +1,7 @@
 include(language_standard)
 
+set(BLA_VENDOR FLAME)
+set(BLA_SIZEOF_INTEGER 8)
 find_package(BLAS REQUIRED)
 
 # util lib
