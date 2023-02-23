@@ -128,7 +128,7 @@ program main
     end do
 
     if (this_image() .eq. 1) then
-        write (*, *) 2.0 * real(totalNz) / 1000000000.0 / &
+        write (*, *) 2.0 * real(totalNz) * iterations / 1000000000.0 / &
             (real(cpu_count2 - cpu_count) / count_rate)
     end if
 end program main
