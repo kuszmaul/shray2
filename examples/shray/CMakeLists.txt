@@ -26,6 +26,7 @@ foreach(suffix
 			reduce
 			segfault
 			sync
+            synctest
 			spmv
 			spmv_mt)
 		set(SHRAY_TARGET "${PROJECT_NAME}")
