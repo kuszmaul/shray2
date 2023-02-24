@@ -1,5 +1,6 @@
 foreach(file
-        segfault)
+        segfault
+        barrier)
 	set(EXAMPLE_TARGET "${file}_gasnet")
 
 	add_executable("${EXAMPLE_TARGET}"
