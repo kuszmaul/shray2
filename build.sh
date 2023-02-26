@@ -12,9 +12,9 @@ set -eu
 export CHPL_COMM=gasnet
 export CHPL_COMM_SUBSTRATE=mpi
 
-rm -rf build
-
 builddir=build
+[ -d "$builddir" ] && rm -r "$builddir"
+
 cmake \
 	-DEXAMPLES=ON \
 	-DChapel_ROOT_DIR="${HOME}/.local" \
