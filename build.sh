@@ -21,7 +21,6 @@ cmake \
 	-DGASNet_CONDUIT=mpi \
 	-DGASNet_ROOT_DIR="/usr/local/gasnet" \
 	-DSANITISE=OFF \
-    -DGFORTRAN_LIB_DIR="/usr/lib/gcc/x86_64-linux-gnu/12" \
 	-S . \
 	-B "$builddir"
 cmake --build "$builddir" -j
