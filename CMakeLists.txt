@@ -24,7 +24,7 @@ if(${SRC})
 	set(PROJECT_LANGUAGES ${PROJECT_LANGUAGES} C CXX)
 endif()
 if(${EXAMPLES})
-	set(PROJECT_LANGUAGES ${PROJECT_LANGUAGES} Fortran)
+	set(PROJECT_LANGUAGES ${PROJECT_LANGUAGES} Fortran Chapel UPC)
 endif()
 
 project(shray2

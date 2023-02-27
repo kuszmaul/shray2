@@ -15,6 +15,7 @@ foreach(file
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			GlobalArrays::GlobalArrays
+			BLAS::BLAS
 			cinterface
 			util)
 endforeach(file)

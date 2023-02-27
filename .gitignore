@@ -10,3 +10,4 @@ CMakeCache.txt
 experiments/results
 experiments/benchmarks
 cage*
+build.txt

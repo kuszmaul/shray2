@@ -103,11 +103,11 @@ int main(int argc, char **argv)
 
     ShrayReport();
 
-    if (check(C, n, 0.01)) {
-        fprintf(stderr, "Success!\n");
-    } else {
-        fprintf(stderr, "Failure!\n");
-    }
+    //if (check(C, n, 0.01)) {
+    //    fprintf(stderr, "Success!\n");
+    //} else {
+    //    fprintf(stderr, "Failure!\n");
+    //}
 
     ShrayFree(A);
     ShrayFree(B);

@@ -16,7 +16,7 @@ foreach(file
 	target_compile_options("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_FLAGS}
-            -cpp
+			-cpp
 			-fcoarray=lib)
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE

@@ -14,7 +14,7 @@ add_subdirectory(chapel)
 add_subdirectory(fortran)
 
 # global arrays examples
-#add_subdirectory(globalarrays)
+add_subdirectory(globalarrays)
 
 # mpi examples
 add_subdirectory(mpi)
