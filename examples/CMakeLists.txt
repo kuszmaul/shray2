@@ -8,10 +8,10 @@ find_package(BLAS REQUIRED)
 add_subdirectory(util)
 
 # shray examples
-#add_subdirectory(chapel)
+add_subdirectory(chapel)
 
 # fortran examples
-#add_subdirectory(fortran)
+add_subdirectory(fortran)
 
 # global arrays examples
 #add_subdirectory(globalarrays)
@@ -23,7 +23,7 @@ add_subdirectory(mpi)
 add_subdirectory(shray)
 
 # upc examples
-#add_subdirectory(upc)
+add_subdirectory(upc)
 
 # gasnet examples
 add_subdirectory(gasnet)

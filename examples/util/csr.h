@@ -39,6 +39,12 @@ csr_t *csr_parse_local(const char *file, int rank);
  */
 void csr_print(const csr_t *matrix);
 
+/*
+ * Creates a monopoly board of size n stochastic matrix. You throw two dices,
+ * Calculates only the local portion for processor s out of p total.
+ */
+csr_t *monopoly(size_t n, unsigned int p, unsigned int s);
+
 #ifdef __cplusplus
 }
 #endif

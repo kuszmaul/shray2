@@ -5,7 +5,8 @@ foreach(file
         1dstencil
 		matrix
 		nbody
-		spmv)
+		spmv
+        monopoly)
 	set(EXAMPLE_TARGET "${file}_globalarrays")
 
 	add_executable("${EXAMPLE_TARGET}"
