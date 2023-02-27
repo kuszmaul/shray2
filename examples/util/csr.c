@@ -188,11 +188,11 @@ static double probabilities[13] = {0, 0, 1 / 36, 2 / 36, 3 / 36, 4 / 36, 5 / 36,
 csr_t *monopoly(size_t n, unsigned int p, unsigned int s)
 {
     size_t blockSize = (n + p - 1) / p;
-    size_t m_total = (s == p - 1) ? n - (p - 1) * blockSize : blockSize;
-    csr_t *board = alloc_matrix(m_total, n, n, 11 * m_total, 11 * n);
+    size_t m_local = (s == p - 1) ? n - (p - 1) * blockSize : blockSize;
+    csr_t *board = alloc_matrix(m_local, n, n, 11 * m_local, 11 * n);
 
     size_t i = 0;
-    for (size_t row = 0; row < m_total; row++) {
+    for (size_t row = 0; row < m_local; row++) {
         size_t global_row = s * blockSize + row;
         for (int eyes = 2; eyes <= 12; eyes++) {
             board->values[i] = probabilities[eyes];
@@ -202,7 +202,7 @@ csr_t *monopoly(size_t n, unsigned int p, unsigned int s)
         board->row_indices[row] = 11 * row;
     }
 
-    board->row_indices[m_total + 1] = 11 * m_total;
+    board->row_indices[m_local] = 11 * m_local;
 
     return board;
 }
