@@ -21,6 +21,7 @@ hash find
 hash gnuplot
 hash head
 hash mpirun # General MPI applications (e.g. fortran/globalarrays)
+hash seq
 
 # Chapel.
 hash chpl
@@ -173,6 +174,7 @@ runtest_wrapper()
 # $2: number of processors
 # $3: executable
 # $4: arguments to the program WITHOUT special strings.
+# $5: test number
 # remainder: arguments to the program as it expects them
 runtest()
 {
@@ -180,11 +182,13 @@ runtest()
 	nproc="$2"
 	example="$3"
 	argsstr="$4"
-	shift;shift;shift;shift
+	testnumber="$5"
+	shift;shift;shift;shift;shift
 
 	printf '%s: ' "$test_type"
 
-	resultdir="$datadir/$example/$argsstr/$test_type"
+	testdir="$datadir/$example/$argsstr/$test_type"
+	resultdir="$testdir/$testnumber"
 	mkdir -p "$resultdir"
 
 	outfile="$resultdir/$nproc.out"
@@ -248,22 +252,44 @@ runtest()
 #export GASNET_REQUESTTIMEOUT_MAX=0
 
 # Run all tests.
-for nproc in 1 2 4 8 16 32 64; do
+for i in $(seq 1 10); do
+for nproc in 1 2 4 8; do # 16 32 64; do
 	# 1D stencil.
 	for size in 20480000 40960000; do
-		for iter in 1000 2000; do 
+		for iter in 1000 2000; do
 			printf '\nBenchmark 1D 3-point stencil (%s nodes, %s size, %s iter)\n' \
 				"$nproc" \
 				"$size" \
 				"$iter"
-			runtest chapel "$nproc" 1dstencil "$size $iter" "--N=$size" "--ITERATIONS=$iter"
-			runtest fortran "$nproc" 1dstencil "$size $iter" "$size" "$iter"
-			runtest globalarrays "$nproc" 1dstencil "$size $iter" "$size" "$iter"
-			runtest upc "$nproc" 1dstencil "$size $iter" "$size" "$iter"
+			runtest chapel "$nproc" 1dstencil "$size $iter" "$i" "--N=$size" "--ITERATIONS=$iter"
+			runtest fortran "$nproc" 1dstencil "$size $iter" "$i" "$size" "$iter"
+			runtest globalarrays "$nproc" 1dstencil "$size $iter" "$i" "$size" "$iter"
+			runtest upc "$nproc" 1dstencil "$size $iter" "$i" "$size" "$iter"
 
 			export SHRAY_WORKERTHREADS=0
 			export SHRAY_CACHEFACTOR=2
-			runtest shray "$nproc" 1dstencil "$size $iter" "$size" "$iter"
+			runtest shray "$nproc" 1dstencil "$size $iter" "$i" "$size" "$iter"
+		done
+	done
+
+	# Sparse matrix-vector multiplication (monopoly)
+	for size in 204800; do # 20480000; do
+		for iterations in 50; do
+			printf '\nBenchmark spmv monopoly (run %s, %s nodes, %s x %s, %s iter)\n' \
+				"$i" \
+				"$nproc" \
+				"$size" \
+				"$size" \
+				"$iterations"
+
+			runtest chapel "$nproc" monopoly "$size $iterations" "$i" "--n=$size" "--iterations=$iterations"
+			runtest fortran "$nproc" monopoly "$size $iterations" "$i" "$size" "$iterations"
+			runtest globalarrays "$nproc" monopoly "$size $iterations" "$i" "$size" "$iterations"
+			runtest upc "$nproc" monopoly "$size $iterations" "$i" "$size" "$iterations"
+
+			export SHRAY_WORKERTHREADS=0
+			export SHRAY_CACHEFACTOR="$nproc"
+			runtest shray "$nproc" monopoly "$size $iterations" "$i" "$size" "$iterations"
 		done
 	done
 
@@ -276,21 +302,21 @@ for nproc in 1 2 4 8 16 32 64; do
 				"$matrix" \
 				"$iterations"
 
-			runtest chapel "$nproc" spmv "$matrix $iterations" "--fileName=$matrixdir/$matrix" "--iterations=$iterations"
-			runtest fortran "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
-			runtest globalarrays "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
-			runtest upc "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
+			runtest chapel "$nproc" spmv "$matrix $iterations" "$i" "--fileName=$matrixdir/$matrix" "--iterations=$iterations"
+			runtest fortran "$nproc" spmv "$matrix $iterations" "$i" "$matrixdir/$matrix" "$iterations"
+			runtest globalarrays "$nproc" spmv "$matrix $iterations" "$i" "$matrixdir/$matrix" "$iterations"
+			runtest upc "$nproc" spmv "$matrix $iterations" "$i" "$matrixdir/$matrix" "$iterations"
 
 			export SHRAY_WORKERTHREADS=0
 			export SHRAY_CACHEFACTOR="$nproc"
-			runtest shray "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
+			runtest shray "$nproc" spmv "$matrix $iterations" "$i" "$matrixdir/$matrix" "$iterations"
 		done
 	done
 done
 
 # Matrix, weak scaling.
-testdirname="2553 3612 5108 7224 10224 14464 20480"
-for i in "1 2553" "2 3612" "4 5108" "8 7224" "16 10224" "32 14464" "64 20480"; do
+testdirname="2146 3036 4296 6080 8608 12192 17280"
+for i in "1 2146" "2 3036" "4 4296" "8 6080" "16 8608" "32 12192" "64 17280"; do
 	set -- $i
 	nproc="$1"
 	size="$2"
@@ -302,13 +328,14 @@ for i in "1 2553" "2 3612" "4 5108" "8 7224" "16 10224" "32 14464" "64 20480"; d
 
 	export SHRAY_WORKERTHREADS=0
 	export SHRAY_CACHEFACTOR=2
-	runtest shray "$nproc" matrix "$testdirname" "$size"
+	runtest shray "$nproc" matrix "$testdirname" "$i" "$size"
 
-	runtest chapel "$nproc" matrix "$testdirname" "--n=$size"
-	runtest fortran "$nproc" matrix "$testdirname" "$size"
-	runtest globalarrays "$nproc" matrix "$testdirname" "$size"
-	runtest upc "$nproc" matrix "$testdirname" "$size"
-	runtest scala "$nproc" matrix "$testdirname" "$size"
+	runtest chapel "$nproc" matrix "$testdirname" "$i" "--n=$size"
+	runtest fortran "$nproc" matrix "$testdirname" "$i" "$size"
+	runtest globalarrays "$nproc" matrix "$testdirname" "$i" "$size"
+	runtest upc "$nproc" matrix "$testdirname" "$i" "$size"
+	runtest scala "$nproc" matrix "$testdirname" "$i" "$size"
+done
 done
 
 # Generate plots.
@@ -324,6 +351,7 @@ for exp in "$datadir"/*; do
 	for paramsdir in "$exp"/*; do
 		params=$(basename "$paramsdir")
 
+
 		# Go through all implementations of that benchmark.
 		for implementation in "$paramsdir"/*; do
 			implementation=$(basename "$implementation")
@@ -331,11 +359,25 @@ for exp in "$datadir"/*; do
 			[ -f "$resultdir/graph.data" ] && rm "$resultdir/graph.data"
 
 			# Group the data per number of processors.
-			find "$resultdir" -name '*.gflops' -exec basename {} \; \
+			find "$resultdir/1" -name '*.gflops' -exec basename -s '.gflops' {} \; \
+				| sort -n \
+				| while IFS= read -r nproc; do
+				for testrun in "$resultdir"/*; do
+					if [ ! -d "$testrun" ]; then
+						continue
+					fi
+					result=$(cat "$testrun/$nproc.gflops")
+					printf '%s\n' "$result" >>"$resultdir/$nproc.raw"
+				done
+			done
+
+			# Generate the data for the graphs.
+			find "$resultdir" -name '*.raw' -exec basename {} \; \
 				| sort -n \
 				| while IFS= read -r nproc_result; do
-				nproc=$(basename "$nproc_result" .gflops)
-				result=$(cat "$resultdir/$nproc_result")
+				nproc=$(basename "$nproc_result" .raw)
+				python3 calc.py "$resultdir/$nproc_result" "$resultdir/$nproc.result"
+				result=$(cat "$resultdir/$nproc.result")
 				printf '%s, %s\n' "$nproc" "$result" >>"$resultdir/graph.data"
 			done
 		done
@@ -348,7 +390,6 @@ for exp in "$datadir"/*; do
 			"$paramsdir/fortran/graph.data" \
 			"$paramsdir/globalarrays/graph.data" \
 			"$paramsdir/shray/graph.data" \
-			"$paramsdir/shraymt/graph.data" \
 			"$paramsdir/scala/graph.data" \
 			"$paramsdir/upc/graph.data"
 	done
