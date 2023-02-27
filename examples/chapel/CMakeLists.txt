@@ -14,6 +14,7 @@ foreach(file
 		1dstencil
 		matrix
 		nbody
+        monopoly
 		spmv)
 	set(EXAMPLE_TARGET "${file}_chapel")
 
