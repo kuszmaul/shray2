@@ -101,14 +101,15 @@ program main
                      5.0 / 36, 4.0 / 36, 3.0 / 36, 2.0 / 36, 1.0 / 36]
     i = 0
     do row = 1, mat%m
-    global_row = (this_image() - 1) * blockSize + row
+        global_row = (this_image() - 1) * blockSize + row
         do eyes = 2, 12
             mat%val(i) = probabilities(eyes)
             mat%col_ind(i) = modulo(global_row + eyes, n) + 1
             i = i + 1
         end do
-        mat%row_ptr(row) = 11 * row
+        mat%row_ptr(row) = 11 * (row - 1) + 1
     end do
+    mat%row_ptr(mat%m + 1) = 11 * mat%m + 1
 
     call system_clock(cpu_count, count_rate, count_max)
 
