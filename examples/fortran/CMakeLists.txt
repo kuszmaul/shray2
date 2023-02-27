@@ -5,6 +5,7 @@ foreach(file
 		nbody
 		nbodyUnblocked
 		random
+        monopoly
         1dstencil
 		spmv)
 	set(EXAMPLE_TARGET "${file}_fortran")
