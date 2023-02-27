@@ -267,24 +267,6 @@ for nproc in 1 2 4 8 16 32 64; do
 		done
 	done
 
-	## Matrix.
-	for size in 2048 4096 8192 10240; do
-		printf '\nBenchmark matrix multiplication (%s nodes, %s x %s)\n' \
-			"$nproc" \
-			"$size" \
-			"$size"
-
-		export SHRAY_WORKERTHREADS=0
-		export SHRAY_CACHEFACTOR=2
-		runtest shray "$nproc" matrix "$size" "$size"
-
-		runtest chapel "$nproc" matrix "$size" "--n=$size"
-		runtest fortran "$nproc" matrix "$size" "$size"
-		runtest globalarrays "$nproc" matrix "$size" "$size"
-		runtest upc "$nproc" matrix "$size" "$size"
-		runtest scala "$nproc" matrix "$size" "$size"
-	done
-
 	# Sparse matrix-vector multiplication
 	for matrixdir in "$mmdir/$nproc"/*; do
 		matrix=$(basename "$matrixdir")
@@ -304,6 +286,29 @@ for nproc in 1 2 4 8 16 32 64; do
 			runtest shray "$nproc" spmv "$matrix $iterations" "$matrixdir/$matrix" "$iterations"
 		done
 	done
+done
+
+# Matrix, weak scaling.
+testdirname="2553 3612 5108 7224 10224 14464 20480"
+for i in "1 2553" "2 3612" "4 5108" "8 7224" "16 10224" "32 14464" "64 20480"; do
+	set -- $i
+	nproc="$1"
+	size="$2"
+
+	printf '\nBenchmark matrix multiplication (%s nodes, %s x %s)\n' \
+		"$nproc" \
+		"$size" \
+		"$size"
+
+	export SHRAY_WORKERTHREADS=0
+	export SHRAY_CACHEFACTOR=2
+	runtest shray "$nproc" matrix "$testdirname" "$size"
+
+	runtest chapel "$nproc" matrix "$testdirname" "--n=$size"
+	runtest fortran "$nproc" matrix "$testdirname" "$size"
+	runtest globalarrays "$nproc" matrix "$testdirname" "$size"
+	runtest upc "$nproc" matrix "$testdirname" "$size"
+	runtest scala "$nproc" matrix "$testdirname" "$size"
 done
 
 # Generate plots.
