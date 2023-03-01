@@ -1,19 +1,10 @@
 ! A matrix multiply of two n x n matrices A and B. We store them distributed blockwise, so
 ! locally each processor has a n x n / p array.
-! The algorithm we use is based on the fact that A (B[1] ... B[p]) = (AB[1] ... AB[p])
-! where p is the number of processors and B[s] is the part stored by processor s.
-! We cannot calculate A B[s] right away because A is not stored in its entirety on processor s.
-! So we calculate it as the inner product
-!
-!                 (         B(1: n / p)[s]       )
-! (A[1] ... A[p]) (             ...              )
-!                 ( B(1 + (p - 1) * n / p: n)[s] )
-
 
 program main
     implicit none
 
-    integer :: n, p, s
+    integer :: n, p, l
     real(KIND=8), dimension(:,:), codimension[:], allocatable :: A, B, C
     character(len=12), dimension(:), allocatable :: args
     integer :: cpu_count, cpu_count2, count_rate, count_max
@@ -28,9 +19,9 @@ program main
         write (*, *) 'Please make sure n divides p'
     end if
 
-    allocate(A(n, n / p)[*])
-    allocate(B(n, n / p)[*])
-    allocate(C(n, n / p)[*])
+    allocate(A(n / p, n)[*])
+    allocate(B(n / p, n)[*])
+    allocate(C(n / p, n)[*])
 
     A = 1
     B = 1
@@ -39,8 +30,8 @@ program main
     sync all
     call system_clock(cpu_count, count_rate, count_max)
 
-    do s = 1, num_images()
-        C = C + matmul(A(:,:)[s], B(1 + (s - 1) * n / p: s * n / p, :))
+    do l = 1, num_images()
+        C = C + matmul(A(:,1 + (l - 1) * n / p: l * n / p), B(:, :)[l])
     end do
 
     sync all
