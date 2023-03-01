@@ -16,6 +16,7 @@ foreach(suffix
 			2dstencilAuto
 			bandwidth
 			matrix
+            broadcast
 			matrixAuto
 			matrix_mt
             monopoly
@@ -26,6 +27,7 @@ foreach(suffix
 			random
 			reduce
 			segfault
+            segfault_prefetch
 			sync
             synctest
 			spmv
@@ -44,6 +46,7 @@ foreach(suffix
 			PRIVATE
 				${SHRAY_TARGET}
 				BLAS::BLAS
+                GASNet::GASNet
 				cinterface
 				util)
 		target_compile_definitions("${EXAMPLE_TARGET}"
