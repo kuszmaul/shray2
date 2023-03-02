@@ -1,0 +1,14 @@
+Install blas implementation and lapack,
+edit the SLmake.inc-example and rename to SLmake.inc
+
+Tested with flags
+FCFLAGS       = -O3 -march=native -mtune=native -fdefault-integer-8
+CCFLAGS       = -O3 -march=native -mtune=native -DInt=long
+
+Run
+sed -i 's/INTSZ = 4/INTSZ = 8/g'   TESTING/EIG/* TESTING/LIN/*
+sed -i 's/INTGSZ = 4/INTGSZ = 8/g' TESTING/EIG/* TESTING/LIN/*
+
+make exe is broken, so do only make lib
+
+In PBLAS/TIMING move the declaration of MEM( MEMSIZ ) form double to integer

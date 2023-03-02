@@ -1,39 +1,79 @@
-CC = mpicc.openmpi
-RUN = mpirun.openmpi
-FLAGS = -O3 -ffast-math -march=native -mtune=native -Wall
-LFLAGS = -lm -lcblas
-APPS = $(wildcard apps/*.c)
-RELEASE = $(patsubst apps/%.c, bin/%, $(APPS))
-DEBUG = $(patsubst apps/%.c, bin/%_debug, $(APPS))
-PROFILE = $(patsubst apps/%.c, bin/%_profile, $(APPS))
+include SHRAYmake.inc
+include $(GASNET_CONDUIT)
 
-all: release debug profile
+CFLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -Wextra -pedantic \
+		 -fno-math-errno -Iinclude
+LFLAGS = -lm -pthread $(BLAS) $(GLOBALARRAYS) $(ARMCI) $(LAPACK) $(SCALAPACK) $(COARRAY_FORTRAN)
+FORTRAN_FLAGS = -O3 -march=native -mtune=native -Wall -ffast-math -fcoarray=lib
+CHAPEL_FLAGS = --fast -O
 
-release: $(RELEASE)
+FORTRANAPPS = $(wildcard examples/fortran/*.f90)
+FORTRAN = $(patsubst examples/fortran/%.f90, bin/fortran/%, $(FORTRANAPPS))
 
-debug: FLAGS += -DDEBUG -g -fsanitize=undefined #-fsanitize=address
-debug: $(DEBUG)
+CHAPELAPPS = $(wildcard examples/chapel/*.chpl)
+CHAPEL = $(patsubst examples/chapel/%.chpl, bin/chapel/%, $(CHAPELAPPS))
 
-profile: FLAGS += -DPROFILE
-profile: $(PROFILE)
+MPIAPPS = $(wildcard examples/mpi/*.c)
+MPI = $(patsubst examples/mpi/%.c, bin/mpi/%, $(MPIAPPS))
 
-bin/shray.o: src/shray.c include/shray.h include/shrayInternal.h
-	$(CC) $(FLAGS) -c $< -o $@
+UPCAPPS = $(wildcard examples/upc/*.c)
+UPC = $(patsubst examples/upc/%.c, bin/upc/%, $(UPCAPPS))
 
-bin/shray_debug.o: src/shray.c include/shray.h include/shrayInternal.h
-	$(CC) $(FLAGS) -c $< -o $@
+GAAPPS = $(wildcard examples/globalarrays/*.c)
+GA = $(patsubst examples/globalarrays/%.c, bin/globalarrays/%, $(GAAPPS))
 
-bin/shray_profile.o: src/shray.c include/shray.h include/shrayInternal.h
-	$(CC) $(FLAGS) -c $< -o $@
+SHRAYAPPS = $(wildcard examples/shray/*.c)
+SHRAY = $(patsubst examples/shray/%.c, bin/shray/%, $(SHRAYAPPS))
 
-bin/%: apps/%.c bin/shray.o
-	$(CC) $(FLAGS) $^ -o $@ $(LFLAGS)
+all: $(SHRAY) $(MPI) 
+.PHONY: all clean cleanShray
 
-bin/%_debug: apps/%.c bin/shray_debug.o
-	$(CC) $(FLAGS) $^ -o $@ $(LFLAGS)
+release: cleanShray $(SHRAY)
 
-bin/%_profile: apps/%.c bin/shray_profile.o
-	$(CC) $(FLAGS) $^ -o $@ $(LFLAGS)
+debug: CFLAGS += -DDEBUG -g -fsanitize=undefined -fbounds-check -fsanitize=address
+debug: LFLAGS += -g -fsanitize=undefined -fbounds-check -fsanitize=address
+debug: cleanShray $(SHRAY)
+
+profile: CFLAGS += -DPROFILE -pg
+profile: LFLAGS += -pg
+profile: cleanShray $(SHRAY)
+
+bin/shray/shray.o: src/shray.c include/shray2/shray.h src/shray.h
+	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(CFLAGS) -c $< -o $@
+
+bin/shray/queue.o: src/queue.c src/queue.h
+	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(CFLAGS) -c $< -o $@
+
+bin/shray/%.o: src/%.c src/%.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: examples/shray/%.c
+	$(GASNET_CC) $(GASNET_CPPFLAGS) $(GASNET_CFLAGS) $(CFLAGS) -c $< -o $@
+
+bin/shray/%: %.o bin/shray/shray.o bin/shray/bitmap.o bin/shray/queue.o bin/shray/ringbuffer.o \
+	bin/csr.o
+	$(GASNET_LD) $(GASNET_LDFLAGS) $^ -o $@ $(GASNET_LIBS) $(LFLAGS)
+
+bin/fortran/%: examples/fortran/%.f90
+	$(FORTRAN_C) $(FORTRAN_FLAGS) $^ -o $@ $(LFLAGS)
+
+bin/chapel/%: examples/chapel/%.chpl
+	chpl $< $(CHAPEL_FLAGS) -o $@ $(BLAS)
+
+bin/mpi/%: examples/mpi/%.c
+	$(MPICC) $< $(CFLAGS) -o $@ $(LFLAGS)
+
+bin/upc/%: examples/upc/%.upc bin/csr.o
+	$(UPCC) -g $^ -o $@ $(BLAS)
+
+bin/csr.o: examples/util/csr.c examples/util/csr.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+bin/globalarrays/%: examples/globalarrays/%.c bin/csr.o
+	$(MPICC) $(CFLAGS) $^ -o $@ $(LFLAGS) $(FORTRANLIB)
 
 clean:
-	$(RM) bin/*
+	$(RM) bin/shray/* bin/chapel/* bin/fortran/* bin/mpi/* bin/upc/* *.mod bin/csr.o
+
+cleanShray:
+	$(RM) bin/shray/*

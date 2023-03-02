@@ -1,3 +1,14 @@
 *.swp
 results/*
 bin/*
+*.out
+*.o
+*.mod
+build/
+CMakeCache.txt
+*.asm
+experiments/results
+experiments/benchmarks
+cage*
+build.txt
+experiments/benchmark.txt
