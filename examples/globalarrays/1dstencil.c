@@ -1,4 +1,5 @@
 #include "../util/time.h"
+#include "../util/host.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -174,6 +175,8 @@ int main(int argc, char **argv)
 	if (GA_Nodeid() == 0) {
         printf("%lf\n", 5.0 * (n - 2) * iterations / 1000000000.0 / duration);
 	}
+
+	hostname_print();
 
 	GA_Destroy(g_in);
 	GA_Destroy(g_out);

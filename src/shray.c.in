@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <unistd.h>
 
 /*****************************************************
  * Global variable declarations.
@@ -33,6 +34,9 @@ Heap heap;
 
 bool ShrayOutput;
 #endif
+
+#define HOSTNAME_LENGTH 256
+static char ShrayHost[HOSTNAME_LENGTH];
 
 // TODO: this is not really necessary anymore
 enum WorkerState
@@ -501,6 +505,10 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
     ShraySegfaultCounter = 0;
     ShrayBarrierCounter = 0;
 
+    if(gethostname(ShrayHost, HOSTNAME_LENGTH) != 0) {
+        ShrayHost[0] = '\0';
+    }
+
     char *cacheLineEnv = getenv("SHRAY_CACHELINE");
     if (cacheLineEnv == NULL) {
         ShrayCacheLineSize = 1;
@@ -854,8 +862,8 @@ void ShrayRunWorker@SHRAY_SUFFIX@(shray_fn handler, void *array, void *args)
 void ShrayReport@SHRAY_SUFFIX@(void)
 {
     fprintf(stderr,
-            "Shray report P(%d): %zu segfaults, %zu barriers, "
-            "%zu bytes communicated.\n", Shray_rank, ShraySegfaultCounter, ShrayBarrierCounter,
+            "Shray report P(%d) on %s: %zu segfaults, %zu barriers, "
+            "%zu bytes communicated.\n", Shray_rank, ShrayHost, ShraySegfaultCounter, ShrayBarrierCounter,
             ShraySegfaultCounter * ShrayPagesz);
 }
 

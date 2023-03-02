@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <cblas.h>
 #include <sys/time.h>
+#include "../util/host.h"
 
 #define TIME(duration, fncalls)                                        \
     {                                                                  \
@@ -120,6 +121,8 @@ int main(int argc, char **argv)
     if (MYTHREAD == 0) {
         printf("%lf\n", 2.0 * n * n * n / 1000000000 / duration);
     }
+
+	hostname_print();
 
 	//if (check(C, n, 0.01)) {
 	//    fprintf(stderr, "Success!\n");
