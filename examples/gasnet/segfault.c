@@ -78,11 +78,6 @@ double reduce(double *A, size_t n)
     if (gasnet_mynode() == 0) {
         double *buffer = malloc(4096);
 
-        /* Local part */
-        for (size_t i = 0; i < n / p; i++) {
-            result += A[i];
-        }
-
         /* Remote parts */
         for (int processor = 1; processor < p; processor++) {
             for (size_t page = 0; page < n / p / 512; page++) {
@@ -118,10 +113,10 @@ int main(int argc, char **argv)
     gasnetBarrier();
 
     double duration, result;
-    TIME(duration, result = reduce(A, n);)
 
     if (gasnet_mynode() == 0) {
-        double microsPerPage = 1000000.0 * duration / (n / 512);
+        TIME(duration, result = reduce(A, n);)
+        double microsPerPage = 1000000.0 * duration / ((n - n / p) / 512);
 
         fprintf(stderr, "We reduced an array on %d processors at %lf microseconds per page:\n"
                 "That is a bandwidth of %lf GB/s (result is %lf)\n",

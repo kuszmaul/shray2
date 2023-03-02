@@ -2,7 +2,7 @@
 
 #SBATCH --account=csmpi
 #SBATCH --partition=csmpi_short
-#SBATCH --nodes=4
+#SBATCH --nodes=8
 #SBATCH --ntasks-per-node=8
 #SBATCH --output=reduce.out
 #SBATCH --time=0:10:00
@@ -43,16 +43,19 @@ runsync()
 {
     nproc="$1"
     printf '%s & ' "${nproc}";
-    mpirun -n ${nproc} "${bindir}/shray/segfault_normal_shray" 50000000;
+    mpirun -n ${nproc} "${bindir}/shray/segfault_normal_shray" 5000000;
     printf ' & ';
-    mpirun -n ${nproc} "${bindir}/gasnet/segfault_gasnet" 50000000;
+    mpirun -n ${nproc} "${bindir}/shray/segfault_prefetch_normal_shray" 5120000 512000;
+    printf ' & ';
+    mpirun -n ${nproc} "${bindir}/gasnet/segfault_gasnet" 5000000;
     printf ' \\\\\n';
 }
 
 {
-printf '\\begin{tabular}{c|c}\n\hline\nProcesses & Shray & GASNet \\\\\n';
-for nproc in 8 16 32; do
+printf '\\begin{tabular}{c|c|c}\n\hline\nProcesses & \shray{} & \shray{} prefetch & \gasnet{} \\\\\n';
+for nproc in 8 16 32 64; do
     runsync "${nproc}"
 done
 printf '\\end{tabular}';
-} > "${datadir}/reduce.csv" 2> "${datadir}/errors.txt"
+#} > "${datadir}/reduce.csv" 2> "${datadir}/errors.txt"
+} > reduce.csv
