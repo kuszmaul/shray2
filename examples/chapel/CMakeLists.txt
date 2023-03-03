@@ -10,10 +10,8 @@ get_filename_component(BLAS_TDIR ${BLAS_LIB_ACTUAL} DIRECTORY)
 get_filename_component(BLAS_TNAME ${BLAS_LIB_ACTUAL} NAME)
 
 foreach(file
-		2dstencil
 		1dstencil
 		matrix
-		nbody
         monopoly
 		spmv)
 	set(EXAMPLE_TARGET "${file}_chapel")
