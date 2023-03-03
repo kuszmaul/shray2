@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+#include "../util/host.h"
 
 #define TIME(duration, fncalls)                                        \
     {                                                                  \
@@ -175,6 +176,7 @@ int main(int argc, char **argv)
     double duration;
     TIME(duration, Stencil(n, &in, &out, iterations););
 
+	hostname_print();
     if (MYTHREAD == 0) {
         printf("%lf\n", 5.0 * (n - 2) * iterations / 1000000000.0 / duration);
         upc_free(in);

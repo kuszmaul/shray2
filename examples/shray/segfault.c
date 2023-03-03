@@ -51,7 +51,7 @@ double reduceAuto(double *arr, size_t n)
 {
     double sum = 0.0;
 
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = ShrayEnd(arr); i < n; i++) {
         sum += arr[i];
     }
 
@@ -76,10 +76,10 @@ int main(int argc, char **argv)
     double duration;
     double result;
 
-    TIME(duration, result = reduceAuto(A, n););
 
     if (ShrayOutput) {
-        double microsPerPage = 1000000.0 * duration / (n / 512);
+        TIME(duration, result = reduceAuto(A, n););
+        double microsPerPage = 1000000.0 * duration / ((n - ShrayEnd(A)) / 512);
 
         fprintf(stderr, "We reduced an array on %d processors at %lf microseconds per page:\n"
                 "That is a bandwidth of %lf GB/s\n",

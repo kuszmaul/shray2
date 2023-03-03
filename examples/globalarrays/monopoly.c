@@ -1,5 +1,6 @@
 #include "../util/csr.h"
 #include "../util/time.h"
+#include "../util/host.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -103,6 +104,7 @@ int main(int argc, char **argv)
 	if (GA_Nodeid() == 0) {
 	    printf("%lf\n", matrix->nnz_total * iterations * 2.0 / 1000000000 / duration);
 	}
+	hostname_print();
 
 	GA_Destroy(g_vector);
 	GA_Destroy(g_out);

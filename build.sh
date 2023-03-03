@@ -10,7 +10,7 @@ set -eu
 
 # Required to force Chapel applications to use gasnet udp-conduit.
 export CHPL_COMM=gasnet
-export CHPL_COMM_SUBSTRATE=mpi
+export CHPL_COMM_SUBSTRATE=udp
 
 builddir=build
 [ -d "$builddir" ] && rm -r "$builddir"

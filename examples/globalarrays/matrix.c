@@ -1,5 +1,6 @@
 #include "../util/csr.h"
 #include "../util/time.h"
+#include "../util/host.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -115,6 +116,7 @@ int main(int argc, char **argv)
 	if (GA_Nodeid() == 0) {
 	    printf("%lf\n", 2.0 * n * n * n / 1000000000 / duration);
 	}
+	hostname_print();
 
 	GA_Destroy(g_a);
 	GA_Destroy(g_b);

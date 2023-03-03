@@ -1,5 +1,6 @@
 add_library(util STATIC
-	csr.c)
+	csr.c
+	host.c)
 
 target_link_libraries(util
 	PRIVATE

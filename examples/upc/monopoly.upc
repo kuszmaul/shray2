@@ -1,6 +1,7 @@
 #include <upc.h>
 #include <upc_tick.h>
 #include "../util/csr.h"
+#include "../util/host.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,6 +93,7 @@ int main(int argc, char **argv)
 
 	TIME(duration, steady_state(matrix, vector, out, matrix->n, iterations););
 
+	hostname_print();
 	if (MYTHREAD == 0) {
 	    printf("%lf\n", matrix->nnz_total * 2.0 * iterations / 1000000000 / duration);
 	}

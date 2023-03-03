@@ -10,4 +10,7 @@ with open(inputfile, "r") as f:
         data.append(float(line))
 
 with open(outputfile, "w") as f:
-    f.write(f"{statistics.mean(data)}, {statistics.stdev(data)}\n")
+    stdev = 0
+    if len(data) > 1:
+        stdev = statistics.stdev(data)
+    f.write(f"{statistics.mean(data)}, {stdev}\n")
