@@ -8,7 +8,7 @@ const a: real(32) = 0.5;
 const b: real(32) = 0.33;
 const c: real(32) = 0.25;
 
-config const N = 100000000;
+config const N = 1000000;
 config const ITERATIONS = 500;
 
 proc left(n: int, iterations: int, input: [0..n + iterations - 1] real(32),
@@ -101,21 +101,17 @@ proc StencilBlocked(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(
 
 proc Stencil(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(32), iterations: int)
 {
-  var temp: [0..n - 1] real(32);
+//  writeln("Hello from locale ", here.id);
 
   for t in 1..iterations / TIMEBLOCK {
     StencilBlocked(n, input, output, TIMEBLOCK);
-    temp = output;
-    output = input;
-    input = temp;
+    input <=> output;
   }
   if (iterations % TIMEBLOCK != 0) {
     StencilBlocked(n, input, output, iterations % TIMEBLOCK);
   } else {
     /* We did one buffer swap too many */
-    temp = output;
-    output = input;
-    input = temp;
+    input <=> output;
   }
 }
 
@@ -128,7 +124,9 @@ proc main()
 
   var watch: Timer;
   watch.start();
-  StencilBlocked(N, input, output, ITERATIONS);
+  coforall loc in Locales do on loc {
+    Stencil(N, input, output, ITERATIONS);
+  }
   watch.stop();
 
   if (here.id == 0) then
