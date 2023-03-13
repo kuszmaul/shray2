@@ -137,7 +137,9 @@ proc main()
   var watch: Timer;
   watch.start();
 
-  vec = steady_state(m, n, nz, val, row_ptr, col_ind, iterations);
+  coforall loc in Locales do on loc {
+    vec = steady_state(m, n, nz, val, row_ptr, col_ind, iterations);
+  }
 
   watch.stop();
 
