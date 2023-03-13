@@ -205,6 +205,14 @@ runtest()
 			"$bindir/examples/$test_type/${example}_profile_${test_type}" \
 			"$@"
 	elif [ "$test_type" = chapel ]; then
+		# Manually set the node count for Chapel since it will not
+		# distribute properly otherwise.
+		if [ "$nproc" -le 8 ]; then
+			export GASNET_CSPAWN_CMD="srun -N 1 -n %N %C"
+		else
+			count=$((nproc / 8))
+			export GASNET_CSPAWN_CMD="srun -N $count -n %N %C"
+		fi
 		runtest_wrapper "$outfile" "$gflopsfile" \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			-nl "$nproc" \
@@ -223,10 +231,8 @@ runtest()
 			"$@"
 	elif [ "$test_type" = upc ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			upcrun \
+			mpirun \
 			-n "$nproc" \
-			-shared-heap 4G \
-			-bind-threads \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
 		# Filter out UPC-specific stderr messages
@@ -244,12 +250,14 @@ runtest()
 }
 
 ## Inform GASNet how to start.
-#export GASNET_SPAWNFN="C"
-#export GASNET_CSPAWN_CMD="srun -n %N %C"
+export GASNET_SPAWNFN="C"
 
 ## UDP-conduit max timeout in microseconds, default is 30000000 (30 seconds)
 ## 0 is infinite timeout.
-#export GASNET_REQUESTTIMEOUT_MAX=0
+export GASNET_REQUESTTIMEOUT_MAX=0
+
+# UPC shared heap configuration
+export UPC_SHARED_HEAP_SIZE="4G"
 
 # Run all tests.
 for i in $(seq 1 10); do
