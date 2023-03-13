@@ -80,9 +80,16 @@ int main(int argc, char **argv)
 	}
 
 	size_t iterations = atoll(argv[2]);
+	int nprocs = GA_Nnodes();
+
+	int _chunks = matrix->n / nprocs;
+	if (matrix->n % nprocs != 0) {
+		_chunks++;
+	}
+	int chunks[1] = { _chunks };
 
 	int v_dimensions[1] = { matrix->n };
-	int g_vector = NGA_Create(C_DBL, 1, v_dimensions, "input vector", NULL);
+	int g_vector = NGA_Create(C_DBL, 1, v_dimensions, "input vector", chunks);
 	if (!g_vector) {
 		GA_Error("Could not allocate input array", 1);
 	}
