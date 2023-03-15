@@ -65,11 +65,11 @@ typedef struct PrefetchStruct {
 
 extern unsigned int Shray_rank;
 extern unsigned int Shray_size;
-extern size_t ShraySegfaultCounter;
-extern size_t ShrayBarrierCounter;
-extern size_t ShrayPagesz;
-extern size_t ShrayCacheLineSize;
-extern double ShrayCacheAllocFactor;
+extern size_t Shray_SegfaultCounter;
+extern size_t Shray_BarrierCounter;
+extern size_t Shray_Pagesz;
+extern size_t Shray_CacheLineSize;
+extern double Shray_CacheAllocFactor;
 extern Heap heap;
 
 /**************************************************

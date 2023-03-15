@@ -1,17 +1,40 @@
 include(language_standard)
 
-SET(SHRAY_SUFFIX "_normal")
-configure_file(shray.c.in shray_normal.c)
-SET(SHRAY_SUFFIX "_debug")
-configure_file(shray.c.in shray_debug.c)
-SET(SHRAY_SUFFIX "_profile")
-configure_file(shray.c.in shray_profile.c)
+file(READ shray.c FILE_CONTENTS_DEBUG)
+set(FILE_CONTENTS_PROFILE "${FILE_CONTENTS_DEBUG}")
+set(FILE_CONTENTS_NORMAL "${FILE_CONTENTS_DEBUG}")
+foreach(fn
+		ShrayInit
+		ShrayMalloc
+		ShrayStart
+		ShrayEnd
+		ShraySync
+		ShrayFree
+		ShrayPrefetch
+		ShrayDiscard
+		ShrayRunWorker
+		ShrayReport
+		ShrayRank
+		ShraySize
+		ShrayFinalize
+		ShrayBroadcast
+		ShrayBarrier
+	)
+	string(REPLACE "${fn}" "${fn}_debug" FILE_CONTENTS_DEBUG
+		"${FILE_CONTENTS_DEBUG}")
+	string(REPLACE "${fn}" "${fn}_profile" FILE_CONTENTS_PROFILE
+		"${FILE_CONTENTS_PROFILE}")
+	string(REPLACE "${fn}" "${fn}_normal" FILE_CONTENTS_NORMAL
+		"${FILE_CONTENTS_NORMAL}")
+endforeach(fn)
+file(WRITE "${PROJECT_BINARY_DIR}/shray_debug.c" "${FILE_CONTENTS_DEBUG}")
+file(WRITE "${PROJECT_BINARY_DIR}/shray_profile.c" "${FILE_CONTENTS_PROFILE}")
+file(WRITE "${PROJECT_BINARY_DIR}/shray_normal.c" "${FILE_CONTENTS_NORMAL}")
 
 # build project library
-
-set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/shray_debug.c
+set_source_files_properties("${PROJECT_BINARY_DIR}/shray_debug.c"
     PROPERTIES COMPILE_DEFINITIONS DEBUG)
-set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/shray_profile.c
+set_source_files_properties("${PROJECT_BINARY_DIR}/shray_profile.c"
     PROPERTIES COMPILE_DEFINITIONS PROFILE)
 
 set(LIB_TARGET "${PROJECT_NAME}")
@@ -19,9 +42,9 @@ add_library("${LIB_TARGET}" SHARED
 	bitmap.c
 	queue.c
 	ringbuffer.c
-	"${CMAKE_CURRENT_BINARY_DIR}/shray_debug.c"
-	"${CMAKE_CURRENT_BINARY_DIR}/shray_normal.c"
-	"${CMAKE_CURRENT_BINARY_DIR}/shray_profile.c")
+	"${PROJECT_BINARY_DIR}/shray_debug.c"
+	"${PROJECT_BINARY_DIR}/shray_normal.c"
+	"${PROJECT_BINARY_DIR}/shray_profile.c")
 target_compile_options("${LIB_TARGET}"
 	PRIVATE
 		-fPIC)

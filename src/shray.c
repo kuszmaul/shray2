@@ -25,11 +25,11 @@
 
 unsigned int Shray_rank;
 unsigned int Shray_size;
-size_t ShraySegfaultCounter;
-size_t ShrayBarrierCounter;
-size_t ShrayPagesz;
-size_t ShrayCacheLineSize;
-double ShrayCacheAllocFactor;
+size_t Shray_SegfaultCounter;
+size_t Shray_BarrierCounter;
+size_t Shray_Pagesz;
+size_t Shray_CacheLineSize;
+double Shray_CacheAllocFactor;
 Heap heap;
 
 bool ShrayOutput;
@@ -105,12 +105,12 @@ static void *toShadow(uintptr_t addr, Allocation *alloc)
 
 static uintptr_t roundUpPage(uintptr_t addr)
 {
-    return roundUp(addr, ShrayPagesz) * ShrayPagesz;
+    return roundUp(addr, Shray_Pagesz) * Shray_Pagesz;
 }
 
 static uintptr_t roundDownPage(uintptr_t addr)
 {
-    return addr / ShrayPagesz * ShrayPagesz;
+    return addr / Shray_Pagesz * Shray_Pagesz;
 }
 
 /* Aw_r := [startWrite(A, r), endWrite(A, r)[ is the part of A that rank r should
@@ -147,8 +147,8 @@ static inline uintptr_t endRead(Allocation *alloc, unsigned int rank)
  * at the last page of the allocation). Note, Ap_r may be empty! */
 static inline uintptr_t startPartition(Allocation *alloc, unsigned int rank)
 {
-    return (endRead(alloc, rank - 1) == startRead(alloc, rank) + ShrayPagesz) ?
-        startRead(alloc, rank) + ShrayPagesz :
+    return (endRead(alloc, rank - 1) == startRead(alloc, rank) + Shray_Pagesz) ?
+        startRead(alloc, rank) + Shray_Pagesz :
         startRead(alloc, rank);
 }
 
@@ -157,7 +157,7 @@ static inline uintptr_t endPartition(Allocation *alloc, unsigned int rank)
     return endRead(alloc, rank);
 }
 
-/* Frees [start, end[. start, end need to be ShrayPagesz-aligned */
+/* Frees [start, end[. start, end need to be Shray_Pagesz-aligned */
 static inline void freeRAM(uintptr_t start, uintptr_t end)
 {
     if (start >= end) return;
@@ -234,8 +234,8 @@ static PrefetchStruct GetPrefetchStruct(void *address, size_t size)
  */
 static void evictCacheEntry(Allocation *alloc, uintptr_t start, size_t pages)
 {
-    size_t index = (start - alloc->location) / ShrayPagesz;
-    size_t size = pages * ShrayPagesz;
+    size_t index = (start - alloc->location) / Shray_Pagesz;
+    size_t size = pages * Shray_Pagesz;
     BitmapSetZeroes(alloc->local, index, index + pages);
     BitmapSetZeroes(alloc->prefetched, index, index + pages);
 
@@ -246,7 +246,7 @@ static void evictCacheEntry(Allocation *alloc, uintptr_t start, size_t pages)
 /* Assumes both pages are page-aligned. */
 static inline int isNextPage(void *x, void *y)
 {
-    return (uintptr_t)y - (uintptr_t)x == ShrayPagesz;
+    return (uintptr_t)y - (uintptr_t)x == Shray_Pagesz;
 }
 
 static void handlePageFault(void *address)
@@ -257,7 +257,7 @@ static void handlePageFault(void *address)
 
     Allocation *alloc = findAlloc((void *)roundedAddress);
 
-    size_t pageNumber = (roundedAddress - alloc->location) / ShrayPagesz;
+    size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
     DBUG_PRINT("Page %zu", pageNumber);
 
     if (BitmapCheck(alloc->prefetched, pageNumber)) {
@@ -276,14 +276,14 @@ static void handlePageFault(void *address)
         void *start = (void *)entry->start;
 
         DBUG_PRINT("%p is currently being prefetched, along with [%p, %p[ (pages [%zu, %zu[)",
-               address, start, (void *)entry->end, (entry->start - alloc->location) / ShrayPagesz,
-               (entry->end - alloc->location) / ShrayPagesz);
+               address, start, (void *)entry->end, (entry->start - alloc->location) / Shray_Pagesz,
+               (entry->end - alloc->location) / Shray_Pagesz);
 
         MREMAP_MOVE(start, toShadow(entry->start, alloc), entry->end - entry->start);
         MMAP_FIXED_SAFE(toShadow(entry->start, alloc), entry->end - entry->start,
                 PROT_READ | PROT_WRITE);
-        BitmapSetOnes(alloc->local, (entry->start - alloc->location) / ShrayPagesz,
-                (entry->end - alloc->location) / ShrayPagesz);
+        BitmapSetOnes(alloc->local, (entry->start - alloc->location) / Shray_Pagesz,
+                (entry->end - alloc->location) / Shray_Pagesz);
     } else {
         DBUG_PRINT("%p is not being prefetched, perform blocking fetch.", address);
         if (ringbuffer_full(alloc->autoCaches)) {
@@ -301,13 +301,13 @@ static void handlePageFault(void *address)
         // case is because otherwise we can potentially get a very large number
         // of mappings which causes future mremap calls to fail.
         if (workerThreadCount == 0) {
-            MPROTECT_SAFE((void *)roundedAddress, ShrayPagesz, PROT_READ | PROT_WRITE);
-            gasnet_get((void *)roundedAddress, owner, (void *)roundedAddress, ShrayPagesz);
+            MPROTECT_SAFE((void *)roundedAddress, Shray_Pagesz, PROT_READ | PROT_WRITE);
+            gasnet_get((void *)roundedAddress, owner, (void *)roundedAddress, Shray_Pagesz);
         } else {
-            gasnet_get(alloc->shadowPage, owner, (void *)roundedAddress, ShrayPagesz);
+            gasnet_get(alloc->shadowPage, owner, (void *)roundedAddress, Shray_Pagesz);
 
-            MREMAP_MOVE((void *)roundedAddress, alloc->shadowPage, ShrayPagesz);
-            MMAP_FIXED_SAFE(alloc->shadowPage, ShrayPagesz, PROT_READ | PROT_WRITE);
+            MREMAP_MOVE((void *)roundedAddress, alloc->shadowPage, Shray_Pagesz);
+            MMAP_FIXED_SAFE(alloc->shadowPage, Shray_Pagesz, PROT_READ | PROT_WRITE);
         }
 
         DBUG_PRINT("We set page %zu to locally available.", pageNumber);
@@ -431,12 +431,12 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
                     rank, (void *)start_r, end_r - start_r);
 
             DBUG_PRINT("We set this to prefetched (pages [%zu, %zu[)",
-                (start_r - location) / ShrayPagesz, (end_r - location) / ShrayPagesz);
+                (start_r - location) / Shray_Pagesz, (end_r - location) / Shray_Pagesz);
 
             queue_queue(alloc->prefetchCaches, alloc, start_r, end_r, handle);
 
-            BitmapSetOnes(alloc->prefetched, (start_r - location) / ShrayPagesz,
-                (end_r - location) / ShrayPagesz);
+            BitmapSetOnes(alloc->prefetched, (start_r - location) / Shray_Pagesz,
+                (end_r - location) / Shray_Pagesz);
         }
     }
 }
@@ -491,7 +491,7 @@ static void startShrayWorkers()
  * Shray functionality
  *****************************************************/
 
-void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
+void ShrayInit(int *argc, char ***argv)
 {
     GASNET_SAFE(gasnet_init(argc, argv));
     /* Must be built with GASNET_SEGMENT_EVERYTHING, so these arguments are ignored. */
@@ -502,8 +502,8 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
 
     ShrayOutput = (Shray_rank == 0);
 
-    ShraySegfaultCounter = 0;
-    ShrayBarrierCounter = 0;
+    Shray_SegfaultCounter = 0;
+    Shray_BarrierCounter = 0;
 
     if(gethostname(ShrayHost, HOSTNAME_LENGTH) != 0) {
         ShrayHost[0] = '\0';
@@ -511,9 +511,9 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
 
     char *cacheLineEnv = getenv("SHRAY_CACHELINE");
     if (cacheLineEnv == NULL) {
-        ShrayCacheLineSize = 1;
+        Shray_CacheLineSize = 1;
     } else {
-        ShrayCacheLineSize = atol(cacheLineEnv);
+        Shray_CacheLineSize = atol(cacheLineEnv);
     }
 
     // TODO: use macro to check whether or not multi-threading is supported
@@ -529,7 +529,7 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
         perror("Querying system page size failed.");
     }
 
-    ShrayPagesz = (size_t)pagesz * ShrayCacheLineSize;
+    Shray_Pagesz = (size_t)pagesz * Shray_CacheLineSize;
 
     heap.size = sizeof(Allocation);
     heap.numberOfAllocs = 0;
@@ -537,9 +537,9 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
 
     char *cacheSizeEnv = getenv("SHRAY_CACHEFACTOR");
     if (cacheSizeEnv == NULL) {
-        ShrayCacheAllocFactor = 1;
+        Shray_CacheAllocFactor = 1;
     } else {
-        ShrayCacheAllocFactor = strtod(cacheSizeEnv, NULL);
+        Shray_CacheAllocFactor = strtod(cacheSizeEnv, NULL);
     }
 
     memoryThread = pthread_self();
@@ -551,17 +551,17 @@ void ShrayInit@SHRAY_SUFFIX@(int *argc, char ***argv)
     registerHandlers();
 }
 
-void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
+void *ShrayMalloc(size_t firstDimension, size_t totalSize)
 {
     void *location;
 
     /* For the segfault handler, we need the start of each allocation to be
-     * ShrayPagesz-aligned. We cheat a little by making it possible for this to be multiple
+     * Shray_Pagesz-aligned. We cheat a little by making it possible for this to be multiple
      * system-pages. So we mmap an extra page at the start and end, and then move the
      * pointer up. */
     if (Shray_rank == 0) {
         void *mmapAddress;
-        MMAP_SAFE(mmapAddress, NULL, totalSize + 2 * ShrayPagesz, PROT_NONE);
+        MMAP_SAFE(mmapAddress, NULL, totalSize + 2 * Shray_Pagesz, PROT_NONE);
         location = (void *)roundUpPage((uintptr_t)mmapAddress);
         DBUG_PRINT("mmapAddress = %p, allocation start = %p", mmapAddress, location);
     }
@@ -571,15 +571,15 @@ void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
             sizeof(void *), GASNET_COLL_DST_IN_SEGMENT);
 
     if (Shray_rank != 0) {
-        MMAP_FIXED_SAFE(location, totalSize + ShrayPagesz, PROT_NONE);
+        MMAP_FIXED_SAFE(location, totalSize + Shray_Pagesz, PROT_NONE);
     }
 
     void *shadow;
-    MMAP_SAFE(shadow, NULL, totalSize + ShrayPagesz, PROT_WRITE);
+    MMAP_SAFE(shadow, NULL, totalSize + Shray_Pagesz, PROT_WRITE);
     DBUG_PRINT("We allocate shadow [%p, %p[", shadow,
-            (void *)((uintptr_t)shadow + totalSize + ShrayPagesz));
+            (void *)((uintptr_t)shadow + totalSize + Shray_Pagesz));
     void *shadowPage;
-    MMAP_SAFE(shadowPage, NULL, ShrayPagesz, PROT_WRITE);
+    MMAP_SAFE(shadowPage, NULL, Shray_Pagesz, PROT_WRITE);
     DBUG_PRINT("We allocate shadow %p", shadowPage);
 
     /* Insert allocation into the heap, making sure allocs stays sorted. */
@@ -618,16 +618,16 @@ void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
 
     MPROTECT_SAFE((void *)startRead(alloc, Shray_rank), segmentLength, PROT_READ | PROT_WRITE);
 
-    alloc->local = BitmapCreate(roundUp(totalSize, ShrayPagesz));
-    alloc->prefetched = BitmapCreate(roundUp(totalSize, ShrayPagesz));
+    alloc->local = BitmapCreate(roundUp(totalSize, Shray_Pagesz));
+    alloc->prefetched = BitmapCreate(roundUp(totalSize, Shray_Pagesz));
 
-    size_t cacheEntries = segmentLength / ShrayPagesz * ShrayCacheAllocFactor;
+    size_t cacheEntries = segmentLength / Shray_Pagesz * Shray_CacheAllocFactor;
     alloc->autoCaches = ringbuffer_alloc(cacheEntries);
     if (!alloc->autoCaches) {
         fprintf(stderr, "[node %d]: Could not allocate autocache", Shray_rank);
         ShrayFinalize(1);
     }
-    DBUG_PRINT("Allocated %zu automatic cache entries (%zu)", cacheEntries, totalSize / ShrayPagesz);
+    DBUG_PRINT("Allocated %zu automatic cache entries (%zu)", cacheEntries, totalSize / Shray_Pagesz);
 
     alloc->prefetchCaches = queue_alloc(5);
     if (!alloc->prefetchCaches) {
@@ -641,13 +641,13 @@ void *ShrayMalloc@SHRAY_SUFFIX@(size_t firstDimension, size_t totalSize)
     return location;
 }
 
-size_t ShrayStart@SHRAY_SUFFIX@(void *array)
+size_t ShrayStart(void *array)
 {
     Allocation *alloc = findAlloc(array);
     return Shray_rank * roundUp(alloc->firstDimension, Shray_size);
 }
 
-size_t ShrayEnd@SHRAY_SUFFIX@(void *array)
+size_t ShrayEnd(void *array)
 {
     Allocation *alloc = findAlloc(array);
     size_t firstDimension = alloc->firstDimension;
@@ -658,10 +658,10 @@ size_t ShrayEnd@SHRAY_SUFFIX@(void *array)
 static void UpdateLeftPage(Allocation *alloc)
 {
     uintptr_t firstPage = startRead(alloc, Shray_rank);
-    /* Rank s has to send [start, end[ := Aw_s \cap [firstPage, firstPage + ShrayPagesz[ to
+    /* Rank s has to send [start, end[ := Aw_s \cap [firstPage, firstPage + Shray_Pagesz[ to
      * rank t whenever [start, end[ \cap Ar_t is non-empty. */
     uintptr_t start = max(startWrite(alloc, Shray_rank), firstPage);
-    uintptr_t end = min(endWrite(alloc, Shray_rank), firstPage + ShrayPagesz);
+    uintptr_t end = min(endWrite(alloc, Shray_rank), firstPage + Shray_Pagesz);
 
     int rank = Shray_rank - 1;
     for (; rank >= 0 && endRead(alloc, rank) - 1 >= start; rank--) {
@@ -672,11 +672,11 @@ static void UpdateLeftPage(Allocation *alloc)
 
 static void UpdateRightPage(Allocation *alloc)
 {
-    uintptr_t lastPage = endRead(alloc, Shray_rank) - ShrayPagesz;
-    /* Rank s has to send [start, end[ := Aw_s \cap [lastPage, lastPage + ShrayPagesz[ to
+    uintptr_t lastPage = endRead(alloc, Shray_rank) - Shray_Pagesz;
+    /* Rank s has to send [start, end[ := Aw_s \cap [lastPage, lastPage + Shray_Pagesz[ to
      * rank t whenever [start, end[ \cap Ar_t is non-empty. */
     uintptr_t start = max(startWrite(alloc, Shray_rank), lastPage);
-    uintptr_t end = min(endWrite(alloc, Shray_rank), lastPage + ShrayPagesz);
+    uintptr_t end = min(endWrite(alloc, Shray_rank), lastPage + Shray_Pagesz);
 
     unsigned int rank = Shray_rank + 1;
     for (; rank < Shray_size && startRead(alloc, rank) < end; rank++) {
@@ -685,7 +685,7 @@ static void UpdateRightPage(Allocation *alloc)
     }
 }
 
-void ShraySync@SHRAY_SUFFIX@(void *array)
+void ShraySync(void *array)
 {
     Allocation *alloc = findAlloc(array);
 
@@ -702,7 +702,7 @@ void ShraySync@SHRAY_SUFFIX@(void *array)
     BARRIERCOUNT
 }
 
-void ShrayFree@SHRAY_SUFFIX@(void *address)
+void ShrayFree(void *address)
 {
     DBUG_PRINT("ShrayFree: we free %p.", address);
 
@@ -725,7 +725,7 @@ void ShrayFree@SHRAY_SUFFIX@(void *address)
     }
 }
 
-void ShrayPrefetch@SHRAY_SUFFIX@(void *address, size_t size)
+void ShrayPrefetch(void *address, size_t size)
 {
     PrefetchStruct prefetch = GetPrefetchStruct(address, size);
 
@@ -740,16 +740,16 @@ static void DiscardGet(queue_entry_t *get, size_t index)
     DBUG_PRINT("We discard [%p, %p[", (void *)get->start, (void *)get->end);
     Allocation *alloc = (Allocation *)get->alloc;
 
-    BitmapSetZeroes(alloc->prefetched, (get->start - alloc->location) / ShrayPagesz,
-            (get->end - alloc->location) / ShrayPagesz);
+    BitmapSetZeroes(alloc->prefetched, (get->start - alloc->location) / Shray_Pagesz,
+            (get->end - alloc->location) / Shray_Pagesz);
 
     /* If not everything is local yet, we are not yet done prefetching. Wait for the prefetch
      * to complete, and free the shadow region. Otherwise, free the light-region. */
     if (get->gottem) {
         DBUG_PRINT("We had already finished get [%p, %p[.", (void *)get->start, (void *)get->end);
         freeRAM(get->start, get->end);
-        BitmapSetZeroes(alloc->local, (get->start - alloc->location) / ShrayPagesz,
-                (get->end - alloc->location) / ShrayPagesz);
+        BitmapSetZeroes(alloc->local, (get->start - alloc->location) / Shray_Pagesz,
+                (get->end - alloc->location) / Shray_Pagesz);
     } else {
         DBUG_PRINT("We had not finished getting [%p, %p[.", (void *)get->start, (void *)get->end);
         gasnet_wait_syncnb(get->handle);
@@ -768,7 +768,7 @@ static int IsSubset(uintptr_t subStart, uintptr_t subEnd, uintptr_t start, uintp
     return (subStart >= start && subStart < end && subEnd <= end && subEnd > subStart);
 }
 
-void ShrayDiscard@SHRAY_SUFFIX@(void *address, size_t size)
+void ShrayDiscard(void *address, size_t size)
 {
     PrefetchStruct prefetch = GetPrefetchStruct(address, size);
 
@@ -793,7 +793,7 @@ static int pageFaultHandled(uintptr_t address)
 {
     uintptr_t roundedAddress = roundDownPage(address);
     Allocation *alloc = findAlloc((void *)roundedAddress);
-    size_t pageNumber = (roundedAddress - alloc->location) / ShrayPagesz;
+    size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
     return BitmapCheck(alloc->local, pageNumber);
 }
 
@@ -810,7 +810,7 @@ static void handleWorkerRequest(shray_worker_t *worker)
     pthread_kill(worker->id, SIGUSR1);
 }
 
-void ShrayRunWorker@SHRAY_SUFFIX@(shray_fn handler, void *array, void *args)
+void ShrayRunWorker(shray_fn handler, void *array, void *args)
 {
     DBUG_PRINT("Starting threaded workload (%zu workers)", workerThreadCount);
     if (workerThreadCount == 0) {
@@ -859,20 +859,20 @@ void ShrayRunWorker@SHRAY_SUFFIX@(shray_fn handler, void *array, void *args)
     DBUG_PRINT("Finished threaded workload (%zu workers)", workerThreadCount);
 }
 
-void ShrayReport@SHRAY_SUFFIX@(void)
+void ShrayReport(void)
 {
     fprintf(stderr,
             "Shray report P(%d) on %s: %zu segfaults, %zu barriers, "
-            "%zu bytes communicated.\n", Shray_rank, ShrayHost, ShraySegfaultCounter, ShrayBarrierCounter,
-            ShraySegfaultCounter * ShrayPagesz);
+            "%zu bytes communicated.\n", Shray_rank, ShrayHost, Shray_SegfaultCounter, Shray_BarrierCounter,
+            Shray_SegfaultCounter * Shray_Pagesz);
 }
 
-unsigned int ShrayRank@SHRAY_SUFFIX@(void)
+unsigned int ShrayRank(void)
 {
     return Shray_rank;
 }
 
-unsigned int ShraySize@SHRAY_SUFFIX@(void)
+unsigned int ShraySize(void)
 {
     return Shray_size;
 }
@@ -892,7 +892,7 @@ static void terminateWorkers()
     }
 }
 
-void ShrayFinalize@SHRAY_SUFFIX@(int exit_code)
+void ShrayFinalize(int exit_code)
 {
     DBUG_PRINT("Terminating with code %d", exit_code);
     if (exit_code == 0) {
@@ -910,7 +910,7 @@ void ShrayFinalize@SHRAY_SUFFIX@(int exit_code)
     gasnet_exit(exit_code);
 }
 
-void ShrayBroadcast@SHRAY_SUFFIX@(void *buffer, size_t size, int root)
+void ShrayBroadcast(void *buffer, size_t size, int root)
 {
     DBUG_PRINT("We broadcast [%p, %p[ from node %d.", buffer,
             (void *)((uintptr_t)buffer + size), root);
@@ -918,7 +918,7 @@ void ShrayBroadcast@SHRAY_SUFFIX@(void *buffer, size_t size, int root)
             GASNET_COLL_DST_IN_SEGMENT);
 }
 
-void ShrayBarrier@SHRAY_SUFFIX@(void)
+void ShrayBarrier(void)
 {
     gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS);
     gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);
