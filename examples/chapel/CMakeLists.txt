@@ -11,9 +11,13 @@ get_filename_component(BLAS_TNAME ${BLAS_LIB_ACTUAL} NAME)
 
 foreach(file
 		1dstencil
+		1dstencil_combi
 		matrix
+		matrix_combi
         monopoly
-		spmv)
+        monopoly_combi
+		spmv
+		spmv_combi)
 	set(EXAMPLE_TARGET "${file}_chapel")
 
 	add_executable("${EXAMPLE_TARGET}"
