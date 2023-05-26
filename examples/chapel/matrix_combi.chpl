@@ -27,17 +27,17 @@ var C: [BlockSpace] real;
 var watch: Timer;
 watch.start();
 
-proc parallel_mul(As: [1..numLocales, 1..numLocales] real, Bl: [1..n / numLocales,1..n] real)
+proc parallel_mul(As: [1..n / numLocales, 1..n / numLocales] real, Bl: [1..n / numLocales,1..n] real)
 {
-  var C: [1..numLocales,1..n] real;
-  var Cpart: [1..numLocales / numTasks,1..n] real;
+  var C: [1..n / numLocales,1..n] real;
+  var Cpart: [1..n / numLocales / numTasks,1..n] real;
+  var Apart: [1..n / numLocales / numTasks,1..n / numLocales] real;
 
   coforall t in 1..numTasks {
     stdout.writeln("Task ", t);
-    Cpart = 1;
-      //dot(As[1 + numLocales / numTasks * (t - 1)..numLocales / numTasks * t,1..n / numLocales],
-            //Bl);
-    C(1 + numLocales / numTasks * (t - 1)..numLocales / numTasks * t,1..n) = 1;// = Cpart;
+    Apart = As(1 + n / numLocales / numTasks * (t - 1) .. 1 + n / numLocales / numTasks, 1..n / numLocales);
+    Cpart = dot(As, B);
+    C[1 + n / numLocales / numTasks * (t - 1) .. 1 + n / numLocales / numTasks, 1..n] = Cpart;
   }
 
   return C;
@@ -45,13 +45,13 @@ proc parallel_mul(As: [1..numLocales, 1..numLocales] real, Bl: [1..n / numLocale
 
 coforall loc in Locales do on loc {
   for l in 0..numLocales - 1 {
-    /* We have to copy out As, Bl to avoid segfaults, probably because dot uses
-     * an external library. */
-    var As: [1..n / numLocales,1..n / numLocales] real =
-      A[A.localSubdomain()](.., 1 + l * n / numLocales..(l + 1) * n / numLocales);
-    var Bl: [1..n / numLocales,1..n] real = B[B.localSubdomain(Locales[l])];
-    C[C.localSubdomain()] += parallel_mul(As, Bl);
-    writeln("Locale ", here.id, " has done loop iteration ", l, "\n");
+        /* We have to copy out As, Bl to avoid segfaults, probably because dot uses
+         * an external library. */
+        var As: [1..n / numLocales,1..n / numLocales] real =
+          A[A.localSubdomain()](.., 1 + l * n / numLocales..(l + 1) * n / numLocales);
+        var Bl: [1..n / numLocales,1..n] real = B[B.localSubdomain(Locales[l])];
+        C[C.localSubdomain()] += dot(As, Bl);
+        writeln("Locale ", here.id, " has done loop iteration ", l, "\n");
   }
 
   allLocalesBarrier.barrier();
