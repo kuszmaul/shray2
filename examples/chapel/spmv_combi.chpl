@@ -62,7 +62,7 @@ proc main()
   var mat: CSRMatrix;
 
   var infoName = fileName + "_info" + (here.id + 1) : string;
-  var infoFile = open(infoName, iomode.r);
+  var infoFile = open(infoName, ioMode.r);
   var infoChannel = infoFile.reader();
   var m: int;
   var n: int;
@@ -86,7 +86,7 @@ proc main()
 
 
   var valuesName = fileName + "_values" + (here.id + 1) : string;
-  var valuesFile = open(valuesName, iomode.r);
+  var valuesFile = open(valuesName, ioMode.r);
   var valuesChannel = valuesFile.reader();
   var val: [1..nz] real;
 
@@ -99,7 +99,7 @@ proc main()
 
 
   var rowName = fileName + "_row" + (here.id + 1) : string;
-  var rowFile = open(rowName, iomode.r);
+  var rowFile = open(rowName, ioMode.r);
   var rowChannel = rowFile.reader();
   var row_ptr: [1..m + 1] int;
 
@@ -112,7 +112,7 @@ proc main()
 
 
   var columnName = fileName + "_column" + (here.id + 1) : string;
-  var columnFile = open(columnName, iomode.r);
+  var columnFile = open(columnName, ioMode.r);
   var columnChannel = columnFile.reader();
   var col_ind: [1..nz] int;
 
@@ -134,7 +134,7 @@ proc main()
   const BlockSpace = Space dmapped Block(boundingBox=Space);
   var vec: [BlockSpace] real = 1 / mat.n;
 
-  var watch: Timer;
+  var watch: stopwatch;
   watch.start();
 
   coforall loc in Locales do on loc {

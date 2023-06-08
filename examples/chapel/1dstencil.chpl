@@ -122,7 +122,7 @@ proc main()
   var input: [BlockSpace] real(32) = 1;
   var output: [BlockSpace] real(32) = 1;
 
-  var watch: Timer;
+  var watch: stopwatch;
   watch.start();
   coforall loc in Locales do on loc {
     Stencil(N, input, output, ITERATIONS);

@@ -1,4 +1,16 @@
-/* Assumes n is divisible by number of locales */
+/***********************************************************************
+ * This is a version that uses multilocale exeuction for parallelism
+ * between nodes, and multitask exeuction for parallelism within a node.
+ *
+ * We calculate AB by
+ *
+ *   A0      A0B
+ *  ...  B = ...
+ *   Ap      ApB
+ *
+ * and allocating As only on node s. The same trick is then applied
+ * with tasks to calculate AsB.
+ ***********************************************************************/
 
 use Time;
 use IO;
@@ -24,10 +36,16 @@ var C: [BlockSpace] real;
 var watch: stopwatch;
 watch.start();
 
+/* cotasks, assumes p | n */
+proc matmul(n: int, A: [0..n - 1, 0..n - 1] real, B: [0..n - 1, 0..n - 1] real)
+{
+
+}
+
 coforall loc in Locales do on loc {
   for l in 0..numLocales - 1 {
         /* We have to copy out As, Bl to avoid segfaults, probably because dot uses
-         * an external library. */
+         * an external library. *
         var As: [1..n / numLocales,1..n / numLocales] real =
           A[A.localSubdomain()](.., 1 + l * n / numLocales..(l + 1) * n / numLocales);
         var Bl: [1..n / numLocales,1..n] real = B[B.localSubdomain(Locales[l])];
@@ -37,11 +55,11 @@ coforall loc in Locales do on loc {
 
   allLocalesBarrier.barrier();
 
-//  for (i, j) in {1..n, 1..n} {
-//    if (C[i, j] != n) {
-//      stdout.writeln("Index (", i, ", ", j, ") should be ", n, ", but is ", C[i, j], "\n");
-//    }
-//  }
+  for (i, j) in {1..n, 1..n} {
+    if (C[i, j] != n) {
+      stdout.writeln("Index (", i, ", ", j, ") should be ", n, ", but is ", C[i, j], "\n");
+    }
+  }
 }
 
 watch.stop();

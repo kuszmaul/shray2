@@ -45,7 +45,7 @@ var masses: [1..n] real = 1;
 var positions: [1..n, 1..3] real = 1;
 var velocities: [1..n, 1..3] real = 1;
 
-var watch: Timer;
+var watch: stopwatch;
 watch.start();
 
 positions = advance(positions, velocities, masses, 0.1, iterations);

@@ -24,7 +24,7 @@ var A: [BlockSpace] real = 1;
 var B: [BlockSpace] real = 1;
 var C: [BlockSpace] real;
 
-var watch: Timer;
+var watch: stopwatch;
 watch.start();
 
 proc parallel_mul(As: [1..n / numLocales, 1..n / numLocales] real, Bl: [1..n / numLocales,1..n] real)

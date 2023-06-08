@@ -81,7 +81,7 @@ proc main()
   const BlockSpace = Space dmapped Block(boundingBox=Space);
   var vec: [BlockSpace] real = 1 / n;
 
-  var watch: Timer;
+  var watch: stopwatch;
   watch.start();
 
   coforall loc in Locales do on loc {
