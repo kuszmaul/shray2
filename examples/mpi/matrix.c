@@ -201,7 +201,6 @@ int main(int argc, char **argv)
     MPI_SAFE(MPI_Comm_rank(row_comm, me));
     MPI_SAFE(MPI_Comm_rank(col_comm, me + 1));
 
-    size_t n = atol(argv[1]);
     if (n % p != 0 || n % q != 0) {
         fprintf(stderr, "Only supports n divisible by %d and %d\n", p, q);
         MPI_SAFE(MPI_Finalize());
