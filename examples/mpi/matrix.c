@@ -45,6 +45,7 @@
 #include <cblas.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <mpi.h>
 
 #define MPI_SAFE(fn)                                            \
