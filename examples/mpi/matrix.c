@@ -33,6 +33,13 @@
  *     | (10) | (11) | (12) |
  *     | (10) | (11) | (12) |
  *
+ *                 B00 B01 B02 B03
+ *                 B10 B11 B12 B13
+ * A0 A1 A2 A3     B20 B21 B22 B23 =
+ *                 B30 B31 B32 B33
+ *
+ *  All the Bst are contiguous in memory, which the As are not
+ *
  ****************************************************************************/
 
 #include <cblas.h>
@@ -112,8 +119,8 @@ void matmul(double *A, double *B, double *C)
         MPI_Datatype a_type = (me[0] == root_a) ? A_type : MPI_DOUBLE;
         int a_count = (me[0] == root_a) ? 1 : n / p * n / r;
 
-        MPI_SAFE(MPI_Bcast(a, a_count, a_type, root_a, row_comm));
-        MPI_SAFE(MPI_Bcast(b, n / r * n / q, MPI_DOUBLE, root_b, col_comm));
+        MPI_SAFE(MPI_Bcast(a, a_count, a_type, root_a, col_comm));
+        MPI_SAFE(MPI_Bcast(b, n / r * n / q, MPI_DOUBLE, root_b, row_comm));
 
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                     n / p, n / q, n / r, 1.0, a, lda,
@@ -205,6 +212,11 @@ int main(int argc, char **argv)
         fprintf(stderr, "Only supports n divisible by %d and %d\n", p, q);
         MPI_SAFE(MPI_Finalize());
     }
+
+    int col_size, row_size;
+    MPI_SAFE(MPI_Comm_size(col_comm, &col_size));
+    MPI_SAFE(MPI_Comm_size(row_comm, &row_size));
+    printf("Row comm is %d, col comm is %d\n", row_size, col_size);
 
     /* Initalize A, B to 1, C to 0 */
     double *A = malloc(n / p * n / q * sizeof(double));
