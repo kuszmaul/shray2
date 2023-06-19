@@ -11,27 +11,24 @@ foreach(suffix
 
 	foreach(file
 			1dstencil
-			1dstencil_mt
 			2dstencil
 			2dstencilAuto
 			bandwidth
 			matrix
-            broadcast
+			broadcast
 			matrixAuto
-			matrix_mt
-            monopoly
+			monopoly
 			gasnet
 			nbody
 			nbodyAuto
-			nbody_mt
 			random
 			reduce
 			segfault
-            segfault_prefetch
+			segfault_prefetch
 			sync
-            synctest
+			synctest
 			spmv
-			spmv_mt)
+		)
 		set(SHRAY_TARGET "${PROJECT_NAME}")
 		set(EXAMPLE_TARGET "${file}${suffix}_shray")
 
