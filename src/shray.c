@@ -532,7 +532,6 @@ static void *memory_main(void *args)
             thread_register_request = false;
         }
 
-        lockIfMultithread();
         size_t next_index = worker_threads->data_start;
         while (next_index != NOLINK) {
             queue_entry_t *entry = &(worker_threads->data[next_index]);
@@ -542,7 +541,6 @@ static void *memory_main(void *args)
             }
             next_index = entry->next;
         }
-        unlockIfMultithread();
     }
 
     DBUG_PRINT("Memory thread terminated %p", args);
