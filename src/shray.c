@@ -595,7 +595,6 @@ void ShrayInit(int *argc, char ***argv)
     }
 
     char *thread_env = getenv("SHRAY_WORKERTHREADS");
-    DBUG_PRINT("WORKER THREADS: %s", thread_env);
     multiThreaded = thread_env != NULL;
     int err = pthread_key_create(&key, NULL);
     if (err) {
