@@ -917,7 +917,7 @@ void ShrayFinalize(int exit_code)
             queue_free(worker_threads);
             pthread_mutex_destroy(&thread_mutex);
         }
-        pthread_key_delete(&key);
+        pthread_key_delete(key);
         for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
             Allocation *alloc = heap.allocs + i;
             queue_free(alloc->prefetchCaches);
