@@ -1,6 +1,7 @@
 use IO;
 use BlockDist;
 use Time;
+use AllLocalesBarriers;
 
 const BLOCK: int = 10000;
 const TIMEBLOCK: int = 100;
@@ -77,10 +78,12 @@ proc StencilBlocked(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(
   var inBuffer: [0..BLOCK + 2 * iterations - 1] real(32);
   var outBuffer: [0..BLOCK + 2 * iterations - 1] real(32);
 
+  // here.id is the locale (node) id
   var start: int = (n / BLOCK + numLocales - 1) / numLocales * here.id;
   var end: int = min((n / BLOCK + numLocales - 1) / numLocales * (here.id + 1), n / BLOCK);
 
-  coforall row in start..end - 1 {
+  // Multithreaded execution, default uses one thread per core
+  forall row in start..end - 1 {
     if (row == 0) {
       inBuffer(0 .. BLOCK + iterations - 1) = input(0 .. BLOCK + iterations - 1);
       left(BLOCK, iterations, inBuffer, outBuffer);
@@ -103,9 +106,10 @@ proc Stencil(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(32), it
 {
 //  writeln("Hello from locale ", here.id);
 
-  sync for t in 1..iterations / TIMEBLOCK {
+  for t in 1..iterations / TIMEBLOCK {
     StencilBlocked(n, input, output, TIMEBLOCK);
     input <=> output;
+    allLocalesBarrier.barrier();
   }
   if (iterations % TIMEBLOCK != 0) {
     StencilBlocked(n, input, output, iterations % TIMEBLOCK);
@@ -113,6 +117,7 @@ proc Stencil(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(32), it
     /* We did one buffer swap too many */
     input <=> output;
   }
+  allLocalesBarrier.barrier();
 }
 
 proc main()
@@ -124,6 +129,7 @@ proc main()
 
   var watch: stopwatch;
   watch.start();
+  // Execute on each node (locale)
   coforall loc in Locales do on loc {
     Stencil(N, input, output, ITERATIONS);
   }

@@ -1,6 +1,7 @@
 use IO;
 use BlockDist;
 use Time;
+use AllLocalesBarriers;
 
 config const fileName = "cage11.mtx";
 config const iterations = 10;
@@ -27,7 +28,7 @@ proc spmv(m: int, n: int, nz: int, val: [1..nz] real, row_ptr: [1..m + 1] int,
 {
   var result: [1..m] real = 0.0;
 
-  coforall row in 1..m {
+  forall row in 1..m {
     for j in row_ptr(row)..row_ptr(row + 1) - 1 {
       result(row) += val(j) * vec(col_ind(j));
     }
@@ -45,11 +46,12 @@ proc steady_state(m: int, n: int, nz: int, val: [1..nz] real, row_ptr: [1..m + 1
 
   var vec: [BlockSpace] real = 1 / n;
 
-  sync for t in 1..iterations do
+  for t in 1..iterations do
     /* As a stochastic matrix is square and we distributed the matrix blockwise along the first
      * dimension, mat.m is precisely the size of the local part of the vector. */
     vec(here.id * blockSize + 1 .. here.id * blockSize + m) =
       spmv(m, n, nz, val, row_ptr, col_ind, vec);
+    allLocalesBarrier.barrier();
 
   return vec;
 }

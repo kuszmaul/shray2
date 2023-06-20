@@ -1,7 +1,6 @@
 /* Assumes n is divisible by number of locales * number of threads per locale.
  * The latter can be set with CHPL_RT_NUM_THREADS_PER_LOCALE */
 
-
 use Time;
 use IO;
 use BLAS;
