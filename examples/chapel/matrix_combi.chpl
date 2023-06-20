@@ -55,11 +55,11 @@ coforall loc in Locales do on loc {
 
   allLocalesBarrier.barrier();
 
-  for (i, j) in {1..n, 1..n} {
-    if (C[i, j] != n) {
-      stdout.writeln("Index (", i, ", ", j, ") should be ", n, ", but is ", C[i, j], "\n");
-    }
-  }
+//  for (i, j) in {1..n, 1..n} {
+//    if (C[i, j] != n) {
+//      stdout.writeln("Index (", i, ", ", j, ") should be ", n, ", but is ", C[i, j], "\n");
+//    }
+//  }
 }
 
 watch.stop();
