@@ -37,7 +37,7 @@ queue_t *queue_alloc(size_t size)
 	}
 
 	queue->size = size;
-    queue->actualSize = 0;
+	queue->actual_size = 0;
 	queue_clear(queue);
 	return queue;
 }
@@ -48,12 +48,13 @@ void queue_free(queue_t *queue)
 	free(queue);
 }
 
-static void double_size(queue_t *queue)
+static int double_size(queue_t *queue)
 {
     queue->size *= 2;
     queue->data = realloc(queue->data, queue->size * sizeof(queue_entry_t));
     if (queue->data == NULL) {
         fprintf(stderr, "Increasing the queue size failed\n");
+	return 1;
     };
 
     /* Append the new space to the free list. */
@@ -67,22 +68,21 @@ static void double_size(queue_t *queue)
     queue->data[queue->size - 1].prev = queue->size - 2;
     queue->data[queue->size - 1].next = NOLINK;
     queue->free_end = queue->size - 1;
+    return 0;
 }
 
-void queue_queue(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, gasnet_handle_t handle)
+static queue_entry_t *queue_queue(queue_t *queue)
 {
-    queue->actualSize++;
-    /* + 1 so the free list can never be empty */
-    if (queue->actualSize + 1 > queue->size) double_size(queue);
+	queue->actual_size++;
+	/* + 1 so the free list can never be empty */
+	if (queue->actual_size + 1 > queue->size) {
+		if (!double_size(queue)) {
+		    return NULL;
+		}
+	}
 
-    /* We canibalise the first free entry */
+	/* We cannibalise the first free entry */
 	queue_entry_t *free_entry = &queue->data[queue->free_start];
-
-	free_entry->alloc = alloc;
-	free_entry->start = start;
-	free_entry->end = end;
-	free_entry->handle = handle;
-	free_entry->gottem = 0;
 
 	if (free_entry->next != NOLINK) {
 		queue->data[free_entry->next].prev = NOLINK;
@@ -101,14 +101,45 @@ void queue_queue(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, ga
 	queue->free_start = free_entry->next;
 
 	free_entry->next = NOLINK;
+	return free_entry;
+
 }
 
-queue_entry_t *queue_find(const queue_t *queue, uintptr_t address)
+int queue_queue_prefetch(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, gasnet_handle_t handle)
+{
+	queue_entry_t *entry = queue_queue(queue);
+	if (!entry) {
+	    return 1;
+	}
+
+	entry->prefetch.alloc = alloc;
+	entry->prefetch.start = start;
+	entry->prefetch.end = end;
+	entry->prefetch.handle = handle;
+	entry->prefetch.gottem = 0;
+	return 0;
+}
+
+int queue_queue_thread(queue_entry_t **result, queue_t *queue, uintptr_t address, pthread_t id, int req)
+{
+	queue_entry_t *entry = queue_queue(queue);
+	if (!entry) {
+	    return 1;
+	}
+
+	entry->threading.address = address;
+	entry->threading.id = id;
+	entry->threading.request = req;
+	*result = entry;
+	return 0;
+}
+
+queue_entry_t *queue_find_prefetch(const queue_t *queue, uintptr_t address)
 {
 	size_t next_index = queue->data_start;
 	while (next_index != NOLINK) {
 		queue_entry_t *entry = &queue->data[next_index];
-		if (entry->start <= address && address < entry->end) {
+		if (entry->prefetch.start <= address && address < entry->prefetch.end) {
 			return entry;
 		}
 

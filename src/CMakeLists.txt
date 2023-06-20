@@ -36,6 +36,7 @@ set_source_files_properties("${PROJECT_BINARY_DIR}/shray_debug.c"
     PROPERTIES COMPILE_DEFINITIONS DEBUG)
 set_source_files_properties("${PROJECT_BINARY_DIR}/shray_profile.c"
     PROPERTIES COMPILE_DEFINITIONS PROFILE)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS shray.c)
 
 set(LIB_TARGET "${PROJECT_NAME}")
 add_library("${LIB_TARGET}" SHARED

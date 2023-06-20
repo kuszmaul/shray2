@@ -22,11 +22,12 @@ foreach(suffix
 			random
 			reduce
 			segfault
-            segfault_prefetch
+			segfault_prefetch
 			sync
-            synctest
+			synctest
 			spmv
-			spmv_mt)
+			spmv_mt
+		)
 		set(SHRAY_TARGET "${PROJECT_NAME}")
 		set(EXAMPLE_TARGET "${file}${suffix}_shray")
 

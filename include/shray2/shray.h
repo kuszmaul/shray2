@@ -9,14 +9,7 @@ extern "C" {
 #include <stdbool.h>
 #include <sys/time.h>
 
-typedef struct {
-    void *args;
-    size_t start;
-    size_t end;
-} worker_info_t;
-
 extern bool ShrayOutput;
-typedef void (*shray_fn)(worker_info_t *info);
 
 /* Debug declarations */
 void ShrayInit_debug(int *argc, char ***argv);
@@ -31,7 +24,6 @@ unsigned int ShraySize_debug(void);
 void ShrayFinalize_debug(int exit_code);
 void ShrayPrefetch_debug(void *address, size_t size);
 void ShrayDiscard_debug(void *address, size_t size);
-void ShrayRunWorker_debug(shray_fn fn, void *array, void *args);
 void ShrayBroadcast_debug(void *buffer, size_t size, int root);
 void ShrayBarrier_debug(void);
 
@@ -48,7 +40,6 @@ unsigned int ShraySize_profile(void);
 void ShrayFinalize_profile(int exit_code);
 void ShrayPrefetch_profile(void *address, size_t size);
 void ShrayDiscard_profile(void *address, size_t size);
-void ShrayRunWorker_profile(shray_fn fn, void *array, void *args);
 void ShrayBroadcast_profile(void *buffer, size_t size, int root);
 void ShrayBarrier_profile(void);
 
@@ -65,7 +56,6 @@ unsigned int ShraySize_normal(void);
 void ShrayFinalize_normal(int exit_code);
 void ShrayPrefetch_normal(void *address, size_t size);
 void ShrayDiscard_normal(void *address, size_t size);
-void ShrayRunWorker_normal(shray_fn fn, void *array, void *args);
 void ShrayBroadcast_normal(void *buffer, size_t size, int root);
 void ShrayBarrier_normal(void);
 
@@ -83,7 +73,6 @@ void ShrayBarrier_normal(void);
 #define ShrayFinalize(exit_code) ShrayFinalize_debug(exit_code)
 #define ShrayPrefetch(address, size) ShrayPrefetch_debug(address, size)
 #define ShrayDiscard(address, size) ShrayDiscard_debug(address, size)
-#define ShrayRunWorker(fn, n, args) ShrayRunWorker_debug(fn, n, args)
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_debug(buffer, size, root)
 #define ShrayBarrier() ShrayBarrier_debug()
 
@@ -102,7 +91,6 @@ void ShrayBarrier_normal(void);
 #define ShrayFinalize(exit_code) ShrayFinalize_profile(exit_code)
 #define ShrayPrefetch(address, size) ShrayPrefetch_profile(address, size)
 #define ShrayDiscard(address, size) ShrayDiscard_profile(address, size)
-#define ShrayRunWorker(fn, n, args) ShrayRunWorker_profile(fn, n, args)
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_profile(buffer, size, root)
 #define ShrayBarrier() ShrayBarrier_profile()
 
@@ -119,7 +107,6 @@ void ShrayBarrier_normal(void);
 #define ShrayFinalize(exit_code) ShrayFinalize_normal(exit_code)
 #define ShrayPrefetch(address, size) ShrayPrefetch_normal(address, size)
 #define ShrayDiscard(address, size) ShrayDiscard_normal(address, size)
-#define ShrayRunWorker(fn, n, args) ShrayRunWorker_normal(fn, n, args)
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_normal(buffer, size, root)
 #define ShrayBarrier() ShrayBarrier_normal()
 #endif /* PROFILE */
@@ -258,21 +245,6 @@ void ShrayBarrier_normal(void);
  *
  *   @param address  start of memory we free.
  *          size     number of bytes starting from address to free.
- *
- ******************************************************************************/
-
-/** <!--********************************************************************-->
- *
- * @fn void ShrayRunWorker(shray_fn fn, void *array, void *args);
- *
- *   @brief          Executes fn on args with args->start = ShrayStart(A),
- *                   args->end = ShrayEnd(A) using multithreading.
- *
- *   @param fn       Function that writes to distributed array A only on
- *                   indices (i1, ..., id) satisfying
- *                   workerinfo_t->start <= i1 < worker_info_t->end.
- *          n        First dimension of A.
- *          args     Arguments of fn.
  *
  ******************************************************************************/
 
