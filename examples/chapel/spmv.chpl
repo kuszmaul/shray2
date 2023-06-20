@@ -27,7 +27,7 @@ proc spmv(m: int, n: int, nz: int, val: [1..nz] real, row_ptr: [1..m + 1] int,
 {
   var result: [1..m] real = 0.0;
 
-  forall row in 1..m {
+  coforall row in 1..m {
     for j in row_ptr(row)..row_ptr(row + 1) - 1 {
       result(row) += val(j) * vec(col_ind(j));
     }
