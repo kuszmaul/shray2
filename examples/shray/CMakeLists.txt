@@ -14,7 +14,6 @@ foreach(suffix
 			1dstencil_mt
 			bandwidth
 			matrix
-			matrix_mt
 			matrixAuto
             monopoly
             monopoly_mt

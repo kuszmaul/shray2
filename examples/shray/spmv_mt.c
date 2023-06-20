@@ -17,8 +17,9 @@ void spmv(csr_t *matrix, double *vector, double *out)
 {
     size_t start = ShrayStart(out);
     size_t end = ShrayEnd(out);
-    #pragma omp parallel for
-	for (size_t i = start, k = 0; i < end; ++i, ++k) {
+    size_t k = 0;
+    #pragma omp parallel for schedule(dynamic)
+	for (size_t i = start; i < end; ++i) {
 		double outval = 0;
 
 		size_t row_start = matrix->row_indices[k];
@@ -31,6 +32,7 @@ void spmv(csr_t *matrix, double *vector, double *out)
 		}
 
 		out[i] = outval;
+        k++;
 	}
 }
 
