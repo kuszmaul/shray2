@@ -3,8 +3,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <omp.h>
+#include <errno.h>
 
 void init(double *a)
 {
@@ -50,23 +50,18 @@ int main(int argc, char **argv)
 	ShrayInit(&argc, &argv);
 
 	if (argc != 3) {
-		fprintf(stderr, "Usage: FILE iterations\n");
+		fprintf(stderr, "Usage: n iterations\n");
 		ShrayFinalize(1);
 	}
 
-	csr_t *matrix = csr_parse_local(argv[1], ShrayRank());
-	if (!matrix) {
-		fprintf(stderr, "Could not parse matrix for %s\n", argv[1]);
-		ShrayFinalize(1);
-	}
-	if (matrix->n != matrix->m_total) {
-		fprintf(stderr, "Expected a square matrix (%zu x %zu)\n",
-				matrix->n,
-				matrix->m_total);
-		ShrayFinalize(1);
-	}
-
+	size_t n = atoll(argv[1]);
 	size_t iterations = atoll(argv[2]);
+
+    csr_t *matrix = monopoly(n, ShraySize(), ShrayRank());
+    if (!matrix) {
+        fprintf(stderr, "Something went wrong when allocating the sparse matrix\n");
+        ShrayFinalize(1);
+    }
 
 	double *vector = (double *)ShrayMalloc(matrix->n, matrix->n * sizeof(double));
 	double *out = (double *)ShrayMalloc(matrix->n, matrix->n * sizeof(double));

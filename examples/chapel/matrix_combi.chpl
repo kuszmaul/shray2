@@ -11,7 +11,7 @@ use LinearAlgebra;
 use AllLocalesBarriers;
 
 config const n: int = 4000;
-config const numTasks = 2;
+config const numTasks = 8;
 
 var MyLocaleView = {0..#numLocales, 1..1};
 var MyLocales: [MyLocaleView] locale = reshape(Locales, MyLocaleView);

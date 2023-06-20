@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
+#include <omp.h>
 #include <shray2/shray.h>
 
 #define T float
@@ -12,13 +13,6 @@
 #define BLOCK 10000
 #define TIMEBLOCK 100
 //#define CHECK
-
-typedef struct {
-    size_t n;
-    T **in;
-    T **out;
-    int iterations;
-} stencil_t;
 
 /* The coefficients of the five-point stencil. */
 const T a = 0.50;
@@ -120,20 +114,13 @@ void right(size_t n, int iterations, T **in, T **out)
 
 /* We use iterations as blocksize. This increases the number of flops performed by a
  * factor 2. */
-void StencilBlocked_mt(worker_info_t *info)
+void StencilBlocked(size_t n, T **in, T **out, int iterations)
 {
-    stencil_t *arguments = (stencil_t *)info->args;
-    size_t start = info->start;
-    size_t end = info->end;
-    size_t n = arguments->n;
-    T **in = arguments->in;
-    T **out = arguments->out;
-    int iterations = arguments->iterations;
-
     T *inBuffer = (T*)malloc((BLOCK + 2 * iterations) * sizeof(T));
     T *outBuffer = (T*)malloc((BLOCK + 2 * iterations) * sizeof(T));
 
-    for (size_t row = start; row < end; row++) {
+    #pragma omp parallel for
+    for (size_t row = ShrayStart(*in); row < ShrayEnd(*in); row++) {
         if (row == 0) {
             memcpy(inBuffer, *in, (BLOCK + iterations) * sizeof(T));
             left(BLOCK, iterations, &inBuffer, &outBuffer);
@@ -151,21 +138,10 @@ void StencilBlocked_mt(worker_info_t *info)
         }
     }
 
+    ShraySync(*out);
+
     free(inBuffer);
     free(outBuffer);
-}
-
-/* We use iterations as blocksize. This increases the number of flops performed by a
- * factor 2. */
-void StencilBlocked(size_t n, T **in, T **out, int iterations)
-{
-    stencil_t stencilInfo;
-    stencilInfo.n = n;
-    stencilInfo.in = in;
-    stencilInfo.out = out;
-    stencilInfo.iterations = iterations;
-
-    ShrayRunWorker(StencilBlocked_mt, *out, &stencilInfo);
 }
 
 void Stencil(size_t n, T **in, T **out, int iterations)
@@ -223,8 +199,8 @@ int main(int argc, char **argv)
     init2d(in, BLOCK);
 
 #ifdef CHECK
-    T *in2 = (T*)ShrayMalloc(n, n * sizeof(T));
-    T *out2 = (T*)ShrayMalloc(n, n * sizeof(T));
+    T *in2 = ShrayMalloc(n, n * sizeof(T));
+    T *out2 = ShrayMalloc(n, n * sizeof(T));
     init(in2);
 #endif
 

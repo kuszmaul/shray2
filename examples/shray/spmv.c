@@ -14,7 +14,9 @@ void init(double *a)
 
 void spmv(csr_t *matrix, double *vector, double *out)
 {
-	for (size_t i = ShrayStart(out), k = 0; i < ShrayEnd(out); ++i, ++k) {
+    size_t start = ShrayStart(out);
+    size_t end = ShrayEnd(out);
+	for (size_t i = start, k = 0; i < end; ++i, ++k) {
 		double outval = 0;
 
 		size_t row_start = matrix->row_indices[k];

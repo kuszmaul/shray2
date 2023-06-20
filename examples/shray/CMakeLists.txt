@@ -12,18 +12,13 @@ foreach(suffix
 	foreach(file
 			1dstencil
 			1dstencil_mt
-			2dstencil
-			2dstencilAuto
 			bandwidth
 			matrix
-            broadcast
-			matrixAuto
 			matrix_mt
+			matrixAuto
             monopoly
+            monopoly_mt
 			gasnet
-			nbody
-			nbodyAuto
-			nbody_mt
 			random
 			reduce
 			segfault
