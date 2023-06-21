@@ -76,7 +76,7 @@ static queue_entry_t *queue_queue(queue_t *queue)
 	queue->actual_size++;
 	/* + 1 so the free list can never be empty */
 	if (queue->actual_size + 1 > queue->size) {
-		if (!double_size(queue)) {
+		if (double_size(queue)) {
 		    return NULL;
 		}
 	}
