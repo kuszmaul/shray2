@@ -1,12 +1,10 @@
 # example fortran binaries
 foreach(file
-		2dstencil
 		matrix
-		nbody
-		nbodyUnblocked
-		random
         monopoly
+        monopoly_mt
         1dstencil
+        1dstencil_mt
 		spmv)
 	set(EXAMPLE_TARGET "${file}_fortran")
 
@@ -22,5 +20,6 @@ foreach(file
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_LINKER_FLAGS}
-			-lcaf_openmpi)
+            /usr/lib/x86_64-linux-gnu/open-coarrays/mpich/lib/libcaf_mpich.so.3
+            -fopenmp)
 endforeach(file)
