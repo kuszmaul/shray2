@@ -372,8 +372,7 @@ static void Usr2Handler(int sig, siginfo_t *si, void *unused)
     (void)si;
     (void)unused;
 
-    pthread_t id = pthread_self();
-    DBUG_PRINT("Received SIGUSR2 (thread %lu)", id);
+    DBUG_PRINT("Received SIGUSR2 (thread %lu)", pthread_self());
 }
 
 static void registerHandlers(void)
@@ -517,6 +516,7 @@ static inline void unlockIfMultithread()
 
 static void *memory_main(void *args)
 {
+    (void)args;
     DBUG_PRINT("Memory thread started with arguments %p", args);
 
     // TODO: check busy-loop vs suspending memory thread as well.
