@@ -116,32 +116,36 @@ void right(size_t n, int iterations, T **in, T **out)
  * factor 2. */
 void StencilBlocked(size_t n, T **in, T **out, int iterations)
 {
-    T *inBuffer = (T*)malloc((BLOCK + 2 * iterations) * sizeof(T));
-    T *outBuffer = (T*)malloc((BLOCK + 2 * iterations) * sizeof(T));
+    #pragma omp parallel
+    {
+        T *inBuffer = (T*)malloc((BLOCK + 2 * iterations) * sizeof(T));
+        T *outBuffer = (T*)malloc((BLOCK + 2 * iterations) * sizeof(T));
 
-    #pragma omp parallel for
-    for (size_t row = ShrayStart(*in); row < ShrayEnd(*in); row++) {
-        if (row == 0) {
-            memcpy(inBuffer, *in, (BLOCK + iterations) * sizeof(T));
-            left(BLOCK, iterations, &inBuffer, &outBuffer);
-            memcpy(*out, outBuffer, BLOCK * sizeof(T));
-        } else if (row == n / BLOCK - 1) {
-            memcpy(inBuffer, *in + row * BLOCK - iterations,
-                    (BLOCK + iterations) * sizeof(T));
-            right(BLOCK, iterations, &inBuffer, &outBuffer);
-            memcpy(*out + row * BLOCK, outBuffer + iterations, BLOCK * sizeof(T));
-        } else {
-            memcpy(inBuffer, *in + row * BLOCK - iterations,
-                    (BLOCK + 2 * iterations) * sizeof(T));
-            middle(BLOCK, iterations, &inBuffer, &outBuffer);
-            memcpy(*out + row * BLOCK, outBuffer + iterations, BLOCK * sizeof(T));
+        #pragma omp for
+        for (size_t row = ShrayStart(*in); row < ShrayEnd(*in); row++) {
+            if (row == 0) {
+                memcpy(inBuffer, *in, (BLOCK + iterations) * sizeof(T));
+                left(BLOCK, iterations, &inBuffer, &outBuffer);
+                memcpy(*out, outBuffer, BLOCK * sizeof(T));
+            } else if (row == n / BLOCK - 1) {
+                memcpy(inBuffer, *in + row * BLOCK - iterations,
+                        (BLOCK + iterations) * sizeof(T));
+                right(BLOCK, iterations, &inBuffer, &outBuffer);
+                memcpy(*out + row * BLOCK, outBuffer + iterations, BLOCK * sizeof(T));
+            } else {
+                memcpy(inBuffer, *in + row * BLOCK - iterations,
+                        (BLOCK + 2 * iterations) * sizeof(T));
+                middle(BLOCK, iterations, &inBuffer, &outBuffer);
+                memcpy(*out + row * BLOCK, outBuffer + iterations, BLOCK * sizeof(T));
+            }
         }
+
+
+        free(inBuffer);
+        free(outBuffer);
     }
 
     ShraySync(*out);
-
-    free(inBuffer);
-    free(outBuffer);
 }
 
 void Stencil(size_t n, T **in, T **out, int iterations)
