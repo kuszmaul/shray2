@@ -4,8 +4,7 @@ foreach(file
         monopoly
         monopoly_mt
         1dstencil
-        1dstencil_mt
-		spmv)
+        1dstencil_mt)
 	set(EXAMPLE_TARGET "${file}_fortran")
 
 	add_executable("${EXAMPLE_TARGET}"

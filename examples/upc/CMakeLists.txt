@@ -1,8 +1,6 @@
 foreach(file
-		hello
 		matrix
         1dstencil
-		spmv
         monopoly)
 	set(EXAMPLE_TARGET "${file}_upc")
 

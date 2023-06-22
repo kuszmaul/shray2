@@ -15,9 +15,7 @@ foreach(file
 		matrix
 		matrix_combi
         monopoly
-        monopoly_combi
-		spmv
-		spmv_combi)
+        monopoly_combi)
 	set(EXAMPLE_TARGET "${file}_chapel")
 
 	add_executable("${EXAMPLE_TARGET}"
