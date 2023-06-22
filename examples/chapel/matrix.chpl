@@ -32,7 +32,6 @@ coforall loc in Locales do on loc {
           A[A.localSubdomain()](.., 1 + l * n / numLocales..(l + 1) * n / numLocales);
         var Bl: [1..n / numLocales,1..n] real = B[B.localSubdomain(Locales[l])];
         C[C.localSubdomain()] += dot(As, Bl);
-        writeln("Locale ", here.id, " has done loop iteration ", l, "\n");
   }
 
   allLocalesBarrier.barrier();

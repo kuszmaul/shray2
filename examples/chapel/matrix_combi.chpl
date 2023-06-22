@@ -33,7 +33,6 @@ proc parallel_mul(As: [1..n / numLocales, 1..n / numLocales] real, Bl: [1..n / n
   var Apart: [1..n / numLocales / numTasks,1..n / numLocales] real;
 
   coforall t in 1..numTasks {
-    stdout.writeln("Task ", t);
     Apart = As(1 + n / numLocales / numTasks * (t - 1) .. 1 + n / numLocales / numTasks, 1..n / numLocales);
     Cpart = dot(As, B);
     C[1 + n / numLocales / numTasks * (t - 1) .. 1 + n / numLocales / numTasks, 1..n] = Cpart;
@@ -50,7 +49,6 @@ coforall loc in Locales do on loc {
           A[A.localSubdomain()](.., 1 + l * n / numLocales..(l + 1) * n / numLocales);
         var Bl: [1..n / numLocales,1..n] real = B[B.localSubdomain(Locales[l])];
         C[C.localSubdomain()] += dot(As, Bl);
-        writeln("Locale ", here.id, " has done loop iteration ", l, "\n");
   }
 
   allLocalesBarrier.barrier();
