@@ -1,6 +1,6 @@
 ! https://people.eecs.berkeley.edu/~aydin/csb2009.pdf
 
-module CSR_SPMV
+module CSR_SPMV_mt
     implicit none
 
     type, public :: CSRMatrix
@@ -68,11 +68,11 @@ contains
         deallocate(input)
     end function
 
-end module CSR_SPMV
+end module CSR_SPMV_mt
 
 
 program main
-    use CSR_SPMV
+    use CSR_SPMV_mt
     implicit none
 
     integer :: iterations

@@ -19,6 +19,6 @@ foreach(file
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_LINKER_FLAGS}
-            /usr/lib/x86_64-linux-gnu/open-coarrays/mpich/lib/libcaf_mpich.so.3
+            -lcaf_openmpi
             -fopenmp)
 endforeach(file)

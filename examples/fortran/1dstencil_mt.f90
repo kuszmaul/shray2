@@ -1,7 +1,7 @@
 #define SPACEBLOCK 10000
 #define TIMEBLOCK 100
 
-module kernels
+module kernels_mt
 contains
 subroutine left(n, iterations, input, output)
     implicit none
@@ -77,12 +77,12 @@ subroutine right(n, iterations, input, output)
         end if
     end do
 end subroutine right
-end module kernels
+end module kernels_mt
 
-module stencilModule
+module stencilModule_mt
 contains
 subroutine BlockedStencil(n, input, output, iterations)
-    use kernels
+    use kernels_mt
     implicit none
     integer, intent(in) :: n, iterations
     real(KIND=8), intent(inout) :: input(n)[*], output(n)[*]
@@ -150,10 +150,10 @@ subroutine Stencil(n, input, output, iterations)
         call BlockedStencil(n, input, output, mod(iterations, TIMEBLOCK))
     end if
 end subroutine Stencil
-end module stencilModule
+end module stencilModule_mt
 
 program main
-    use stencilModule
+    use stencilModule_mt
     implicit none
 
     integer :: n, iterations
