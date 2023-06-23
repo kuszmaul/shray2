@@ -6,6 +6,7 @@ program main
 
     integer :: n, p, l
     real(KIND=8), dimension(:,:), codimension[:], allocatable :: A, B, C
+    real(KIND=8), dimension(:,:), allocatable :: Bl
     character(len=12), dimension(:), allocatable :: args
     integer :: cpu_count, cpu_count2, count_rate, count_max
 
@@ -21,6 +22,7 @@ program main
 
     allocate(A(n / p, n)[*])
     allocate(B(n / p, n)[*])
+    allocate(Bl(n / p, n))
     allocate(C(n / p, n)[*])
 
     A = 1
@@ -31,7 +33,9 @@ program main
     call system_clock(cpu_count, count_rate, count_max)
 
     do l = 1, num_images()
-        C = C + matmul(A(:,1 + (l - 1) * n / p: l * n / p), B(:,:)[l])
+        Bl(:,:) = B(:,:)[l]
+        call dgemm('N', 'N', n / p, n, n / p, 1.0, A(1, (l - 1) * n / p + 1), &
+               n / p, Bl, n / p, 1.0, C, n / p)
     end do
 
     sync all

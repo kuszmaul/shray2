@@ -1,5 +1,6 @@
 # example fortran binaries
 foreach(file
+        blas
 		matrix
         monopoly
         monopoly_mt
@@ -19,6 +20,8 @@ foreach(file
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_LINKER_FLAGS}
-            -lcaf_openmpi
+            -lcaf_mpich
+#            -lcaf_openmpi
+            /home/tkoopman/.local/lib/libopenblas.a
             -fopenmp)
 endforeach(file)
