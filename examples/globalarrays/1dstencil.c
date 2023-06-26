@@ -89,21 +89,21 @@ void StencilBlocked(size_t n, int g_in, int g_out, int iterations)
         if (row == 0) {
             lo[0] = 0;
             hi[0] = BLOCK + iterations - 1;
-			NGA_Get(g_in, lo, hi, inBuffer, ld);
+            NGA_Get(g_in, lo, hi, inBuffer, ld);
             left(BLOCK, iterations, &inBuffer, &outBuffer);
             ld[0] = BLOCK;
             NGA_Put(g_out, lo, hi, outBuffer, ld);
         } else if (row == n / BLOCK - 1) {
             lo[0] = row * BLOCK - iterations;
             hi[0] = (row + 1) * BLOCK - 1;
-			NGA_Get(g_in, lo, hi, inBuffer, ld);
+            NGA_Get(g_in, lo, hi, inBuffer, ld);
             right(BLOCK, iterations, &inBuffer, &outBuffer);
             ld[0] = BLOCK;
             NGA_Put(g_out, lo, hi, outBuffer + iterations, ld);
         } else {
             lo[0] = row * BLOCK - iterations;
             hi[0] = (row + 1) * BLOCK + iterations - 1;
-			NGA_Get(g_in, lo, hi, inBuffer, ld);
+            NGA_Get(g_in, lo, hi, inBuffer, ld);
             middle(BLOCK, iterations, &inBuffer, &outBuffer);
             ld[0] = BLOCK;
             NGA_Put(g_out, lo, hi, outBuffer + iterations, ld);
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
 		GA_Error("MA_init failed", 1);
 	}
 
-    size_t n = atoll(argv[1]);
+	size_t n = atoll(argv[1]);
 	int iterations = atoi(argv[2]);
 
 	int v_dimensions[1] = {n};
