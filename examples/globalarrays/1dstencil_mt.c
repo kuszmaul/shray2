@@ -76,62 +76,67 @@ void right(size_t n, int iterations, float **in, float **out)
  * factor 2. */
 void StencilBlocked(size_t n, int g_in, int g_out, int iterations)
 {
-    float *inBuffer = malloc((BLOCK + 2 * iterations) * sizeof(float));
-    float *outBuffer = malloc((BLOCK + 2 * iterations) * sizeof(float));
+	int s = GA_Nodeid();
+	int p = GA_Nnodes();
+	size_t distributionBlockSize = (n / BLOCK + p - 1) / p;
+	size_t start = distributionBlockSize * s;
+	size_t end = MIN(distributionBlockSize * (s + 1), n / BLOCK);
 
-    int lo[1], hi[1], ld[1];
-    int s = GA_Nodeid();
-    int p = GA_Nnodes();
-    size_t distributionBlockSize = (n / BLOCK + p - 1) / p;
-    size_t start = distributionBlockSize * s;
-    size_t end = MIN(distributionBlockSize * (s + 1), n / BLOCK);
-    for (size_t row = start; row < end; row++) {
-        if (row == 0) {
-            lo[0] = 0;
-            hi[0] = BLOCK + iterations - 1;
-            NGA_Get(g_in, lo, hi, inBuffer, ld);
-            left(BLOCK, iterations, &inBuffer, &outBuffer);
-            ld[0] = BLOCK;
-            NGA_Put(g_out, lo, hi, outBuffer, ld);
-        } else if (row == n / BLOCK - 1) {
-            lo[0] = row * BLOCK - iterations;
-            hi[0] = (row + 1) * BLOCK - 1;
-            NGA_Get(g_in, lo, hi, inBuffer, ld);
-            right(BLOCK, iterations, &inBuffer, &outBuffer);
-            ld[0] = BLOCK;
-            NGA_Put(g_out, lo, hi, outBuffer + iterations, ld);
-        } else {
-            lo[0] = row * BLOCK - iterations;
-            hi[0] = (row + 1) * BLOCK + iterations - 1;
-            NGA_Get(g_in, lo, hi, inBuffer, ld);
-            middle(BLOCK, iterations, &inBuffer, &outBuffer);
-            ld[0] = BLOCK;
-            NGA_Put(g_out, lo, hi, outBuffer + iterations, ld);
-        }
-    }
+	#pragma omp parallel
+	{
+		float *inBuffer = malloc((BLOCK + 2 * iterations) * sizeof(float));
+		float *outBuffer = malloc((BLOCK + 2 * iterations) * sizeof(float));
 
-    GA_Sync();
+		int lo[1], hi[1], ld[1];
+		#pragma omp for
+		for (size_t row = start; row < end; row++) {
+			if (row == 0) {
+				lo[0] = 0;
+				hi[0] = BLOCK + iterations - 1;
+				NGA_Get(g_in, lo, hi, inBuffer, ld);
+				left(BLOCK, iterations, &inBuffer, &outBuffer);
+				ld[0] = BLOCK;
+				NGA_Put(g_out, lo, hi, outBuffer, ld);
+			} else if (row == n / BLOCK - 1) {
+				lo[0] = row * BLOCK - iterations;
+				hi[0] = (row + 1) * BLOCK - 1;
+				NGA_Get(g_in, lo, hi, inBuffer, ld);
+				right(BLOCK, iterations, &inBuffer, &outBuffer);
+				ld[0] = BLOCK;
+				NGA_Put(g_out, lo, hi, outBuffer + iterations, ld);
+			} else {
+				lo[0] = row * BLOCK - iterations;
+				hi[0] = (row + 1) * BLOCK + iterations - 1;
+				NGA_Get(g_in, lo, hi, inBuffer, ld);
+				middle(BLOCK, iterations, &inBuffer, &outBuffer);
+				ld[0] = BLOCK;
+				NGA_Put(g_out, lo, hi, outBuffer + iterations, ld);
+			}
+		}
 
-    free(inBuffer);
-    free(outBuffer);
+		free(inBuffer);
+		free(outBuffer);
+	}
+
+	GA_Sync();
 }
 
 void Stencil(size_t n, int g_in, int g_out, int iterations)
 {
-    for (int t = TIMEBLOCK; t <= iterations; t += TIMEBLOCK) {
-        StencilBlocked(n, g_in, g_out, TIMEBLOCK);
-        int temp = g_out;
-        g_out = g_in;
-        g_in = temp;
-    }
-    if (iterations % TIMEBLOCK != 0) {
-        StencilBlocked(n, g_in, g_out, iterations % TIMEBLOCK);
-    } else {
-        /* We did one buffer swap too many */
-        int temp = g_out;
-        g_out = g_in;
-        g_in = temp;
-    }
+	for (int t = TIMEBLOCK; t <= iterations; t += TIMEBLOCK) {
+		StencilBlocked(n, g_in, g_out, TIMEBLOCK);
+		int temp = g_out;
+		g_out = g_in;
+		g_in = temp;
+	}
+	if (iterations % TIMEBLOCK != 0) {
+		StencilBlocked(n, g_in, g_out, iterations % TIMEBLOCK);
+	} else {
+		/* We did one buffer swap too many */
+		int temp = g_out;
+		g_out = g_in;
+		g_in = temp;
+	}
 }
 
 int main(int argc, char **argv)
@@ -139,7 +144,11 @@ int main(int argc, char **argv)
 	int heap = 3000000;
 	int stack = 3000000;
 
-	MPI_Init(&argc, &argv);
+	int prov;
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &prov);
+	if (prov != MPI_THREAD_MULTIPLE) {
+		GA_Error("MPI implementation does not support MPI_THREAD_MULTIPLE\n", 1);
+	}
 	GA_Initialize();
 
 	if (argc != 3) {

@@ -10,6 +10,7 @@
 #include <mpi.h>
 #include <sys/param.h>
 #include <macdecls.h>
+#include <omp.h>
 
 void spmv(csr_t *matrix, int g_vector, int g_out)
 {
@@ -21,6 +22,7 @@ void spmv(csr_t *matrix, int g_vector, int g_out)
 	NGA_Distribution(g_out, rank, lo_out, hi_out);
 	NGA_Access(g_out, lo_out, hi_out, &out, ld_out);
 
+	#pragma omp parallel for
 	for (int i = lo_out[0]; i <= hi_out[0]; ++i) {
 		double outval = 0;
 
@@ -62,7 +64,11 @@ int main(int argc, char **argv)
 	int heap = 3000000;
 	int stack = 3000000;
 
-	MPI_Init(&argc,&argv);
+	int prov;
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &prov);
+	if (prov != MPI_THREAD_MULTIPLE) {
+		GA_Error("MPI implementation does not support MPI_THREAD_MULTIPLE\n", 1);
+	}
 	GA_Initialize();
 
 	if (argc != 3) {
@@ -80,7 +86,7 @@ int main(int argc, char **argv)
 	csr_t *matrix = monopoly(n, GA_Nnodes(), GA_Nodeid());
 	if (!matrix) {
 		fprintf(stderr, "Could not generate matrix\n");
-        exit(EXIT_FAILURE);
+        	exit(EXIT_FAILURE);
 	}
 
 	int v_dimensions[1] = { matrix->n };
@@ -102,7 +108,7 @@ int main(int argc, char **argv)
 	TIME(duration, steady_state(matrix, g_vector, g_out, iterations););
 
 	if (GA_Nodeid() == 0) {
-	    printf("%lf\n", matrix->nnz_total * iterations * 2.0 / 1000000000 / duration);
+		printf("%lf\n", matrix->nnz_total * iterations * 2.0 / 1000000000 / duration);
 	}
 	hostname_print();
 
