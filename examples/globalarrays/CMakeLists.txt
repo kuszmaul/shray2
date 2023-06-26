@@ -4,7 +4,8 @@ foreach(file
 		1dstencil
 		1dstencil_mt
 		matrix
-		monopoly)
+		monopoly
+		monopoly_mt)
 	set(EXAMPLE_TARGET "${file}_globalarrays")
 
 	add_executable("${EXAMPLE_TARGET}"
