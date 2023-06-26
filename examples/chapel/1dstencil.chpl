@@ -71,8 +71,7 @@ proc StencilBlocked(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(
   var start: int = (n / BLOCK + numLocales - 1) / numLocales * here.id;
   var end: int = min((n / BLOCK + numLocales - 1) / numLocales * (here.id + 1), n / BLOCK);
 
-  // Multithreaded execution, default uses one thread per core
-  forall row in start..end - 1 {
+  for row in start..end - 1 {
     if (row == 0) {
       for i in 0 .. BLOCK + iterations - 1 {
         inBuffer(i) = input.localAccess(i);
