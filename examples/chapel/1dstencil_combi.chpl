@@ -64,9 +64,12 @@ proc right(n: int, iterations: int, input: [0..n + iterations - 1] real(32),
 
 proc StencilBlocked(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(32), iterations: int)
 {
-  var dom: domain(1) = input.localSubdomain();
-  var start: int = dom.first / BLOCK;
-  var end: int = dom.last / BLOCK;
+//  var dom: domain(1) = input.localSubdomain();
+//  var start: int = dom.first / BLOCK;
+//  var end: int = dom.last / BLOCK;
+  var start: int = (n / BLOCK + numLocales - 1) / numLocales * here.id;
+  var end: int = (n / BLOCK + numLocales - 1) / numLocales * (here.id + 1);
+
 
   /* Multithreaded execution, default uses one thread per core
    * We copy in a loop instead of array slices to mark local accesses */
