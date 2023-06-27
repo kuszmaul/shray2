@@ -40,19 +40,9 @@ bool ShrayOutput;
 #define HOSTNAME_LENGTH 256
 static char ShrayHost[HOSTNAME_LENGTH];
 
-static queue_t *worker_threads;
 
-static volatile bool thread_register_request;
-static pthread_t thread_register_id;
-static pthread_mutex_t thread_mutex;
-static threading_entry_t *thread_register_entry;
-
-static bool memthread_continue;
 static bool thread_lock;
 static bool multiThreaded;
-static pthread_t memory_thread_id;
-
-static pthread_key_t key;
 
 /*****************************************************
  * Helper functions
@@ -315,64 +305,41 @@ static inline bool atomic_test_set(void *p)
         return __atomic_test_and_set(p, __ATOMIC_SEQ_CST);
 }
 
-static void handleWorkerFault(void *address)
+static inline void lockIfMultithread()
 {
-    sigset_t mask;
-    sigemptyset(&mask);
-
-    threading_entry_t *worker = pthread_getspecific(key);
-    if (!worker) {
-        pthread_t pid = pthread_self();
-        DBUG_PRINT("Segfault in unknown worker with id %lu, registering thread", pid);
+    if (multiThreaded) {
         while (atomic_test_set(&thread_lock));
-        thread_register_id = pid;
-        thread_register_request = true;
-        sigsuspend(&mask);
+    }
+}
 
-        worker = thread_register_entry;
-        pthread_setspecific(key, worker);
+static inline void unlockIfMultithread()
+{
+    if (multiThreaded) {
         atomic_clear(&thread_lock);
     }
+}
 
-    DBUG_PRINT("Handling worker fault in worker %lu", worker->id);
-
-    worker->address = (uintptr_t)address;
-    worker->request = 1;
-    sigsuspend(&mask);
-    DBUG_PRINT("Finished handling fault in worker %lu", worker->id);
+static inline int pageFaultHandled(uintptr_t address)
+{
+    uintptr_t roundedAddress = roundDownPage(address);
+    Allocation *alloc = findAlloc((void *)roundedAddress);
+    size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
+    return BitmapCheck(alloc->local, pageNumber);
 }
 
 static void SegvHandler(int sig, siginfo_t *si, void *unused)
 {
     (void)sig;
     (void)unused;
-    if (multiThreaded) {
-        while (atomic_test_set(&thread_lock));
-        SEGFAULTCOUNT
-        atomic_clear(&thread_lock);
-        handleWorkerFault(si->si_addr);
-    } else {
-        SEGFAULTCOUNT
-        handlePageFault(si->si_addr);
+
+    void *address = si->si_addr;
+
+    lockIfMultithread();
+    SEGFAULTCOUNT;
+    if (!pageFaultHandled((uintptr_t)address)) {
+        handlePageFault(address);
     }
-}
-
-static void Usr1Handler(int sig, siginfo_t *si, void *unused)
-{
-    (void)sig;
-    (void)si;
-    (void)unused;
-
-    DBUG_PRINT("Received SIGUSR1 (worker %lu)", ((threading_entry_t*)pthread_getspecific(key))->id);
-}
-
-static void Usr2Handler(int sig, siginfo_t *si, void *unused)
-{
-    (void)sig;
-    (void)si;
-    (void)unused;
-
-    DBUG_PRINT("Received SIGUSR2 (thread %lu)", pthread_self());
+    unlockIfMultithread();
 }
 
 static void registerHandlers(void)
@@ -384,20 +351,6 @@ static void registerHandlers(void)
 
     if (sigaction(SIGSEGV, &sa, NULL) == -1) {
         perror("Registering SIGSEGV handler failed.\n");
-        gasnet_exit(1);
-    }
-
-    sigemptyset (&sa.sa_mask);
-    sa.sa_sigaction = Usr1Handler;
-    if (sigaction(SIGUSR1, &sa, NULL) == -1) {
-        perror("Registering SIGUSR1 handler failed.\n");
-        gasnet_exit(1);
-    }
-
-    sigemptyset (&sa.sa_mask);
-    sa.sa_sigaction = Usr2Handler;
-    if (sigaction(SIGUSR2, &sa, NULL) == -1) {
-        perror("Registering SIGUSR2 handler failed.\n");
         gasnet_exit(1);
     }
 }
@@ -469,84 +422,6 @@ static void ShrayResetCache(Allocation *alloc)
     queue_reset(alloc->prefetchCaches);
 }
 
-static int pageFaultHandled(uintptr_t address)
-{
-    uintptr_t roundedAddress = roundDownPage(address);
-    Allocation *alloc = findAlloc((void *)roundedAddress);
-    size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
-    return BitmapCheck(alloc->local, pageNumber);
-}
-
-/* A page fault occurred in the given worker */
-static void handleWorkerRequest(threading_entry_t *worker)
-{
-    DBUG_PRINT("Handling request for worker %lu (%p)", worker->id, (void*)worker->address);
-    if (!pageFaultHandled(worker->address)) {
-        handlePageFault((void*)worker->address);
-    }
-
-    worker->request = 0;
-    DBUG_PRINT("Sending USR1 to worker %lu", worker->id);
-    pthread_kill(worker->id, SIGUSR1);
-}
-
-static inline void lockIfMultithread()
-{
-    if (multiThreaded) {
-        //DBUG_PRINT("Acquiring lock in thread %lu", pthread_self());
-        int err = pthread_mutex_lock(&thread_mutex);
-        if (err) {
-            fprintf(stderr, "Could not lock mutex: %s\n", strerror(err));
-            ShrayFinalize(1);
-        }
-    }
-}
-
-static inline void unlockIfMultithread()
-{
-    if (multiThreaded) {
-        //DBUG_PRINT("Releasing lock in thread %lu", pthread_self());
-        int err = pthread_mutex_unlock(&thread_mutex);
-        if (err) {
-            fprintf(stderr, "Could not unlock mutex: %s\n", strerror(err));
-            ShrayFinalize(1);
-        }
-    }
-}
-
-static void *memory_main(void *args)
-{
-    (void)args;
-    DBUG_PRINT("Memory thread started with arguments %p", args);
-
-    // TODO: check busy-loop vs suspending memory thread as well.
-    while (memthread_continue) {
-        if (thread_register_request) {
-            DBUG_PRINT("Received thread register request %lu", thread_register_id);
-            queue_entry_t *tmp;
-            queue_queue_thread(&tmp, worker_threads, 0, thread_register_id, 0);
-            thread_register_entry = &tmp->threading;
-
-            DBUG_PRINT("Sending USR2 to worker %lu", thread_register_id);
-            pthread_kill(thread_register_id, SIGUSR2);
-            thread_register_request = false;
-        }
-
-        size_t next_index = worker_threads->data_start;
-        while (next_index != NOLINK) {
-            queue_entry_t *entry = &(worker_threads->data[next_index]);
-
-            if (entry->threading.request) {
-                handleWorkerRequest(&entry->threading);
-            }
-            next_index = entry->next;
-        }
-    }
-
-    DBUG_PRINT("Memory thread terminated %p", args);
-    return NULL;
-}
-
 /*****************************************************
  * Shray functionality
  *****************************************************/
@@ -594,38 +469,10 @@ void ShrayInit(int *argc, char ***argv)
         Shray_CacheAllocFactor = strtod(cacheSizeEnv, NULL);
     }
 
-    char *thread_env = getenv("SHRAY_WORKERTHREADS");
+    char *thread_env = getenv("SHRAY_PAR");
     multiThreaded = thread_env != NULL;
-    int err = pthread_key_create(&key, NULL);
-    if (err) {
-            fprintf(stderr, "Could not create thread-local data: %s\n", strerror(err));
-            gasnet_exit(1);
-    }
-
-    thread_register_request = false;
     if (multiThreaded) {
         DBUG_PRINT("Running multi threaded %d", 1);
-        memthread_continue = true;
-        err = pthread_create(&memory_thread_id, NULL, memory_main, NULL);
-        if (err) {
-            fprintf(stderr, "Could not create memory thread: %s\n", strerror(err));
-            gasnet_exit(1);
-        }
-
-        worker_threads = queue_alloc(32);
-        if (!worker_threads) {
-            fprintf(stderr, "Could not allocate worker thread array: %s\n", strerror(err));
-            gasnet_exit(1);
-        }
-        thread_register_entry = NULL;
-        thread_lock = 0;
-
-        err = pthread_mutex_init(&thread_mutex, NULL);
-        if (err) {
-            fprintf(stderr, "Could not allocate mutex: %s\n", strerror(err));
-            gasnet_exit(1);
-        }
-
         atomic_clear(&thread_lock);
     }
 
@@ -911,13 +758,6 @@ void ShrayFinalize(int exit_code)
 {
     DBUG_PRINT("Terminating with code %d", exit_code);
     if (exit_code == 0) {
-        if (multiThreaded) {
-            memthread_continue = false;
-            pthread_join(memory_thread_id, NULL);
-            queue_free(worker_threads);
-            pthread_mutex_destroy(&thread_mutex);
-        }
-        pthread_key_delete(key);
         for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
             Allocation *alloc = heap.allocs + i;
             queue_free(alloc->prefetchCaches);

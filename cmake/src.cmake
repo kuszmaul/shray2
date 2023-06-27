@@ -11,7 +11,6 @@ set(PROJECT_FLAGS
 	-mtune=native
 	-fno-math-errno
 	-Ofast
-	-fno-unswitch-loops
     -fopenmp
 	)
 
