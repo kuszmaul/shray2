@@ -79,6 +79,7 @@ int main(int argc, char **argv)
 	    printf("%lf\n", matrix->nnz_total * iterations * 2.0 / 1000000000 / duration);
 	}
 
+	ShrayReport();
 	ShrayFree(out);
 	ShrayFree(vector);
 	csr_free(matrix);
