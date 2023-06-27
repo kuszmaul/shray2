@@ -64,65 +64,55 @@ proc right(n: int, iterations: int, input: [0..n + iterations - 1] real(32),
 
 proc StencilBlocked(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(32), iterations: int)
 {
-  var inBuffer: [0..BLOCK + 2 * iterations - 1] real(32);
-  var outBuffer: [0..BLOCK + 2 * iterations - 1] real(32);
+  var dom: domain(1) = input.localSubdomain();
+  var start: int = dom.first / BLOCK;
+  var end: int = dom.last / BLOCK;
 
-  // here.id is the locale (node) id
-  var start: int = (n / BLOCK + numLocales - 1) / numLocales * here.id;
-  var end: int = min((n / BLOCK + numLocales - 1) / numLocales * (here.id + 1), n / BLOCK);
-
+  /* We copy in a loop instead of array slices to mark local accesses */
   for row in start..end - 1 {
+    var inBuffer: [0..BLOCK + 2 * iterations - 1] real(32);
+    var outBuffer: [0..BLOCK + 2 * iterations - 1] real(32);
+
     if (row == 0) {
       for i in 0 .. BLOCK + iterations - 1 {
         inBuffer(i) = input.localAccess(i);
       }
-//      inBuffer(0 .. BLOCK + iterations - 1) = input(0 .. BLOCK + iterations - 1);
       left(BLOCK, iterations, inBuffer(0..BLOCK + iterations - 1),
                               outBuffer(0..BLOCK + iterations - 1));
       for i in 0 .. BLOCK - 1 {
         output.localAccess(i) = outBuffer(i);
       }
-//      output(0..BLOCK - 1) = outBuffer(0..BLOCK - 1);
     } else if (row == n / BLOCK - 1) {
       for i in 0 .. BLOCK + iterations - 1 {
         inBuffer(i) = input.localAccess(row * BLOCK - iterations + i);
       }
-//      inBuffer(0 .. BLOCK + iterations - 1) =
-//         input(row * BLOCK - iterations .. (row + 1) * BLOCK - 1);
       right(BLOCK, iterations, inBuffer(0..BLOCK + iterations - 1),
                                outBuffer(0..BLOCK + iterations - 1));
       for i in 0 .. BLOCK - 1 {
         output.localAccess(row * BLOCK + i) = outBuffer(iterations + i);
       }
-//      output(row * BLOCK .. (row + 1) * BLOCK - 1) = outBuffer(iterations .. iterations + BLOCK - 1);
     } else {
       /* The first and last block will access some elements from neighbouring
-       * locales. TODO still a mistake in this that shows up with --fast, but
-       * not without. */
-//      if (row != start && row != end - 1) {
-//        for i in 0 .. BLOCK + 2 * iterations - 1 {
-//          inBuffer(i) = input.localAccess(row * BLOCK - iterations + i);
-//        }
-//      } else {
-//        for i in 0 .. BLOCK + 2 * iterations - 1 {
-//          inBuffer(i) = input(row * BLOCK - iterations + i);
-//        }
-//      }
-      inBuffer(0 .. BLOCK + 2 * iterations - 1) =
-          input(row * BLOCK - iterations .. (row + 1) * BLOCK + iterations - 1);
+       * locales. */
+      if (row != start && row != end - 1) {
+        for i in 0 .. BLOCK + 2 * iterations - 1 {
+          inBuffer(i) = input.localAccess(row * BLOCK - iterations + i);
+        }
+      } else {
+        for i in 0 .. BLOCK + 2 * iterations - 1 {
+          inBuffer(i) = input(row * BLOCK - iterations + i);
+        }
+      }
       middle(BLOCK, iterations, inBuffer, outBuffer);
       for i in 0 .. BLOCK - 1 {
         output.localAccess(row * BLOCK + i) = outBuffer(iterations + i);
       }
-//      output(row * BLOCK .. (row + 1) * BLOCK - 1) = outBuffer(iterations .. iterations + BLOCK - 1);
     }
   }
 }
 
 proc Stencil(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(32), iterations: int)
 {
-//  writeln("Hello from locale ", here.id);
-
   for t in 1..iterations / TIMEBLOCK {
     StencilBlocked(n, input, output, TIMEBLOCK);
     input <=> output;
@@ -148,15 +138,13 @@ proc main()
   watch.start();
   // Execute on each node (locale)
   coforall loc in Locales do on loc {
-    startCommDiagnostics();
+    startCommDiagnosticsHere();
     Stencil(N, input, output, ITERATIONS);
-    stopCommDiagnostics();
-    if (here.id == 0) {
-      printCommDiagnosticsTable();
-    }
+    stopCommDiagnosticsHere();
   }
   watch.stop();
 
+  printCommDiagnosticsTable();
   if (here.id == 0) then
     stdout.writeln(5.0 * (N - 2) * ITERATIONS / watch.elapsed() / 1000000000, '\n');
 }
