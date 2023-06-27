@@ -23,7 +23,9 @@ foreach(file
 
 	target_compile_options("${EXAMPLE_TARGET}"
 		PRIVATE
+            --ccflags -Ofast
 			--fast
+            --no-ieee-float
 			-O
 			-L${BLAS_TDIR}
 			-l:${BLAS_TNAME})

@@ -3,8 +3,10 @@
 #SBATCH --account=csmpi
 #SBATCH --partition=csmpi_long
 #SBATCH --nodes=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=16GB
 #SBATCH --time=00:15:00
-#SBATCH --output=build.txt
+#SBATCH --output=build.out
 
 set -eu
 
@@ -19,7 +21,7 @@ cmake \
 	-DEXAMPLES=ON \
 	-DChapel_ROOT_DIR="${HOME}/.local" \
 	-DGASNet_CONDUIT=mpi \
-	-DGASNet_ROOT_DIR="/usr/local/gasnet" \
+	-DGASNet_ROOT_DIR="${HOME}/.local" \
 	-DSANITISE=OFF \
 	-S . \
 	-B "$builddir"
