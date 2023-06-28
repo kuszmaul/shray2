@@ -10,6 +10,8 @@ extern "C" {
 }
 #endif
 
+//#define CHECK
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -89,11 +91,13 @@ int main(int argc, char **argv)
 
     ShrayReport();
 
-    //if (check(C, n, 0.01)) {
-    //    fprintf(stderr, "Success!\n");
-    //} else {
-    //    fprintf(stderr, "Failure!\n");
-    //}
+#ifdef CHECK
+    if (check(C, n, 0.01)) {
+        fprintf(stderr, "Success!\n");
+    } else {
+        fprintf(stderr, "Failure!\n");
+    }
+#endif
 
     ShrayFree(A);
     ShrayFree(B);

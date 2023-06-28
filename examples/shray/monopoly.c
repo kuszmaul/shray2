@@ -4,11 +4,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <math.h>
 
-void init(double *a)
+/* Though this should work in theory, we run into representability problems for 
+ * n any respectable number. We have only about 15 digits of accuracy. */
+//#define CHECK
+
+void init(double *a, size_t n)
 {
+    /* sum_i a[i] = 1. */
 	for (size_t i = ShrayStart(a); i < ShrayEnd(a); ++i) {
-		a[i] = i;
+		a[i] = i / (n * (n + 1) / 2);
 	}
 }
 
@@ -62,12 +68,28 @@ int main(int argc, char **argv)
 	double *vector = (double *)ShrayMalloc(matrix->n, matrix->n * sizeof(double));
 	double *out = (double *)ShrayMalloc(matrix->n, matrix->n * sizeof(double));
 
-	init(vector);
+	init(vector, n);
 	ShraySync(vector);
 
 	double duration;
 
 	TIME(duration, steady_state(matrix, vector, out, iterations););
+
+#ifdef CHECK
+    /* Steady state is (1/n, ..., 1/n). This may take a while to converge. */
+    double max = vector[0];
+    size_t argmax = 0;
+    for (size_t i = 1; i < n; i++) {
+        if (fabs(vector[i] - 1.0 / n) > max) {
+            max = fabs(vector[i] - 1.0 / n);
+            argmax = i;
+        }
+    }
+    fprintf(stderr, "The state vector should converge to all %lf's.\n"
+                    "The maximum error after %d iterations is in state %d,\n"
+                    "with %lf (error %lf)\n", 
+                    1.0 / n, iterations, argmax, vector[argmax], max);
+#endif
 
 	if (ShrayOutput) {
 	    printf("%lf\n", matrix->nnz_total * iterations * 2.0 / 1000000000 / duration);
