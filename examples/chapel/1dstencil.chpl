@@ -64,48 +64,43 @@ proc right(n: int, iterations: int, input: [0..n + iterations - 1] real(32),
 
 proc StencilBlocked(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(32), iterations: int)
 {
+  /* Cannot use localSubdomain because we divide the computation by a
+   * block distribution on slices of size BLOCK, instead of single elements.*/
   var start: int = (n / BLOCK + numLocales - 1) / numLocales * here.id;
   var end: int = (n / BLOCK + numLocales - 1) / numLocales * (here.id + 1);
 
-  /* We copy in a loop instead of array slices to mark local accesses */
+  /* Multithreaded execution, default uses one thread per core
+   * We copy in a loop instead of array slices to mark local accesses */
+  var bufDom = {0..BLOCK + 2 * iterations - 1};
+  var inBuffer: [bufDom] real(32);
+  var outBuffer: [bufDom] real(32);
   for row in start..end - 1 {
-    var inBuffer: [0..BLOCK + 2 * iterations - 1] real(32);
-    var outBuffer: [0..BLOCK + 2 * iterations - 1] real(32);
-
     if (row == 0) {
-      for i in 0 .. BLOCK + iterations - 1 {
-        inBuffer(i) = input.localAccess(i);
-      }
+      inBuffer(0..BLOCK + iterations - 1) =
+        input.localSlice(0..BLOCK + iterations - 1);
       left(BLOCK, iterations, inBuffer(0..BLOCK + iterations - 1),
-                              outBuffer(0..BLOCK + iterations - 1));
-      for i in 0 .. BLOCK - 1 {
-        output.localAccess(i) = outBuffer(i);
-      }
+           outBuffer(0..BLOCK + iterations - 1));
+      output.localSlice(0..BLOCK - 1) = outBuffer(0..BLOCK - 1);
     } else if (row == n / BLOCK - 1) {
-      for i in 0 .. BLOCK + iterations - 1 {
-        inBuffer(i) = input.localAccess(row * BLOCK - iterations + i);
-      }
+      inBuffer(0..BLOCK + iterations - 1) =
+        input.localSlice(row * BLOCK - iterations..(row + 1) * BLOCK - 1);
       right(BLOCK, iterations, inBuffer(0..BLOCK + iterations - 1),
                                outBuffer(0..BLOCK + iterations - 1));
-      for i in 0 .. BLOCK - 1 {
-        output.localAccess(row * BLOCK + i) = outBuffer(iterations + i);
-      }
+      output.localSlice(row * BLOCK..(row + 1) * BLOCK - 1) =
+        outBuffer(row * BLOCK + iterations..(row + 1) * BLOCK + iterations - 1);
     } else {
       /* The first and last block will access some elements from neighbouring
        * locales. */
       if (row != start && row != end - 1) {
-        for i in 0 .. BLOCK + 2 * iterations - 1 {
-          inBuffer(i) = input.localAccess(row * BLOCK - iterations + i);
-        }
+        inBuffer(0..BLOCK + 2 * iterations - 1) =
+          input.localSlice(row * BLOCK - iterations..(row + 1) * BLOCK + iterations - 1);
       } else {
-        for i in 0 .. BLOCK + 2 * iterations - 1 {
-          inBuffer(i) = input(row * BLOCK - iterations + i);
-        }
+        inBuffer(0..BLOCK + 2 * iterations - 1) =
+          input(row * BLOCK - iterations..(row + 1) * BLOCK + iterations - 1);
       }
       middle(BLOCK, iterations, inBuffer, outBuffer);
-      for i in 0 .. BLOCK - 1 {
-        output.localAccess(row * BLOCK + i) = outBuffer(iterations + i);
-      }
+      output.localSlice(row * BLOCK..(row + 1) * BLOCK - 1) =
+        outBuffer(iterations..BLOCK + iterations - 1);
     }
   }
 }
