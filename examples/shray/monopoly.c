@@ -6,8 +6,6 @@
 #include <errno.h>
 #include <math.h>
 
-/* Though this should work in theory, we run into representability problems for 
- * n any respectable number. We have only about 15 digits of accuracy. */
 //#define CHECK
 
 void init(double *a, size_t n)
@@ -85,9 +83,9 @@ int main(int argc, char **argv)
             argmax = i;
         }
     }
-    fprintf(stderr, "The state vector should converge to all %lf's.\n"
-                    "The maximum error after %d iterations is in state %d,\n"
-                    "with %lf (error %lf)\n", 
+    fprintf(stderr, "The state vector should converge to all %10e's.\n"
+                    "The maximum error after %ld iterations is in state %ld,\n"
+                    "with %10e (error %10e)\n", 
                     1.0 / n, iterations, argmax, vector[argmax], max);
 #endif
 

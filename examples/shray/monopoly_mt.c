@@ -7,7 +7,7 @@
 #include <math.h>
 #include <omp.h>
 
-#define CHECK
+//#define CHECK
 
 void init(double *a, size_t n)
 {
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
     error = sqrt(error);
     double relative_error = error / sqrt(1.0 / n);
     fprintf(stderr, "The state vector should converge to all %.10e's.\n"
-                    "The relative error after %ld iterations is %.10e\n"
+                    "The relative error after %ld iterations is %.10e\n",
                     1.0 / n, iterations, relative_error);
 #endif
 
