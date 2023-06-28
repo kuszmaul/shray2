@@ -88,7 +88,7 @@ proc StencilBlocked(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(
       right(BLOCK, iterations, inBuffer(0..BLOCK + iterations - 1),
                                outBuffer(0..BLOCK + iterations - 1));
       output.localSlice(row * BLOCK..(row + 1) * BLOCK - 1) =
-        outBuffer(row * BLOCK + iterations..(row + 1) * BLOCK + iterations - 1);
+        outBuffer(iterations..BLOCK + iterations - 1);
     } else {
       /* The first and last block will access some elements from neighbouring
        * locales. */
