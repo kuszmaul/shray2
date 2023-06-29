@@ -182,8 +182,8 @@ void csr_print(const csr_t *matrix)
 }
 
 /* probabilities[eyes] is the probability to throw eyes with two dice. */
-static double probabilities[13] = {0, 0, 1 / 36, 2 / 36, 3 / 36, 4 / 36, 5 / 36, 6 / 36,
-                                   5 / 36, 4 / 36, 3 / 36, 2 / 36, 1 / 36};
+static double probabilities[13] = {0, 0, 1.0 / 36, 2.0 / 36, 3.0 / 36, 4.0 / 36, 5.0 / 36, 6.0 / 36,
+                                   5.0 / 36, 4.0 / 36, 3.0 / 36, 2.0 / 36, 1.0 / 36};
 
 csr_t *monopoly(size_t n, unsigned int p, unsigned int s)
 {

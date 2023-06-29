@@ -13,14 +13,14 @@ void init(double *a, size_t n)
 {
     /* sum_i a[i] = 1. */
 	for (size_t i = ShrayStart(a); i < ShrayEnd(a); ++i) {
-		a[i] = i / (n * (n + 1) / 2);
+		a[i] = (i % 2 == 0) ? 2.0 / n : 0.0;
 	}
 }
 
 void spmv(csr_t *matrix, double *vector, double *out)
 {
     size_t start = ShrayStart(out);
-    size_t end = ShrayStart(out);
+    size_t end = ShrayEnd(out);
     size_t k = 0;
     #pragma omp parallel for
 	for (size_t i = start; i < end; i++) {
@@ -81,18 +81,15 @@ int main(int argc, char **argv)
 
 #ifdef CHECK
     /* Steady state is (1/n, ..., 1/n). This may take a while to converge. */
-    double max = vector[0];
-    size_t argmax = 0;
-    for (size_t i = 1; i < n; i++) {
-        if (fabs(vector[i] - 1.0 / n) > max) {
-            max = fabs(vector[i] - 1.0 / n);
-            argmax = i;
-        }
+    double error = 0.0; // L2 norm of difference
+    for (size_t i = 0; i < n; i++) {
+        error += (vector[i] - 1.0 / n) * (vector[i] - 1.0 / n);
     }
-    fprintf(stderr, "The state vector should converge to all %lf's.\n"
-                    "The maximum error after %d iterations is in state %d,\n"
-                    "with %lf (error %lf)\n", 
-                    1.0 / n, iterations, argmax, vector[argmax], max);
+    error = sqrt(error);
+    double relative_error = error / sqrt(1.0 / n);
+    fprintf(stderr, "The state vector should converge to all %.10e's.\n"
+                    "The relative error after %ld iterations is %.10e\n",
+                    1.0 / n, iterations, relative_error);
 #endif
 
 	if (ShrayOutput) {
