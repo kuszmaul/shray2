@@ -14,7 +14,7 @@ hash gasnet_trace
 hash ga-config
 hash upcc
 
-if [ "$#" -lt 2 ]; then
+if [ "$#" -lt 1 ]; then
 	printf "Usage: systeminfo.sh OUTPUTDIR\n\n" >&2
 	printf "\tOUTPUTDIR: Directory to store sytem info.\n" >&2
 	exit 1
