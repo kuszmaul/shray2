@@ -10,6 +10,8 @@ hash find
 hash gnuplot
 hash head
 hash seq
+hash m4
+hash grep
 
 if [ "$#" -lt 2 ]; then
 	printf "Usage: benchmark.sh BINDIR OUTPUTDIR MMDIR\n\n" >&2
@@ -25,64 +27,85 @@ curdate=$(date -u '+%Y-%m-%dT%H:%M:%S+00:00')
 datadir="$outputdir/$curdate"
 mkdir -p "$datadir"
 
+scriptsdir="$datadir/scripts"
+mkdir -p "$scriptsdir"
+
 printf 'Running benchmarks with output directory '\''%s'\''\n' \
 	"$datadir"
 
 # Obtain system information
-sbatch --wait ./systeminfo.sh
+if ! sbatch --wait ./systeminfo.sh "$datadir"; then
+	printf 'Error while running systeminfo.sh via sbatch\n' >&2
+	exit 1
+fi
 
-# One rank per node (multiple threads)
-NODES=1
-NTASKS=8
-while [ $NODES -le 8 ]; do
-	genfile="./benchmark_run_tmp.sh"
+# Cluster configuration
+max_ntasks_per_node=8
+max_ntasks=64
 
-	sed "s/__NODES__/$NODES/g" ./benchmark_run.sh >"$genfile"
-	sed -i "s/__NTASKS__/$NTASKS/g" "$genfile"
-	sed -i "s/__THREADTYPE__/multi/g" "$genfile"
-	sbatch --wait "$genfile" "$bindir" "$datadir"
+# Generate scripts and run them
+for threadtype in single multi; do
+	ntasks=1
+	ntasks_per_node=1
+	while [ "$ntasks" -le "$max_ntasks" ]; do
+		if [ "$ntasks" -le "$max_ntasks_per_node" ]; then
+			nodes=1
+			ntasks_per_node="$ntasks"
+		else
+			nodes=$((ntasks / max_ntasks_per_node))
+			ntasks_per_node="$max_ntasks_per_node"
+		fi
 
-	rm "$genfile"
+		name="./benchmark.$threadtype.$nodes.$ntasks"
+		gen_script="$name.sh"
+		gen_output="$name.txt"
+		m4 -EP \
+			-D "__NTASKS__=[[[$ntasks]]]" \
+			-D "__NODES__=[[[$nodes]]]" \
+			-D "__THREADTYPE__=[[[$threadtype]]]" \
+			-D "__NTASKS_PER_NODE__=[[[$ntasks_per_node]]]" \
+			-- ./benchmark_run.sh >"$gen_script"
 
-	NODES=$(( 2 * NODES ))
+		printf 'Running configuration (%s tasks/threads, %s nodes, %s tasks per node, %s)\n' \
+			"$ntasks" \
+			"$nodes" \
+			"$ntasks_per_node" \
+			"$threadtype"
+		if ! sbatch --wait "$gen_script" "$bindir" "$datadir"; then
+			printf 'Error while running %s via sbatch\n' "$gen_script" >&2
+			exit 1
+		fi
+
+		# TODO: print failed count properly
+		# failed=$(grep -c 'result: FAILED' "$gen_output")
+		# if [ "$failed" -gt 0 ]; then
+		# 	printf 'Script %s had %s failed benchmarks\n' \
+		# 		"$gen_script" \
+		# 		"$failed"
+		# fi
+
+		mv "$gen_script" "$scriptsdir"
+		mv "$gen_output" "$scriptsdir"
+
+		ntasks=$(( 2 * ntasks ))
+	done
 done
 
-# Many ranks per node (single threaded)
-NODES=1
-while [ $NODES -le 8 ]; do
-	NTASKS=$(( 8 * NODES ))
-
-	genfile="./benchmark_run_tmp.sh"
-
-	sed "s/__NODES__/$NODES/g" ./benchmark_run.sh >"$genfile"
-	sed -i "s/__NTASKS__/$NTASKS/g" "$genfile"
-	sed -i "s/__THREADTYPE__/single/g" "$genfile"
-	sbatch --wait "$genfile" "$bindir" "$datadir"
-
-	rm "$genfile"
-
-	NODES=$(( 2 * NODES ))
-done
 
 # Generate plots.
-mkdir -p "$datadir/plots/single"
-mkdir -p "$datadir/plots/multi"
-for exp in "$datadir"/*; do
-	example=$(basename "$exp")
+mkdir -p "$datadir/plots"
+for thread_type in single multi; do
+	for exp in "$datadir/$thread_type"/*; do
+		example=$(basename "$exp")
 
-	if [ ! -d "$exp" ] || [ "$example" = plots ]; then
-		continue
-	fi
+		# Go through all parameters used for a benchmark.
+		for paramsdir in "$exp"/*; do
+			params=$(basename "$paramsdir")
 
-	# Go through all parameters used for a benchmark.
-	for paramsdir in "$exp"/*; do
-		params=$(basename "$paramsdir")
-
-		for thread_type in single multi; do
 			# Go through all implementations of that benchmark.
-			for implementation in "$paramsdir/$thread_type"/*; do
+			for implementation in "$paramsdir"/*; do
 				implementation=$(basename "$implementation")
-				resultdir="$paramsdir/$thread_type/$implementation"
+				resultdir="$paramsdir/$implementation"
 				[ -f "$resultdir/graph.data" ] && rm "$resultdir/graph.data"
 
 				# Group the data per number of processors.
@@ -113,12 +136,12 @@ for exp in "$datadir"/*; do
 			gnuplot -c benchmark_gflops.gpi \
 				"$example ($params, $thread_type)" \
 				"$datadir/plots" \
-				"$paramsdir/$thread_type/chapel/graph.data" \
-				"$paramsdir/$thread_type/fortran/graph.data" \
-				"$paramsdir/$thread_type/globalarrays/graph.data" \
-				"$paramsdir/$thread_type/shray/graph.data" \
-				"$paramsdir/$thread_type/scala/graph.data" \
-				"$paramsdir/$thread_type/upc/graph.data"
+				"$paramsdir/chapel/graph.data" \
+				"$paramsdir/fortran/graph.data" \
+				"$paramsdir/globalarrays/graph.data" \
+				"$paramsdir/shray/graph.data" \
+				"$paramsdir/scala/graph.data" \
+				"$paramsdir/upc/graph.data"
 		done
 	done
 done

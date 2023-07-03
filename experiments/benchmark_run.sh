@@ -1,13 +1,20 @@
+m4_changecom()m4_dnl
+m4_changequote(`[[[',`]]]')m4_dnl
 #!/bin/sh
 
 #SBATCH --account=csmpi
-#SBATCH --ntasks=__NTASKS__
 #SBATCH --nodes=__NODES__
-#SBATCH --ntasks-per-node=8
+m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
+#SBATCH --cpus-per-task=__NTASKS_PER_NODE__
+#SBATCH --ntasks-per-node=1
+]]], [[[m4_dnl
+#SBATCH --ntasks=__NTASKS__
+#SBATCH --ntasks-per-node=__NTASKS_PER_NODE__
 #SBATCH --threads-per-core=1
+]]])m4_dnl
 #SBATCH --partition=csmpi_long
 #SBATCH --time=08:00:00
-#SBATCH --output=benchmark(__THREADTYPE__)(__NODES__)(__NTASKS__).txt
+#SBATCH --output=benchmark.__THREADTYPE__.__NODES__.__NTASKS__.txt
 
 # A script to automatically benchmark test programs.
 
@@ -49,8 +56,11 @@ fi
 bindir="$1"
 datadir="$2"
 
+# TODO: just use m4 preprocessor everywhere, rather than both m4 and runtime
+# checks.
 ntasks=__NTASKS__
 nodes=__NODES__
+ntasks_per_node=__NTASKS_PER_NODE__
 thread_type=__THREADTYPE__
 
 # Run the given test. Writes 0 to the gflops file if the test fails.
@@ -71,7 +81,6 @@ runtest_wrapper()
 	if ! "$@" >"$gflopsfile" 2>"$outfile"; then
 		printf '0.0\n' >"$gflopsfile"
 		printf 'FAILED\n'
-		failed=$((failed + 1))
 	else
 		printf 'SUCCESS\n'
 	fi
@@ -91,11 +100,11 @@ runtest()
 	example="$2"
 	argsstr="$3"
 	testnumber="$4"
-	shift 5
+	shift 4
 
 	printf '%s: ' "$test_type"
 
-	testdir="$datadir/$example/$argsstr/$thread_type/$test_type"
+	testdir="$datadir/$thread_type/$example/$argsstr/$test_type"
 	resultdir="$testdir/$testnumber"
 	mkdir -p "$resultdir"
 
@@ -158,33 +167,46 @@ export GASNET_REQUESTTIMEOUT_MAX=0
 # UPC shared heap configuration
 export UPC_SHARED_HEAP_SIZE="4G"
 
+if [ "$thread_type" = multi ]; then
+	export OMP_NUM_THREADS="$ntasks_per_node"
+fi
+
 # Run all tests.
-for i in $(seq 1 1); do
+for i in $(seq 1 2); do
 
 	# 1D stencil.
 	export SHRAY_CACHEFACTOR=2
 	for size in 20480000; do # 40960000; do
 		for iter in 1000; do #2000; do
-			printf '\nBenchmark 1D 3-point stencil (%s, %s nodes, %s size, %s iter)\n' \
-				"$nproc" \
+			printf '\nBenchmark 1D 3-point stencil (run %s, %s, %s tasks, %s nodes, %s size, %s iter)\n' \
+				"$i" \
+				"$thread_type" \
+				"$ntasks" \
+				"$nodes" \
 				"$size" \
 				"$iter"
-			#runtest chapel "$nproc" 1dstencil "$size $iter" "$i" "--N=$size" "--ITERATIONS=$iter"
-			#runtest fortran "$nproc" 1dstencil "$size $iter" "$i" "$size" "$iter"
-			#runtest globalarrays "$nproc" 1dstencil "$size $iter" "$i" "$size" "$iter"
-			#runtest upc "$nproc" 1dstencil "$size $iter" "$i" "$size" "$iter"
 
-			runtest shray 1dstencil "$size $iter" "$i" "$size" "$iter"
+			if [ "$thread_type" = multi ]; then
+				runtest shray 1dstencil_mt "$size $iter" "$i" "$size" "$iter"
+			else
+				runtest shray 1dstencil "$size $iter" "$i" "$size" "$iter"
+			fi
+
+			#runtest chapel "$ntasks" 1dstencil "$size $iter" "$i" "--N=$size" "--ITERATIONS=$iter"
+			#runtest fortran "$ntasks" 1dstencil "$size $iter" "$i" "$size" "$iter"
+			#runtest globalarrays "$ntasks" 1dstencil "$size $iter" "$i" "$size" "$iter"
+			#runtest upc "$ntasks" 1dstencil "$size $iter" "$i" "$size" "$iter"
+
 		done
 	done
 
 	# Sparse matrix-vector multiplication (monopoly)
-	export SHRAY_CACHEFACTOR="$nproc"
+	export SHRAY_CACHEFACTOR="$ntasks"
 	#for size in 204800; do # 20480000; do
 	#	for iterations in 50; do
 	#		printf '\nBenchmark spmv monopoly (run %s, %s nodes, %s x %s, %s iter)\n' \
 	#			"$i" \
-	#			"$nproc" \
+	#			"$ntasks" \
 	#			"$size" \
 	#			"$size" \
 	#			"$iterations"
