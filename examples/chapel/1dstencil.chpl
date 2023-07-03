@@ -108,16 +108,12 @@ proc StencilBlocked(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(
 proc Stencil(n: int, input: [0..n - 1] real(32), output: [0..n - 1] real(32), iterations: int)
 {
   for t in 1..iterations / TIMEBLOCK {
-    coforall loc in Locales do on loc {
-      StencilBlocked(n, input, output, TIMEBLOCK);
-    }
-    input <=> output;
+    StencilBlocked(n, input, output, TIMEBLOCK);
     allLocalesBarrier.barrier();
+    input <=> output;
   }
   if (iterations % TIMEBLOCK != 0) {
-    coforall loc in Locales do on loc {
-      StencilBlocked(n, input, output, iterations % TIMEBLOCK);
-    }
+    StencilBlocked(n, input, output, iterations % TIMEBLOCK);
   } else {
     /* We did one buffer swap too many */
     input <=> output;
@@ -134,7 +130,9 @@ proc main()
 
   var watch: stopwatch;
   watch.start();
-  Stencil(N, input, output, ITERATIONS);
+  coforall loc in Locales do on loc {
+    Stencil(N, input, output, ITERATIONS);
+  }
   watch.stop();
 
   printCommDiagnosticsTable();
