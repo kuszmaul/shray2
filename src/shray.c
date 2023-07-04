@@ -231,8 +231,6 @@ static void handlePageFault(void *address)
 {
     uintptr_t roundedAddress = roundDownPage((uintptr_t)address);
 
-    DBUG_PRINT("Segfault %p", address);
-
     Allocation *alloc = findAlloc((void *)roundedAddress);
 
     size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
@@ -333,6 +331,8 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
     (void)unused;
 
     void *address = si->si_addr;
+
+    DBUG_PRINT("Segfault %p", address);
 
     lockIfMultithread();
     SEGFAULTCOUNT;
@@ -551,7 +551,8 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     alloc->local = BitmapCreate(roundUp(totalSize, Shray_Pagesz));
     alloc->prefetched = BitmapCreate(roundUp(totalSize, Shray_Pagesz));
 
-    size_t cacheEntries = segmentLength / Shray_Pagesz * Shray_CacheAllocFactor;
+    size_t cacheEntries = min(1, segmentLength / Shray_Pagesz *
+                                            Shray_CacheAllocFactor);
     alloc->autoCaches = ringbuffer_alloc(cacheEntries);
     if (!alloc->autoCaches) {
         fprintf(stderr, "[node %d]: Could not allocate autocache", Shray_rank);
