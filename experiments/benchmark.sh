@@ -34,7 +34,8 @@ printf 'Running benchmarks with output directory '\''%s'\''\n' \
 	"$datadir"
 
 # Obtain system information
-if ! sbatch --wait ./systeminfo.sh "$datadir"; then
+printf 'Obtaining system configuration\n'
+if ! sbatch --quiet --wait ./systeminfo.sh "$datadir"; then
 	printf 'Error while running systeminfo.sh via sbatch\n' >&2
 	exit 1
 fi
@@ -66,15 +67,18 @@ for threadtype in single multi; do
 			-D "__NTASKS_PER_NODE__=[[[$ntasks_per_node]]]" \
 			-- ./benchmark_run.sh >"$gen_script"
 
-		printf 'Running configuration (%s tasks/threads, %s nodes, %s tasks per node, %s)\n' \
+		printf 'Running configuration (%s tasks/threads, %s nodes, %s tasks/threads per node, %s)\n' \
 			"$ntasks" \
 			"$nodes" \
 			"$ntasks_per_node" \
 			"$threadtype"
-		if ! sbatch --wait "$gen_script" "$bindir" "$datadir"; then
+		if ! sbatch --quiet --wait "$gen_script" "$bindir" "$datadir"; then
 			printf 'Error while running %s via sbatch\n' "$gen_script" >&2
 			exit 1
 		fi
+
+		# Sleep to wait for SLURM to finish writing to the output file.
+		sleep 5
 
 		# TODO: print failed count properly
 		# failed=$(grep -c 'result: FAILED' "$gen_output")
@@ -90,7 +94,6 @@ for threadtype in single multi; do
 		ntasks=$(( 2 * ntasks ))
 	done
 done
-
 
 # Generate plots.
 mkdir -p "$datadir/plots"
@@ -133,15 +136,22 @@ for thread_type in single multi; do
 			done
 
 			# Generate the plot for this specific benchmark.
+			filtered=$(printf '%s' "$example" | tr _ ' ')
+			if [ "$thread_type" = multi ]; then
+				xaxis="Number of threads"
+			else
+				xaxis="Number of ranks"
+			fi
 			gnuplot -c benchmark_gflops.gpi \
-				"$example ($params, $thread_type)" \
+				"$filtered ($params)" \
 				"$datadir/plots" \
 				"$paramsdir/chapel/graph.data" \
 				"$paramsdir/fortran/graph.data" \
 				"$paramsdir/globalarrays/graph.data" \
 				"$paramsdir/shray/graph.data" \
 				"$paramsdir/scala/graph.data" \
-				"$paramsdir/upc/graph.data"
+				"$paramsdir/upc/graph.data" \
+				"$xaxis"
 		done
 	done
 done

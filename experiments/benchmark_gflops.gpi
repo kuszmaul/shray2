@@ -6,7 +6,7 @@ set lmargin 18
 set tics font "Helvetica,26"
 
 # Configura axis.
-set xlabel 'Number of ranks' font "Helvetica,26"
+set xlabel ARG9.' ' font "Helvetica,26"
 set ylabel 'Gflops/s' font "Helvetica,26" offset -4,0
 
 set format y '%.0f'

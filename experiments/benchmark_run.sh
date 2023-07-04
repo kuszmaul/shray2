@@ -56,13 +56,6 @@ fi
 bindir="$1"
 datadir="$2"
 
-# TODO: just use m4 preprocessor everywhere, rather than both m4 and runtime
-# checks.
-ntasks=__NTASKS__
-nodes=__NODES__
-ntasks_per_node=__NTASKS_PER_NODE__
-thread_type=__THREADTYPE__
-
 # Run the given test. Writes 0 to the gflops file if the test fails.
 # $1: output file name
 # $1: gflops file name
@@ -104,42 +97,44 @@ runtest()
 
 	printf '%s: ' "$test_type"
 
-	testdir="$datadir/$thread_type/$example/$argsstr/$test_type"
+	testdir="$datadir/__THREADTYPE__/$example/$argsstr/$test_type"
 	resultdir="$testdir/$testnumber"
 	mkdir -p "$resultdir"
 
-	outfile="$resultdir/$ntasks.out"
-	gflopsfile="$resultdir/$ntasks.gflops"
+	outfile="$resultdir/__NTASKS__.out"
+	gflopsfile="$resultdir/__NTASKS__.gflops"
+
+m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
+	export SHRAY_PAR=y
+]]], [[[m4_dnl
+	unset SHRAY_PAR
+]]])m4_dnl
 
 	if [ "$test_type" = shray ]; then
-		if [ "$thread_type" = multi ]; then
-			export SHRAY_PAR=y
-		else
-			unset SHRAY_PAR
-		fi
+
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun \
+			mpirun m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
 			"$bindir/examples/$test_type/${example}_profile_${test_type}" \
 			"$@"
 	elif [ "$test_type" = chapel ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
 			"$bindir/examples/$test_type/${example}_$test_type" \
-			-nl "$nodes" \
+			-nl "__NODES__" \
 			"$@"
 	elif [ "$test_type" = fortran ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun \
+			mpirun m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
 	elif [ "$test_type" = globalarrays ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun \
+			mpirun m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
 	elif [ "$test_type" = upc ]; then
 		# TODO: upc
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun \
+			mpirun m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
 		# Filter out UPC-specific stderr messages
@@ -147,7 +142,7 @@ runtest()
 	elif [ "$test_type" = scala ]; then
 		./scalapack_generator.sh ${ntasks} 250 "$@"
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun \
+			mpirun m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
 			xdpblas3tim
 	else
 		printf 'Unknown test type: %s' "$test_type" >&2
@@ -167,12 +162,12 @@ export GASNET_REQUESTTIMEOUT_MAX=0
 # UPC shared heap configuration
 export UPC_SHARED_HEAP_SIZE="4G"
 
-if [ "$thread_type" = multi ]; then
-	export OMP_NUM_THREADS="$ntasks_per_node"
-fi
+m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
+export OMP_NUM_THREADS="__NTASKS_PER_NODE__"
+]]])m4_dnl
 
 # Run all tests.
-for i in $(seq 1 2); do
+for i in $(seq 1 5); do
 
 	# 1D stencil.
 	export SHRAY_CACHEFACTOR=2
@@ -180,17 +175,17 @@ for i in $(seq 1 2); do
 		for iter in 1000; do #2000; do
 			printf '\nBenchmark 1D 3-point stencil (run %s, %s, %s tasks, %s nodes, %s size, %s iter)\n' \
 				"$i" \
-				"$thread_type" \
-				"$ntasks" \
-				"$nodes" \
+				"__THREADTYPE__" \
+				"__NTASKS__" \
+				"__NODES__" \
 				"$size" \
 				"$iter"
 
-			if [ "$thread_type" = multi ]; then
-				runtest shray 1dstencil_mt "$size $iter" "$i" "$size" "$iter"
-			else
-				runtest shray 1dstencil "$size $iter" "$i" "$size" "$iter"
-			fi
+m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
+			runtest shray 1dstencil_mt "$size $iter" "$i" "$size" "$iter"
+]]], [[[m4_dnl
+			runtest shray 1dstencil "$size $iter" "$i" "$size" "$iter"
+]]])m4_dnl
 
 			#runtest chapel "$ntasks" 1dstencil "$size $iter" "$i" "--N=$size" "--ITERATIONS=$iter"
 			#runtest fortran "$ntasks" 1dstencil "$size $iter" "$i" "$size" "$iter"
@@ -201,7 +196,7 @@ for i in $(seq 1 2); do
 	done
 
 	# Sparse matrix-vector multiplication (monopoly)
-	export SHRAY_CACHEFACTOR="$ntasks"
+	export SHRAY_CACHEFACTOR="__TASKS__"
 	#for size in 204800; do # 20480000; do
 	#	for iterations in 50; do
 	#		printf '\nBenchmark spmv monopoly (run %s, %s nodes, %s x %s, %s iter)\n' \
