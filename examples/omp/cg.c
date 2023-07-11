@@ -183,7 +183,7 @@ c---------------------------------------------------------------------*/
       program cg
 --------------------------------------------------------------------*/
 
-int main(int argc, char **argv) {
+int main(void) {
     int	i, j, k, it;
     double zeta;
     double rnorm;
@@ -250,11 +250,9 @@ c---------------------------------------------------------------------*/
 #pragma omp parallel default(shared) private(i,j,k)
 {
 #pragma omp for nowait
-    for (j = 1; j <= lastrow - firstrow + 1; j++) {
-	for (k = rowstr[j]; k < rowstr[j+1]; k++) {
+	for (k = rowstr[1]; k < rowstr[lastrow - firstrow + 1]; k++) {
             colidx[k] = colidx[k] - firstcol + 1;
 	}
-    }
 
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
@@ -705,35 +703,35 @@ c  Used by sprnvc to mark nonzero positions
 c---------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(i)
     for (i = 1; i <= n; i++) {
-	colidx[n+i] = 0;
+    	colidx[n+i] = 0;
     }
     for (iouter = 1; iouter <= n; iouter++) {
-	nzv = nonzer;
-	sprnvc(n, nzv, v, iv, &(colidx[0]), &(colidx[n]));
-	vecset(v, iv, &nzv, iouter, 0.5);
-	for (ivelt = 1; ivelt <= nzv; ivelt++) {
-	    jcol = iv[ivelt];
-	    if (jcol >= firstcol && jcol <= lastcol) {
-		scale = size * v[ivelt];
-		for (ivelt1 = 1; ivelt1 <= nzv; ivelt1++) {
-	            irow = iv[ivelt1];
+	    nzv = nonzer;
+	    sprnvc(n, nzv, v, iv, &(colidx[0]), &(colidx[n]));
+	    vecset(v, iv, &nzv, iouter, 0.5);
+	    for (ivelt = 1; ivelt <= nzv; ivelt++) {
+	        jcol = iv[ivelt];
+	        if (jcol >= firstcol && jcol <= lastcol) {
+	    	    scale = size * v[ivelt];
+	    	    for (ivelt1 = 1; ivelt1 <= nzv; ivelt1++) {
+	                irow = iv[ivelt1];
                     if (irow >= firstrow && irow <= lastrow) {
-			nnza = nnza + 1;
-			if (nnza > nz) {
-			    printf("Space for matrix elements exceeded in"
-				   " makea\n");
-			    printf("nnza, nzmax = %d, %d\n", nnza, nz);
-			    printf("iouter = %d\n", iouter);
-			    exit(1);
-			}
-			acol[nnza] = jcol;
-			arow[nnza] = irow;
-			aelt[nnza] = v[ivelt1] * scale;
-		    }
-		}
+	    	    	    nnza = nnza + 1;
+	    	    	    if (nnza > nz) {
+	    	    	        printf("Space for matrix elements exceeded in"
+	    	    	    	   " makea\n");
+	    	    	        printf("nnza, nzmax = %d, %d\n", nnza, nz);
+	    	    	        printf("iouter = %d\n", iouter);
+	    	    	        exit(1);
+	    	    	    }
+	    	    	    acol[nnza] = jcol;
+	    	    	    arow[nnza] = irow;
+	    	    	    aelt[nnza] = v[ivelt1] * scale;
+	    	        }
+	    	    }
+	        }
 	    }
-	}
-	size = size * ratio;
+	    size = size * ratio;
     }
 
 /*---------------------------------------------------------------------
@@ -741,19 +739,19 @@ c       ... add the identity * rcond to the generated matrix to bound
 c           the smallest eigenvalue from below by rcond
 c---------------------------------------------------------------------*/
     for (i = firstrow; i <= lastrow; i++) {
-	if (i >= firstcol && i <= lastcol) {
-	    iouter = n + i;
-	    nnza = nnza + 1;
-	    if (nnza > nz) {
-		printf("Space for matrix elements exceeded in makea\n");
-		printf("nnza, nzmax = %d, %d\n", nnza, nz);
-		printf("iouter = %d\n", iouter);
-		exit(1);
-	    }
-	    acol[nnza] = i;
-	    arow[nnza] = i;
-	    aelt[nnza] = rcond - shift;
-	}
+    	if (i >= firstcol && i <= lastcol) {
+    	    iouter = n + i;
+    	    nnza = nnza + 1;
+    	    if (nnza > nz) {
+    		    printf("Space for matrix elements exceeded in makea\n");
+    		    printf("nnza, nzmax = %d, %d\n", nnza, nz);
+    		    printf("iouter = %d\n", iouter);
+    		    exit(1);
+    	    }
+    	    acol[nnza] = i;
+    	    arow[nnza] = i;
+    	    aelt[nnza] = rcond - shift;
+    	}
     }
 
 /*---------------------------------------------------------------------
@@ -801,19 +799,19 @@ c     ...count the number of triples in each row
 c-------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(j)
     for (j = 1; j <= n; j++) {
-	rowstr[j] = 0;
-	mark[j] = false;
+	    rowstr[j] = 0;
+	    mark[j] = false;
     }
     rowstr[n+1] = 0;
 
     for (nza = 1; nza <= nnza; nza++) {
-	j = (arow[nza] - firstrow + 1) + 1;
-	rowstr[j] = rowstr[j] + 1;
+	    j = (arow[nza] - firstrow + 1) + 1;
+	    rowstr[j] = rowstr[j] + 1;
     }
 
     rowstr[1] = 1;
     for (j = 2; j <= nrows+1; j++) {
-	rowstr[j] = rowstr[j] + rowstr[j-1];
+	    rowstr[j] = rowstr[j] + rowstr[j-1];
     }
 
 /*---------------------------------------------------------------------
@@ -833,18 +831,18 @@ c---------------------------------------------------------------------*/
 c     ... do a bucket sort of the triples on the row index
 c-------------------------------------------------------------------*/
     for (nza = 1; nza <= nnza; nza++) {
-	j = arow[nza] - firstrow + 1;
-	k = rowstr[j];
-	a[k] = aelt[nza];
-	colidx[k] = acol[nza];
-	rowstr[j] = rowstr[j] + 1;
+	    j = arow[nza] - firstrow + 1;
+	    k = rowstr[j];
+	    a[k] = aelt[nza];
+	    colidx[k] = acol[nza];
+	    rowstr[j] = rowstr[j] + 1;
     }
 
 /*--------------------------------------------------------------------
 c       ... rowstr(j) now points to the first element of row j+1
 c-------------------------------------------------------------------*/
     for (j = nrows; j >= 1; j--) {
-	rowstr[j+1] = rowstr[j];
+	    rowstr[j+1] = rowstr[j];
     }
     rowstr[1] = 1;
 
@@ -854,43 +852,43 @@ c-------------------------------------------------------------------*/
     nza = 0;
 #pragma omp parallel for default(shared) private(i)
     for (i = 1; i <= n; i++) {
-	x[i] = 0.0;
-	mark[i] = false;
+	    x[i] = 0.0;
+	    mark[i] = false;
     }
 
     jajp1 = rowstr[1];
     for (j = 1; j <= nrows; j++) {
-	nzrow = 0;
+	    nzrow = 0;
 
 /*--------------------------------------------------------------------
-c          ...loop over the jth row of a
+c              ...loop over the jth row of a
 c-------------------------------------------------------------------*/
-	for (k = jajp1; k < rowstr[j+1]; k++) {
+	    for (k = jajp1; k < rowstr[j+1]; k++) {
             i = colidx[k];
             x[i] = x[i] + a[k];
             if ( mark[i] == false && x[i] != 0.0) {
-		mark[i] = true;
-		nzrow = nzrow + 1;
-		nzloc[nzrow] = i;
+	    	    mark[i] = true;
+	    	    nzrow = nzrow + 1;
+	    	    nzloc[nzrow] = i;
+	        }
 	    }
-	}
 
 /*--------------------------------------------------------------------
-c          ... extract the nonzeros of this row
+c              ... extract the nonzeros of this row
 c-------------------------------------------------------------------*/
-	for (k = 1; k <= nzrow; k++) {
+	    for (k = 1; k <= nzrow; k++) {
             i = nzloc[k];
             mark[i] = false;
             xi = x[i];
             x[i] = 0.0;
             if (xi != 0.0) {
-		nza = nza + 1;
-		a[nza] = xi;
-		colidx[nza] = i;
+	    	    nza = nza + 1;
+	    	    a[nza] = xi;
+	    	    colidx[nza] = i;
+	        }
 	    }
-	}
-	jajp1 = rowstr[j+1];
-	rowstr[j+1] = nza + rowstr[1];
+	    jajp1 = rowstr[j+1];
+	    rowstr[j+1] = nza + rowstr[1];
     }
 }
 
