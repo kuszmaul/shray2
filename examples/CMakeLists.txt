@@ -11,19 +11,22 @@ add_subdirectory(util)
 add_subdirectory(chapel)
 
 # fortran examples
-#add_subdirectory(fortran)
+add_subdirectory(fortran)
 
 # global arrays examples
-#add_subdirectory(globalarrays)
+add_subdirectory(globalarrays)
 
 # mpi examples
-#add_subdirectory(mpi)
+add_subdirectory(mpi)
 
 # shray examples
 add_subdirectory(shray)
 
 # upc examples
-#add_subdirectory(upc)
+add_subdirectory(upc)
 
 # gasnet examples
-#add_subdirectory(gasnet)
+add_subdirectory(gasnet)
+
+# omp reference example (cg)
+add_subdirectory(omp)
