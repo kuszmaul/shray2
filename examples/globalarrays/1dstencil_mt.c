@@ -93,24 +93,42 @@ void StencilBlocked(size_t n, int g_in, int g_out, int iterations)
 			if (row == 0) {
 				lo[0] = 0;
 				hi[0] = BLOCK + iterations - 1;
+				#pragma omp critical
+				{
 				NGA_Get(g_in, lo, hi, inBuffer, ld);
+				}
 				left(BLOCK, iterations, &inBuffer, &outBuffer);
 				ld[0] = BLOCK;
+				#pragma omp critical
+				{
 				NGA_Put(g_out, lo, hi, outBuffer, ld);
+				}
 			} else if (row == n / BLOCK - 1) {
 				lo[0] = row * BLOCK - iterations;
 				hi[0] = (row + 1) * BLOCK - 1;
+				#pragma omp critical
+				{
 				NGA_Get(g_in, lo, hi, inBuffer, ld);
+				}
 				right(BLOCK, iterations, &inBuffer, &outBuffer);
 				ld[0] = BLOCK;
+				#pragma omp critical
+				{
 				NGA_Put(g_out, lo, hi, outBuffer + iterations, ld);
+				}
 			} else {
 				lo[0] = row * BLOCK - iterations;
 				hi[0] = (row + 1) * BLOCK + iterations - 1;
+				#pragma omp critical
+				{
 				NGA_Get(g_in, lo, hi, inBuffer, ld);
+				}
 				middle(BLOCK, iterations, &inBuffer, &outBuffer);
 				ld[0] = BLOCK;
+				#pragma omp critical
+				{
 				NGA_Put(g_out, lo, hi, outBuffer + iterations, ld);
+				}
 			}
 		}
 

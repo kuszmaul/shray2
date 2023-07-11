@@ -37,7 +37,10 @@ void spmv(csr_t *matrix, int g_vector, int g_out)
 			int hi_val[1] = { col };
 			int ld_val[1] = { 0 };
 
+			#pragma omp critical
+			{
 			NGA_Get(g_vector, lo_val, hi_val, &value, ld_val);
+			}
 
 			outval += v * value;
 		}
