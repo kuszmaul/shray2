@@ -23,7 +23,8 @@ set -eu
 # Ensure required programs exist.
 
 # General.
-hash mpirun # General MPI applications (e.g. fortran/globalarrays)
+hash mpirun.openmpi
+hash mpirun.mpich
 hash seq
 
 # Chapel.
@@ -113,7 +114,7 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 	if [ "$test_type" = shray ]; then
 
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
+			mpirun.openmpi m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
 			"$bindir/examples/$test_type/${example}_profile_${test_type}" \
 			"$@"
 	elif [ "$test_type" = chapel ]; then
@@ -123,18 +124,17 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 			"$@"
 	elif [ "$test_type" = fortran ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
+			mpirun.mpich m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
 	elif [ "$test_type" = globalarrays ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
+			mpirun.mpich m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
 	elif [ "$test_type" = upc ]; then
-		# TODO: upc
 		runtest_wrapper "$outfile" "$gflopsfile" \
-			mpirun m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
+			mpirun.openmpi m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
 			"$bindir/examples/$test_type/${example}_$test_type" \
 			"$@"
 		# Filter out UPC-specific stderr messages
@@ -153,7 +153,8 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 ## Inform GASNet how to start.
 export GASNET_SPAWNFN="C"
 export GASNET_CSPAWN_CMD="srun -N %N %C"
-export CHPL_RT_NUM_THREADS_PER_LOCALE=8
+
+export CHPL_RT_NUM_THREADS_PER_LOCALE="__NTASKS_PER_NODE__"
 
 ## UDP-conduit max timeout in microseconds, default is 30000000 (30 seconds)
 ## 0 is infinite timeout.
@@ -167,10 +168,9 @@ export OMP_NUM_THREADS="__NTASKS_PER_NODE__"
 ]]])m4_dnl
 
 # Run all tests.
+export SHRAY_CACHEFACTOR=1
 for i in $(seq 1 5); do
-
 	# 1D stencil.
-	export SHRAY_CACHEFACTOR=2
 	for size in 20480000; do # 40960000; do
 		for iter in 1000; do #2000; do
 			printf '\nBenchmark 1D 3-point stencil (run %s, %s, %s tasks, %s nodes, %s size, %s iter)\n' \
@@ -183,59 +183,78 @@ for i in $(seq 1 5); do
 
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 			runtest shray 1dstencil_mt "$size $iter" "$i" "$size" "$iter"
+			runtest globalarrays 1dstencil_mt "$size $iter" "$i" "$size" "$iter"
+			runtest fortran 1dstencil_mt "$size $iter" "$i" "$size" "$iter"
+			runtest chapel 1dstencil "$size $iter" "$i" "--N=$size" "--ITERATIONS=$iter"
 ]]], [[[m4_dnl
 			runtest shray 1dstencil "$size $iter" "$i" "$size" "$iter"
+			runtest globalarrays 1dstencil "$size $iter" "$i" "$size" "$iter"
+			runtest fortran 1dstencil "$size $iter" "$i" "$size" "$iter"
+			runtest upc 1dstencil "$size $iter" "$i" "$size" "$iter"
 ]]])m4_dnl
-
-			#runtest chapel "$ntasks" 1dstencil "$size $iter" "$i" "--N=$size" "--ITERATIONS=$iter"
-			#runtest fortran "$ntasks" 1dstencil "$size $iter" "$i" "$size" "$iter"
-			#runtest globalarrays "$ntasks" 1dstencil "$size $iter" "$i" "$size" "$iter"
-			#runtest upc "$ntasks" 1dstencil "$size $iter" "$i" "$size" "$iter"
-
 		done
 	done
 
 	# Sparse matrix-vector multiplication (monopoly)
-	export SHRAY_CACHEFACTOR="__TASKS__"
-	#for size in 204800; do # 20480000; do
-	#	for iterations in 50; do
-	#		printf '\nBenchmark spmv monopoly (run %s, %s nodes, %s x %s, %s iter)\n' \
-	#			"$i" \
-	#			"$ntasks" \
-	#			"$size" \
-	#			"$size" \
-	#			"$iterations"
+	for size in 204800; do # 20480000; do
+		for iterations in 5; do
+			printf '\nBenchmark spmv monopoly (run %s, %s, %s tasks, %s nodes, %s x %s, %s iter)\n' \
+				"$i" \
+				"__THREADTYPE__" \
+				"__NTASKS__" \
+				"__NODES__" \
+				"$size" \
+				"$size" \
+				"$iterations"
 
-	#		runtest chapel "$nproc" monopoly "$size $iterations" "$i" "--n=$size" "--iterations=$iterations"
-	#		#runtest fortran "$nproc" monopoly "$size $iterations" "$i" "$size" "$iterations"
-	#		#runtest globalarrays "$nproc" monopoly "$size $iterations" "$i" "$size" "$iterations"
-	#		#runtest upc "$nproc" monopoly "$size $iterations" "$i" "$size" "$iterations"
+m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
+			runtest shray monopoly_mt "$size $iterations" "$i" "$size" "$iterations"
+			runtest globalarrays monopoly_mt "$size $iterations" "$i" "$size" "$iterations"
+			runtest fortran monopoly_mt "$size $iterations" "$i" "$size" "$iterations"
+			runtest chapel monopoly "$size $iterations" "$i" "--n=$size" "--iterations=$iterations"
+]]], [[[m4_dnl
+			runtest shray monopoly "$size $iterations" "$i" "$size" "$iterations"
+			runtest globalarrays monopoly "$size $iterations" "$i" "$size" "$iterations"
+			runtest fortran monopoly "$size $iterations" "$i" "$size" "$iterations"
+			runtest upc monopoly "$size $iterations" "$i" "$size" "$iterations"
+]]])m4_dnl
+		done
+	done
 
-	#		#runtest shray "$nproc" monopoly "$size $iterations" "$i" "$size" "$iterations"
-	#	done
-	#done
+#	# Matrix, weak scaling.
+	testdirname="2146 3036 4296 6080 8608 12192 17280"
+	case "__NTASKS__" in
+		 1) size=2146;;
+		 2) size=3036;;
+		 4) size=4296;;
+		 8) size=6080;;
+		16) size=8608;;
+		32) size=12192;;
+		64) size=17280;;
+	esac
+	printf '\nBenchmark matrix multiplcation (run %s, %s, %s tasks, %s nodes, %s x %s )\n' \
+		"$i" \
+		"__THREADTYPE__" \
+		"__NTASKS__" \
+		"__NODES__" \
+		"$size" \
+		"$size"
 
-# Matrix, weak scaling.
-#testdirname="2146 3036 4296 6080 8608 12192 17280"
-export SHRAY_CACHEFACTOR=2
-#for j in "1 2146" "2 3036" "4 4296" "8 6080"; do # "16 8608" "32 12192" "64 17280"; do
-#	set -- $j
-#	nproc="$1"
-#	size="$2"
-#
-#	printf '\nBenchmark matrix multiplication (%s nodes, %s x %s)\n' \
-#		"$nproc" \
-#		"$size" \
-#		"$size"
-#
-#	#export SHRAY_CACHEFACTOR=2
-#	#export OPENBLAS_NUM_THREADS=1
-#	#runtest shray "$nproc" matrix "$testdirname" "$i" "$size"
-#
-#	runtest chapel "$nproc" matrix "$testdirname" "$i" "--n=$size"
-#	#runtest fortran "$nproc" matrix "$testdirname" "$i" "$size"
-#	#runtest globalarrays "$nproc" matrix "$testdirname" "$i" "$size"
-#	#runtest upc "$nproc" matrix "$testdirname" "$i" "$size"
-#	#runtest scala "$nproc" matrix "$testdirname" "$i" "$size"
-#done
+m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
+	export BLIS_NUM_THREADS="__NTASKS_PER_NODE__"
+	export OPENBLAS_NUM_THREADS="__NTASKS_PER_NODE__"
+	runtest shray matrix "$testdirname" "$i" "$size"
+	runtest globalarrays matrix "$testdirname" "$i" "$size"
+	runtest fortran matrix "$testdirname" "$i" "$size"
+	runtest chapel matrix "$testdirname" "$i" "--n=$size"
+]]], [[[m4_dnl
+	export BLIS_NUM_THREADS=1
+	export OPENBLAS_NUM_THREADS=1
+	runtest shray matrix "$testdirname" "$i" "$size"
+	runtest globalarrays matrix "$testdirname" "$i" "$size"
+	runtest fortran matrix "$testdirname" "$i" "$size"
+	runtest upc matrix "$testdirname" "$i" "$size"
+	#runtest scala matrix "$testdirname" "$i" "$size"
+]]])m4_dnl
+
 done

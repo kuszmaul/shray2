@@ -13,6 +13,8 @@ hash gfortran
 hash gasnet_trace
 hash ga-config
 hash upcc
+hash mpirun.openmpi
+hash mpirun.mpich
 
 if [ "$#" -lt 1 ]; then
 	printf "Usage: systeminfo.sh OUTPUTDIR\n\n" >&2
@@ -35,8 +37,11 @@ datadir="$1"
 	printf '\n----------\nGlobalArrays:\n'
 	ga-config --version
 
-	printf '\n----------\nMPI:\n'
-	mpirun --version
+	printf '\n----------\nMPI (openmpi):\n'
+	mpirun.openmpi --version
+
+	printf '\n----------\nMPI (mpich):\n'
+	mpirun.mpich --version
 
 	printf '\n----------\nGASNet:\n'
 	# gasnet_trace exits with an error code on help messages, gasnetrun_mpi

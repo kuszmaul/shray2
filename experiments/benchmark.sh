@@ -80,13 +80,10 @@ for threadtype in single multi; do
 		# Sleep to wait for SLURM to finish writing to the output file.
 		sleep 5
 
-		# TODO: print failed count properly
-		# failed=$(grep -c 'result: FAILED' "$gen_output")
-		# if [ "$failed" -gt 0 ]; then
-		# 	printf 'Script %s had %s failed benchmarks\n' \
-		# 		"$gen_script" \
-		# 		"$failed"
-		# fi
+		if failed=$(grep -c 'result: FAILED' "$gen_output"); then
+			printf '\tFAILED: %s\n' \
+				"$failed"
+		fi
 
 		mv "$gen_script" "$scriptsdir"
 		mv "$gen_output" "$scriptsdir"
@@ -96,7 +93,8 @@ for threadtype in single multi; do
 done
 
 # Generate plots.
-mkdir -p "$datadir/plots"
+mkdir -p "$datadir/plots/single"
+mkdir -p "$datadir/plots/multi"
 for thread_type in single multi; do
 	for exp in "$datadir/$thread_type"/*; do
 		example=$(basename "$exp")
@@ -144,7 +142,7 @@ for thread_type in single multi; do
 			fi
 			gnuplot -c benchmark_gflops.gpi \
 				"$filtered ($params)" \
-				"$datadir/plots" \
+				"$datadir/plots/$thread_type" \
 				"$paramsdir/chapel/graph.data" \
 				"$paramsdir/fortran/graph.data" \
 				"$paramsdir/globalarrays/graph.data" \
