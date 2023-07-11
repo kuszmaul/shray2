@@ -68,6 +68,7 @@ static void gasnetBarrier(void)
 {
     gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS);
     gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);
+    BARRIERCOUNT
 }
 
 static int inRange(void *address, int index)
@@ -567,7 +568,6 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     }
 
     gasnetBarrier();
-    BARRIERCOUNT;
 
     unlockIfMultithread();
     return location;
@@ -638,7 +638,6 @@ void ShraySync(void *array)
 
     /* So no one reads from us before the communications are completed. */
     gasnetBarrier();
-    BARRIERCOUNT
     unlockIfMultithread();
 }
 
@@ -649,7 +648,6 @@ void ShrayFree(void *address)
 
     /* So everyone has finished reading before we free the array. */
     gasnetBarrier();
-    BARRIERCOUNT
 
     int index = findAllocIndex(address);
     Allocation *alloc = heap.allocs + index;
