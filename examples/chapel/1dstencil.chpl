@@ -135,7 +135,7 @@ proc main()
   }
   watch.stop();
 
-  printCommDiagnosticsTable();
+  /* printCommDiagnosticsTable(); */
   if (here.id == 0) then
     stdout.writeln(5.0 * (N - 2) * ITERATIONS / watch.elapsed() / 1000000000, '\n');
 }
