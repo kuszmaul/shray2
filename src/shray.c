@@ -164,7 +164,7 @@ static int findAllocIndex(void *segfault)
 
     if (!inRange(segfault, middle)) {
         DBUG_PRINT("%p is not in an allocation.\n", segfault);
-        ShrayFinalize(1);
+        gasnet_exit(1);
     }
 
     return middle;
@@ -244,7 +244,7 @@ static void handlePageFault(void *address)
         if (entry == NULL) {
             DBUG_PRINT("%p set to prefetched, but was not in the prefetch queue",
                     (void *)roundedAddress);
-            ShrayFinalize(1);
+            gasnet_exit(1);
         }
 
         gasnet_wait_syncnb(entry->prefetch.handle);
@@ -392,7 +392,7 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
 
             if (queue_queue_prefetch(alloc->prefetchCaches, alloc, start_r, end_r, handle)) {
                 DBUG_PRINT("ERROR: could not add prefetch to queue, %d", 1);
-                ShrayFinalize(1);
+                gasnet_exit(1);
             }
 
             BitmapSetOnes(alloc->prefetched, (start_r - location) / Shray_Pagesz,
@@ -557,14 +557,14 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     alloc->autoCaches = ringbuffer_alloc(cacheEntries);
     if (!alloc->autoCaches) {
         fprintf(stderr, "[node %d]: Could not allocate autocache", Shray_rank);
-        ShrayFinalize(1);
+        gasnet_exit(1);
     }
     DBUG_PRINT("Allocated %zu automatic cache entries (%zu)", cacheEntries, totalSize / Shray_Pagesz);
 
     alloc->prefetchCaches = queue_alloc(5);
     if (!alloc->prefetchCaches) {
         fprintf(stderr, "Could not allocate cache buffers\n");
-        ShrayFinalize(1);
+        gasnet_exit(1);
     }
 
     gasnetBarrier();
@@ -756,11 +756,10 @@ unsigned int ShraySize(void)
 void ShrayFinalize(int exit_code)
 {
     DBUG_PRINT("Terminating with code %d", exit_code);
-    if (exit_code == 0) {
-        for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
-            Allocation *alloc = heap.allocs + i;
-            queue_free(alloc->prefetchCaches);
-        }
+    gasnetBarrier();
+    for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
+        Allocation *alloc = heap.allocs + i;
+        queue_free(alloc->prefetchCaches);
     }
     gasnet_exit(exit_code);
 }
