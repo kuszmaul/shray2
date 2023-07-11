@@ -11,11 +11,12 @@ get_filename_component(BLAS_TNAME ${BLAS_LIB_ACTUAL} NAME)
 
 foreach(file
 		1dstencil
-		1dstencil_combi
+		#1dstencil_combi
 		matrix
-		matrix_combi
-        monopoly
-        monopoly_combi)
+		#matrix_combi
+		monopoly
+		#monopoly_combi
+	 )
 	set(EXAMPLE_TARGET "${file}_chapel")
 
 	add_executable("${EXAMPLE_TARGET}"
@@ -23,9 +24,10 @@ foreach(file
 
 	target_compile_options("${EXAMPLE_TARGET}"
 		PRIVATE
-            --ccflags -Ofast
+			--ccflags
+			-Ofast
 			--fast
-            --no-ieee-float
+			--no-ieee-float
 			-O
 			-L${BLAS_TDIR}
 			-l:${BLAS_TNAME})

@@ -20,8 +20,8 @@ foreach(file
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_LINKER_FLAGS}
-            -lcaf_mpich
-#            -lcaf_openmpi
-            /home/tkoopman/.local/lib/libopenblas.a
-            -fopenmp)
+			-lcaf_mpich
+			#-lcaf_openmpi
+			BLAS::BLAS
+			-fopenmp)
 endforeach(file)

@@ -1,7 +1,7 @@
 foreach(file
 		matrix
-        1dstencil
-        monopoly)
+		1dstencil
+		monopoly)
 	set(EXAMPLE_TARGET "${file}_upc")
 
 	add_executable("${EXAMPLE_TARGET}"
