@@ -1,30 +1,5 @@
 /*--------------------------------------------------------------------
 
-  Only generates the sparse matrix a and writes the output
-  files a.cg colidx.cg rowstr.cg
-
-  NAS Parallel Benchmarks 3.0 structured OpenMP C versions - CG
-
-  This benchmark is an OpenMP C version of the NPB CG code.
-
-  The OpenMP C 2.3 versions are derived by RWCP from the serial Fortran versions
-  in "NPB 2.3-serial" developed by NAS. 3.0 translation is performed by the UVSQ.
-
-  Permission to use, copy, distribute and modify this software for any
-  purpose with or without fee is hereby granted.
-  This software is provided "as is" without express or implied warranty.
-
-  Information on OpenMP activities at RWCP is available at:
-
-           http://pdplab.trc.rwcp.or.jp/pdperf/Omni/
-
-  Information on NAS Parallel Benchmarks 2.3 is available at:
-
-           http://www.nas.nasa.gov/NAS/NPB/
-
---------------------------------------------------------------------*/
-/*--------------------------------------------------------------------
-
   Authors: M. Yarrow
            C. Kuszmaul
 
@@ -32,26 +7,16 @@
 
   3.0 structure translation: F. Conti
 
-  Modified to single source file, some warning fixes by T. Koopman
+  Modification for outputting a by T. Koopman
 
 --------------------------------------------------------------------*/
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <sys/time.h>
 #include <stdbool.h>
 #include <omp.h>
-
-/* Class C */
-#define	NA	150000
-#define	NONZER	15
-#define	NITER	75
-#define	SHIFT	110.0
-#define	RCOND	1.0e-1
-#define	CONVERTDOUBLE	false
-
-#define	NZ	NA*(NONZER+1)*(NONZER+1)+NA*(NONZER+2)
+#include <string.h>
 
 /* For random numbers */
 #define r23 pow(0.5, 23.0)
@@ -69,17 +34,6 @@ static int lastrow;
 static int firstcol;
 static int lastcol;
 
-/* common /main_int_mem/ */
-static int colidx[NZ+1];	/* colidx[1:NZ] */
-static int rowstr[NA+1+1];	/* rowstr[1:NA+1] */
-static int iv[2*NA+1+1];	/* iv[1:2*NA+1] */
-static int arow[NZ+1];		/* arow[1:NZ] */
-static int acol[NZ+1];		/* acol[1:NZ] */
-
-/* common /main_flt_mem/ */
-static double v[NA+1+1];	/* v[1:NA+1] */
-static double aelt[NZ+1];	/* aelt[1:NZ] */
-static double a[NZ+1];		/* a[1:NZ] */
 //static double w[NA+2+1];	/* w[1:NA+2] */
 
 /* common /urando/ */
@@ -165,11 +119,56 @@ c---------------------------------------------------------------------*/
 --------------------------------------------------------------------*/
 
 int main(int argc, char **argv) {
-    if (argc != 2 || atoi(argv[1]) > 3 || atoi(argv[1]) < 1) {
-        fprintf(stderr, "Usage: %s n with n = 1 for non-zeroes,\n"
-                "n = 2 for colidx, n = 3 for rowstr\n", argv[0]);
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s class with class in {S, W, A, B, C}\n"
+                        "Will output a.cg.class for the non-zeroes\n"
+                        "colidx.cg.class for the column incides\n"
+                        "rowstr.cg.class for the row pointers\n",
+                        argv[0]);
         return EXIT_FAILURE;
     }
+
+    char *class = argv[1];
+
+    int NA, NONZER, NITER;
+    double RCOND = 1.0e-1;
+    double SHIFT;
+
+    if (!strcmp(class, "S")) {
+        NA = 1400;
+        NONZER = 7;
+        NITER = 15;
+        SHIFT = 10.0;
+    } else if (!strcmp(class, "W")) {
+        NA = 7000;
+        NONZER = 7;
+        NITER = 15;
+        SHIFT = 12.0;
+    } else if (!strcmp(class, "A")) {
+        NA = 14000;
+        NONZER = 11;
+        NITER = 15;
+        SHIFT = 20.0;
+    } else if (!strcmp(class, "B")) {
+        NA = 75000;
+        NONZER = 13;
+        NITER = 75;
+        SHIFT = 60.0;
+    } else if (!strcmp(class, "C")) {
+        NA = 150000;
+        NONZER = 15;
+        NITER = 75;
+        SHIFT = 110.0;
+    } else {
+        fprintf(stderr, "Error, class should be in {S, W, A, B, C}\n");
+        return EXIT_FAILURE;
+    }
+
+    fprintf(stderr, "Generating file for program class %s\n", class);
+
+    int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
+    printf("%d = %d * (%d + 1) * (%d + 1) + %d * (%d + 2)\n", NZ, NA, NONZER, NONZER, NA, NONZER);
+
 
     firstrow = 1;
     lastrow  = NA;
@@ -178,6 +177,17 @@ int main(int argc, char **argv) {
 
     naa = NA;
     nzz = NZ;
+
+    int *colidx = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
+    int *rowstr = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
+    int *iv = malloc((2*NA+1+1) * sizeof(int));	/* iv[1:2*NA+1] */
+    int *arow = malloc((NZ+1) * sizeof(int));		/* arow[1:NZ] */
+    int *acol = malloc((NZ+1) * sizeof(int));		/* acol[1:NZ] */
+
+    double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
+    double *aelt = malloc((NZ+1) * sizeof(double));	/* aelt[1:NZ] */
+    double *a = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
+
 
 /*--------------------------------------------------------------------
 c  Initialize random number generator
@@ -192,19 +202,41 @@ c-------------------------------------------------------------------*/
 	  firstrow, lastrow, firstcol, lastcol,
 	  RCOND, arow, acol, aelt, v, iv, SHIFT);
 
-    if (atoi(argv[1]) == 1) {
-        for (int i = 0; i < NZ + 1; i++) {
-            printf("%.17g\n", a[i]);
-        }
-    } else if (atoi(argv[1]) == 2) {
-        for (int i = 0; i < NZ + 1; i++) {
-            printf("%.d\n", colidx[i]);
-        }
-    } else {
-        for (int i = 0; i < NA + 1 + 1; i++) {
-            printf("%.d\n", rowstr[i]);
-        }
+    char *a_name = malloc(7);
+    sprintf(a_name, "a.cg.%s", class);
+    char *colidx_name = malloc(12);
+    sprintf(colidx_name, "colidx.cg.%s", class);
+    char *rowstr_name = malloc(12);
+    sprintf(rowstr_name, "rowstr.cg.%s", class);
+
+    FILE *a_stream = fopen(a_name, "w");
+    FILE *colidx_stream = fopen(colidx_name, "w");
+    FILE *rowstr_stream = fopen(rowstr_name, "w");
+
+    if (!a_stream || !colidx_stream || !rowstr_stream) {
+        printf("Opening files failed\n");
+        return EXIT_FAILURE;
     }
+
+    for (int i = 0; i < NZ + 1; i++) {
+        fprintf(a_stream, "%.17lf\n", a[i]);
+    }
+
+    for (int i = 0; i < NZ + 1; i++) {
+        fprintf(colidx_stream, "%d\n", colidx[i]);
+    }
+
+    for (int i = 0; i < NA + 1 + 1; i++) {
+        fprintf(rowstr_stream, "%d\n", rowstr[i]);
+    }
+
+    free(colidx);
+    free(rowstr);
+    free(iv);
+    free(arow);
+    free(acol);
+    free(v);
+    free(aelt);
 
     return EXIT_SUCCESS;
 }
