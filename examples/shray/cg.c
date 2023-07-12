@@ -29,7 +29,7 @@
 
   3.0 structure translation: F. Conti
 
-  Shray version by T. Koopman
+  Shray version by T. Koopman, S. Schrijvers
 
 --------------------------------------------------------------------*/
 
@@ -69,6 +69,7 @@ c---------------------------------------------------------------------
 
 /* common /partit_size/ */
 static char *class;
+static char *matdir;
 static int naa;
 static int nzz;
 static int firstrow;
@@ -109,11 +110,32 @@ void gasnetSum(double *number)
     }
 }
 
+static char *strcatalloc(const char *s)
+{
+    char suffix[100];
+    snprintf(suffix, 100, ".%s_%d", class,  ShrayRank());
+
+    size_t dirlen = strlen(matdir) + 1;
+    size_t slen = strlen(s);
+    size_t ranklen = strlen(suffix);
+    char *res = malloc(dirlen + slen + ranklen + 1);
+    if (!res) {
+        return NULL;
+    }
+
+    strcpy(res, matdir);
+    strcat(res, "/");
+    strcat(res, s);
+    strcat(res, suffix);
+    res[dirlen + slen + ranklen] = '\0';
+
+    return res;
+}
+
 int cg_read_a(double *a)
 {
-    char name[50];
-    sprintf(name, "a.cg.%s_%d", class, ShrayRank());
-    FILE *stream = fopen(name, "r");
+    char *fname = strcatalloc("a.cg");
+    FILE *stream = fopen(fname, "r");
     if (stream == NULL) {
         perror("Opening a.cg failed");
         return 1;
@@ -128,7 +150,6 @@ int cg_read_a(double *a)
         a[i] = atof(line);
         i++;
     }
-    printf("Rank %d read %lu lines\n", ShrayRank(), i);
 
     free(line);
     int err;
@@ -137,14 +158,14 @@ int cg_read_a(double *a)
         return err;
     }
 
+    free(fname);
     return i - (nzz + 1);
 }
 
 int cg_read_col(int *colidx)
 {
-    char name[50];
-    sprintf(name, "colidx.cg.%s_%d", class, ShrayRank());
-    FILE *stream = fopen(name, "r");
+    char *fname = strcatalloc("colidx.cg");
+    FILE *stream = fopen(fname, "r");
     if (stream == NULL) {
         perror("Opening colidx.cg failed");
         return 1;
@@ -167,14 +188,14 @@ int cg_read_col(int *colidx)
         return err;
     }
 
+    free(fname);
     return i - (nzz + 1);
 }
 
 int cg_read_row(int *rowstr)
 {
-    char name[50];
-    sprintf(name, "rowstr.cg.%s_%d", class, ShrayRank());
-    FILE *stream = fopen(name, "r");
+    char *fname = strcatalloc("rowstr.cg");
+    FILE *stream = fopen(fname, "r");
     if (stream == NULL) {
         perror("Opening rowstr.cg failed");
         return 1;
@@ -197,6 +218,7 @@ int cg_read_row(int *rowstr)
         return err;
     }
 
+    free(fname);
     return i - (naa + 2);
 }
 
@@ -271,14 +293,15 @@ int min(int a, int b)
 
 int main(int argc, char **argv) {
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s class\n", argv[0]);
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s class directory\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     ShrayInit(&argc, &argv);
 
     class = argv[1];
+    matdir = argv[2];
 
     int NA, NONZER, NITER;
     double SHIFT;
