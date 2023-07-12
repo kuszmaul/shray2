@@ -111,6 +111,7 @@ void gasnetSum(double *number)
 
 int cg_read_a(double *a)
 {
+    printf("Rank %d is reading a\n", ShrayRank());
     char name[50];
     sprintf(name, "a.cg.%s_%d", class, ShrayRank());
     FILE *stream = fopen(name, "r");
@@ -363,9 +364,9 @@ c-------------------------------------------------------------------*/
     double *q = ShrayMalloc(NA+2+1, (NA+2+1) * sizeof(double));	/* q[1:NA+2] */
     double *r = ShrayMalloc(NA+2+1, (NA+2+1) * sizeof(double));	/* r[1:NA+2] */
 
-    cg_read_a(a);
-    cg_read_col(colidx);
-    cg_read_row(rowstr);
+    cg_read_a(a + ShrayStart(a));
+    cg_read_col(colidx + ShrayStart(colidx));
+    cg_read_row(rowstr + ShrayStart(rowstr));
 
 /*---------------------------------------------------------------------
 c  Note: as a result of the above call to makea:
