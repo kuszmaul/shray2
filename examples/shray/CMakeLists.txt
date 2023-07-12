@@ -10,15 +10,15 @@ foreach(suffix
 	endif()
 
 	foreach(file
-            cg
-            norm
+			cg
+			norm
 			1dstencil
 			1dstencil_mt
 			bandwidth
 			matrix
 			matrixAuto
-            monopoly
-            monopoly_mt
+			monopoly
+			monopoly_mt
 			gasnet
 			random
 			reduce
