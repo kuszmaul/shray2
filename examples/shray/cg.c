@@ -91,12 +91,6 @@ static void conj_grad (int colidx[], int rowstr[], double x[], double z[],
  * Utilities
 ----------------------------------------------------------------------*/
 
-void gasnetBarrier(void)
-{
-    gasnet_barrier_notify(0, GASNET_BARRIERFLAG_ANONYMOUS);
-    gasnet_barrier_wait(0, GASNET_BARRIERFLAG_ANONYMOUS);
-}
-
 /* Collective operation, replaces number by its sum over
  * all nodes. */
 void gasnetSum(double *number)
@@ -449,7 +443,7 @@ c-------------------------------------------------------------------*/
         norm_temp11 = norm_temp11 + x[j]*z[j];
         norm_temp12 = norm_temp12 + z[j]*z[j];
 	}
-    gasnetBarrier();
+    ShrayBarrier();
     gasnetSum(&norm_temp11);
     gasnetSum(&norm_temp12);
 
@@ -508,7 +502,7 @@ c-------------------------------------------------------------------*/
             norm_temp11 = norm_temp11 + x[j]*z[j];
             norm_temp12 = norm_temp12 + z[j]*z[j];
 	}
-    gasnetBarrier();
+    ShrayBarrier();
     gasnetSum(&norm_temp11);
     gasnetSum(&norm_temp12);
 
@@ -623,7 +617,7 @@ c-------------------------------------------------------------------*/
             j < min(ShrayEnd(r), lastcol-firstcol+2); j++) {
 	    rho = rho + r[j]*r[j];
     }
-    gasnetBarrier();
+    ShrayBarrier();
     gasnetSum(&rho);
 /*--------------------------------------------------------------------
 c---->
@@ -666,7 +660,7 @@ c-------------------------------------------------------------------*/
             j < min(ShrayEnd(p), lastcol-firstcol+2); j++) {
         d = d + p[j]*q[j];
 	}
-    gasnetBarrier();
+    ShrayBarrier();
     gasnetSum(&d);
 /*--------------------------------------------------------------------
 c  Obtain alpha = rho / (p.q)
@@ -689,7 +683,7 @@ c---------------------------------------------------------------------*/
         r[j] = r[j] - alpha*q[j];
         rho = rho + r[j]*r[j];
 	}
-    gasnetBarrier();
+    ShrayBarrier();
     gasnetSum(&rho);
 
 /*--------------------------------------------------------------------
@@ -732,7 +726,7 @@ c-------------------------------------------------------------------*/
     	d = x[j] - r[j];
 	    sum = sum + d*d;
     }
-    gasnetBarrier();
+    ShrayBarrier();
     gasnetSum(&sum);
     (*rnorm) = sqrt(sum);
 }
