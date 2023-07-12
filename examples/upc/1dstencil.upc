@@ -179,9 +179,10 @@ int main(int argc, char **argv)
 	hostname_print();
     if (MYTHREAD == 0) {
         printf("%lf\n", 5.0 * (n - 2) * iterations / 1000000000.0 / duration);
-        upc_free(in);
-        upc_free(out);
     }
+
+    upc_all_free(in);
+    upc_all_free(out);
 
     exit(EXIT_SUCCESS);
 }

@@ -132,9 +132,7 @@ int main(int argc, char **argv)
 
     free(A);
     free(C);
-    if (MYTHREAD == 0) {
-        upc_free(B);
-    }
+        upc_all_free(B);
 
 	exit(EXIT_SUCCESS);
 }
