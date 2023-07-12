@@ -5,9 +5,9 @@ set -eu
 hash sed
 hash wc
 
-if [ "$#" -lt 2 ]; then
+if [ "$#" -ne 2 ]; then
     printf "Usage: cg_dist.sh CLASS RANKS\n" >&2
-           "Assumes makea has generated the full files already\n" >&2
+    printf "Assumes makea has generated the full files already\n" >&2
 fi
 
 distribute()
