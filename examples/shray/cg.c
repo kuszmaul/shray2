@@ -111,7 +111,6 @@ void gasnetSum(double *number)
 
 int cg_read_a(double *a)
 {
-    printf("Rank %d is reading a\n", ShrayRank());
     char name[50];
     sprintf(name, "a.cg.%s_%d", class, ShrayRank());
     FILE *stream = fopen(name, "r");
@@ -133,7 +132,7 @@ int cg_read_a(double *a)
 
     free(line);
     int err;
-    if (!(err = fclose(stream))) {
+    if ((err = fclose(stream))) {
         perror("Closing a.cg failed");
         return err;
     }
@@ -163,7 +162,7 @@ int cg_read_col(int *colidx)
 
     free(line);
     int err;
-    if (!(err = fclose(stream))) {
+    if ((err = fclose(stream))) {
         perror("Closing colidx.cg failed");
         return err;
     }
@@ -193,7 +192,7 @@ int cg_read_row(int *rowstr)
 
     free(line);
     int err;
-    if (!(err = fclose(stream))) {
+    if ((err = fclose(stream))) {
         perror("Closing rowstr.cg failed");
         return err;
     }
