@@ -22,11 +22,7 @@
 
 void init(shared double *a, size_t n)
 {
-    size_t blockSize = (n + THREADS - 1) / THREADS;
-    size_t start = MYTHREAD * blockSize;
-    size_t end = MAX((MYTHREAD + 1) * blockSize, n);
-
-	for (size_t i = start; i < end; ++i) {
+	upc_forall (size_t i = 0; i < n; ++i; i) {
 		a[i] = i;
 	}
 }

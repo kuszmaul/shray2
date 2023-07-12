@@ -27,12 +27,10 @@ void init(double *matrix, size_t n, double value)
 
 void initParallel(shared double *matrix, size_t n, double value)
 {
-    size_t start = MYTHREAD * n / THREADS;
-    size_t end = (MYTHREAD + 1) * n / THREADS;
-	for (size_t i = start; i < end; i++) {
-		for (size_t j = 0; j < n; j++) {
-			matrix[i * n + j] = value;
-		}
+    upc_forall (size_t i = 0; i < n; i++; i) {
+	for (size_t j = 0; j < n; j++) {
+		matrix[i * n + j] = value;
+	}
     }
 }
 

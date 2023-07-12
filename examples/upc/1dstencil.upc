@@ -30,10 +30,9 @@ const T c = 0.25;
 
 void init(shared T *arr, size_t n)
 {
-    for (size_t i = MYTHREAD * n / THREADS; i < (MYTHREAD + 1) * n / THREADS; i++) {
+    upc_forall (size_t i = 0; i < n; i++; i) {
             arr[i] = i;
     }
-    upc_barrier;
 }
 
 void left(size_t n, int iterations, T **in, T **out)
@@ -172,6 +171,7 @@ int main(int argc, char **argv)
     shared T *in = upc_all_alloc(THREADS, n * sizeof(T));
     shared T *out = upc_all_alloc(THREADS, n * sizeof(T));
     init(in, n);
+    upc_barrier;
 
     double duration;
     TIME(duration, Stencil(n, &in, &out, iterations););
