@@ -167,8 +167,6 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Generating file for program class %s\n", class);
 
     int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
-    printf("%d = %d * (%d + 1) * (%d + 1) + %d * (%d + 2)\n", NZ, NA, NONZER, NONZER, NA, NONZER);
-
 
     firstrow = 1;
     lastrow  = NA;

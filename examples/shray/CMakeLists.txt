@@ -10,6 +10,8 @@ foreach(suffix
 	endif()
 
 	foreach(file
+            cg
+            norm
 			1dstencil
 			1dstencil_mt
 			bandwidth
