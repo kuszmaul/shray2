@@ -94,6 +94,7 @@ static double z[NA+2+1];	/* z[1:NA+2] */
 static double p[NA+2+1];	/* p[1:NA+2] */
 static double q[NA+2+1];	/* q[1:NA+2] */
 static double r[NA+2+1];	/* r[1:NA+2] */
+static double a[NZ+1];
 //static double w[NA+2+1];	/* w[1:NA+2] */
 
 /* common /urando/ */
@@ -259,7 +260,6 @@ c-------------------------------------------------------------------*/
 c
 c-------------------------------------------------------------------*/
 
-    double *a = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
     double *a2 = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
     makea(naa, nzz, a, colidx, rowstr, NONZER,
 	  firstrow, lastrow, firstcol, lastcol,
@@ -269,11 +269,19 @@ c-------------------------------------------------------------------*/
     if ((err = read_sparse("a.cg.C", a2, (NZ + 1) * sizeof(double)))) {
         printf("Reading in a failed with code %d\n", err);
     }
+
+    bool correct_a = true;
     for (int i = 0; i < NZ + 1; i++) {
-        if (a[i] != a2[i]) {
-            printf("Failure at %d, %lf != %lf\n", i, a[i], a2[i]);
+        if (a2[i] != a[i]) {
+            correct_a = false;
+            printf("Created a[%d] = %.17lf is wrong (should be %.17lf)\n",
+                    i, a2[i], a[i]);
         }
     }
+
+    fprintf(stderr, "Checked output of a, is %scorrect!\n",
+            (correct_a) ? "" : "in");
+
 /*---------------------------------------------------------------------
 c  Note: as a result of the above call to makea:
 c        values of j used in indexing rowstr go from 1 --> lastrow-firstrow+1

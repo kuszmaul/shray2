@@ -12,7 +12,6 @@
 --------------------------------------------------------------------*/
 
 #include <stdlib.h>
-#define __USE_XOPEN2K8 /* FIXME Pretty sure I should not do this... */
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
@@ -670,4 +669,3 @@ static void vecset(
 	iv[*nzv] = i;
     }
 }
-
