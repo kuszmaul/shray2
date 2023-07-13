@@ -1,5 +1,6 @@
 foreach(file
 	cg
+	cg_comp
 	)
 	set(EXAMPLE_TARGET "${file}_omp")
 
@@ -8,5 +9,6 @@ foreach(file
 
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
+            -lm
 			cinterface)
 endforeach(file)

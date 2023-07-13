@@ -1,21 +1,57 @@
 /*--------------------------------------------------------------------
 
+  Only outputs generated matrix
+
+  NAS Parallel Benchmarks 3.0 structured OpenMP C versions - CG
+
+  This benchmark is an OpenMP C version of the NPB CG code.
+
+  The OpenMP C 2.3 versions are derived by RWCP from the serial Fortran versions
+  in "NPB 2.3-serial" developed by NAS. 3.0 translation is performed by the UVSQ.
+
+  Permission to use, copy, distribute and modify this software for any
+  purpose with or without fee is hereby granted.
+  This software is provided "as is" without express or implied warranty.
+
+  Information on OpenMP activities at RWCP is available at:
+
+           http://pdplab.trc.rwcp.or.jp/pdperf/Omni/
+
+  Information on NAS Parallel Benchmarks 2.3 is available at:
+
+           http://www.nas.nasa.gov/NAS/NPB/
+
+--------------------------------------------------------------------*/
+/*--------------------------------------------------------------------
+
   Authors: M. Yarrow
            C. Kuszmaul
 
   OpenMP C version: S. Satoh
-
   3.0 structure translation: F. Conti
 
-  Modification for outputting a by T. Koopman
+  Modified to single source file, some refactoring by T. Koopman
 
 --------------------------------------------------------------------*/
+
+/*
+c---------------------------------------------------------------------
+c  Note: please observe that in the routine conj_grad three
+c  implementations of the sparse matrix-vector multiply have
+c  been supplied.  The default matrix-vector multiply is not
+c  loop unrolled.  The alternate implementations are unrolled
+c  to a depth of 2 and unrolled to a depth of 8.  Please
+c  experiment with these to find the fastest for your particular
+c  architecture.  If reporting timing results, any of these three may
+c  be used without penalty.
+c---------------------------------------------------------------------
+*/
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <sys/time.h>
 #include <stdbool.h>
-#include <unistd.h>
 #include <omp.h>
 #include <string.h>
 
@@ -26,16 +62,7 @@
 #define t46 (t23*t23)
 
 /* global variables */
-
 char *class;
-
-/* common /partit_size/ */
-static int naa;
-static long nzz;
-static int firstrow;
-static int lastrow;
-static int firstcol;
-static int lastcol;
 
 /* common /urando/ */
 static double amult;
@@ -145,11 +172,7 @@ c---------------------------------------------------------------------*/
 
 int main(int argc, char **argv) {
     if (argc != 2) {
-        fprintf(stderr, "Usage: %s class with class in {S, W, A, B, C}\n"
-                        "Will output a.cg.class for the non-zeroes\n"
-                        "colidx.cg.class for the column incides\n"
-                        "rowstr.cg.class for the row pointers\n",
-                        argv[0]);
+        fprintf(stderr, "Usage: %s class\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -158,48 +181,73 @@ int main(int argc, char **argv) {
     int NA, NONZER, NITER;
     double RCOND = 1.0e-1;
     double SHIFT;
+    double zeta_verify_value;
 
     if (!strcmp(class, "S")) {
         NA = 1400;
         NONZER = 7;
         NITER = 15;
         SHIFT = 10.0;
+	    zeta_verify_value = 8.5971775078648;
     } else if (!strcmp(class, "W")) {
         NA = 7000;
         NONZER = 7;
         NITER = 15;
         SHIFT = 12.0;
+	    zeta_verify_value = 10.362595087124;
     } else if (!strcmp(class, "A")) {
         NA = 14000;
         NONZER = 11;
         NITER = 15;
         SHIFT = 20.0;
+	    zeta_verify_value = 17.130235054029;
     } else if (!strcmp(class, "B")) {
         NA = 75000;
         NONZER = 13;
         NITER = 75;
         SHIFT = 60.0;
+	    zeta_verify_value = 22.712745482631;
     } else if (!strcmp(class, "C")) {
         NA = 150000;
         NONZER = 15;
         NITER = 75;
         SHIFT = 110.0;
+	    zeta_verify_value = 28.973605592845;
     } else {
         fprintf(stderr, "Error, class should be in {S, W, A, B, C}\n");
         return EXIT_FAILURE;
     }
 
-    fprintf(stderr, "Generating file for program class %s\n", class);
+    int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
 
-    long NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
+    int	i, j, k;
+    double rnorm;
+    double t, mflops;
+    double norm_temp11, norm_temp12;
 
-    firstrow = 1;
-    lastrow  = NA;
-    firstcol = 1;
-    lastcol  = NA;
+    int firstrow = 1;
+    int lastrow  = NA;
+    int firstcol = 1;
+    int lastcol  = NA;
 
-    naa = NA;
-    nzz = NZ;
+    fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured OpenMP C version"
+	   " - CG Benchmark\n");
+    fprintf(stderr, " Size: %10d\n", NA);
+    fprintf(stderr, " Iterations: %5d\n", NITER);
+
+    int naa = NA;
+    int nzz = NZ;
+
+/*--------------------------------------------------------------------
+c  Initialize random number generator
+c-------------------------------------------------------------------*/
+    tran    = 314159265.0;
+    amult   = 1220703125.0;
+    double zeta    = randlc( &tran, amult );
+
+/*--------------------------------------------------------------------
+c
+c-------------------------------------------------------------------*/
 
     int *colidx = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
     int *colidx2 = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
@@ -211,22 +259,22 @@ int main(int argc, char **argv) {
 
     double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
     double *aelt = malloc((NZ+1) * sizeof(double));	/* aelt[1:NZ] */
-    double *a = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
-    double *a2 = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
+    double *x = malloc((NA+2+1) * sizeof(double));	/* x[1:NA+2] */
+    double *z = malloc((NA+2+1) * sizeof(double));	/* z[1:NA+2] */
+    double *p = malloc((NA+2+1) * sizeof(double));	/* p[1:NA+2] */
+    double *q = malloc((NA+2+1) * sizeof(double));	/* q[1:NA+2] */
+    double *r = malloc((NA+2+1) * sizeof(double));	/* r[1:NA+2] */
+    double *a = malloc((NZ+1) * sizeof(double));
+    double *a2 = malloc((NZ+1) * sizeof(double));
 
-
-/*--------------------------------------------------------------------
-c  Initialize random number generator
-c-------------------------------------------------------------------*/
-    tran    = 314159265.0;
-    amult   = 1220703125.0;
-
-/*--------------------------------------------------------------------
-c
-c-------------------------------------------------------------------*/
     makea(naa, nzz, a, colidx, rowstr, NONZER,
 	  firstrow, lastrow, firstcol, lastcol,
 	  RCOND, arow, acol, aelt, v, iv, SHIFT);
+
+    fprintf(stderr, "First 10 elements of a are:\n");
+    for (int i = 0; i < 10; i++) {
+        fprintf(stderr, "a[%d] = %.17lf\n", i, a[i]);
+    }
 
     char *a_name = malloc(7);
     sprintf(a_name, "a.cg.%s", class);
@@ -314,12 +362,15 @@ c-------------------------------------------------------------------*/
     free(iv);
     free(arow);
     free(acol);
+
     free(v);
-    free(aelt);
     free(a);
     free(a2);
-
-    return EXIT_SUCCESS;
+    free(x);
+    free(z);
+    free(p);
+    free(q);
+    free(r);
 }
 
 /*---------------------------------------------------------------------
@@ -669,3 +720,4 @@ static void vecset(
 	iv[*nzv] = i;
     }
 }
+
