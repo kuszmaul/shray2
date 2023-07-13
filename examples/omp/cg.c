@@ -26,10 +26,9 @@
            C. Kuszmaul
 
   OpenMP C version: S. Satoh
-
   3.0 structure translation: F. Conti
 
-  Modified to single source file, some warning fixes by T. Koopman
+  Modified to single source file, some refactoring by T. Koopman
 
 --------------------------------------------------------------------*/
 
@@ -52,16 +51,7 @@ c---------------------------------------------------------------------
 #include <sys/time.h>
 #include <stdbool.h>
 #include <omp.h>
-
-/* Class C */
-#define	NA	150000
-#define	NONZER	15
-#define	NITER	75
-#define	SHIFT	110.0
-#define	RCOND	1.0e-1
-#define	CONVERTDOUBLE	false
-
-#define	NZ	NA*(NONZER+1)*(NONZER+1)+NA*(NONZER+2)
+#include <string.h>
 
 /* For random numbers */
 #define r23 pow(0.5, 23.0)
@@ -70,32 +60,7 @@ c---------------------------------------------------------------------
 #define t46 (t23*t23)
 
 /* global variables */
-
-/* common /partit_size/ */
-static int naa;
-static int nzz;
-static int firstrow;
-static int lastrow;
-static int firstcol;
-static int lastcol;
-
-/* common /main_int_mem/ */
-static int colidx[NZ+1];	/* colidx[1:NZ] */
-static int rowstr[NA+1+1];	/* rowstr[1:NA+1] */
-static int iv[2*NA+1+1];	/* iv[1:2*NA+1] */
-static int arow[NZ+1];		/* arow[1:NZ] */
-static int acol[NZ+1];		/* acol[1:NZ] */
-
-/* common /main_flt_mem/ */
-static double v[NA+1+1];	/* v[1:NA+1] */
-static double aelt[NZ+1];	/* aelt[1:NZ] */
-static double x[NA+2+1];	/* x[1:NA+2] */
-static double z[NA+2+1];	/* z[1:NA+2] */
-static double p[NA+2+1];	/* p[1:NA+2] */
-static double q[NA+2+1];	/* q[1:NA+2] */
-static double r[NA+2+1];	/* r[1:NA+2] */
-static double a[NZ+1];
-//static double w[NA+2+1];	/* w[1:NA+2] */
+char *class;
 
 /* common /urando/ */
 static double amult;
@@ -104,8 +69,8 @@ static double tran;
 /* function declarations */
 static void conj_grad (int colidx[], int rowstr[], double x[], double z[],
 		       double a[], double p[], double q[], double r[],
-		       //double w[],
-		       double *rnorm);
+		       double *rnorm, int naa, int firstrow, int lastrow, int firstcol,
+               int lastcol);
 static void makea(int n, int nz, double a[], int colidx[], int rowstr[],
 		  int nonzer, int firstrow, int lastrow, int firstcol,
 		  int lastcol, double rcond, int arow[], int acol[],
@@ -122,6 +87,13 @@ static void vecset(double v[], int iv[], int *nzv, int i, double val);
 /*--------------------------------------------------------------------
  * Utilities
 ----------------------------------------------------------------------*/
+
+double gettime()
+{
+    struct timeval tv_start;
+    gettimeofday(&tv_start, NULL);
+    return (double)tv_start.tv_usec / 1000000 + (double)tv_start.tv_sec;
+}
 
 int read_sparse(char *name, void *array, size_t size)
 {
@@ -207,63 +179,109 @@ c---------------------------------------------------------------------*/
       program cg
 --------------------------------------------------------------------*/
 
-int main(void) {
-    int	i, j, k, it;
-    double zeta;
-    double rnorm;
-    double norm_temp11;
-    double norm_temp12;
-    double t, mflops;
-    char class;
-    double zeta_verify_value, epsilon;
-
-    firstrow = 1;
-    lastrow  = NA;
-    firstcol = 1;
-    lastcol  = NA;
-
-    if (NA == 1400 && NONZER == 7 && NITER == 15 && SHIFT == 10.0) {
-	class = 'S';
-	zeta_verify_value = 8.5971775078648;
-    } else if (NA == 7000 && NONZER == 8 && NITER == 15 && SHIFT == 12.0) {
-	class = 'W';
-	zeta_verify_value = 10.362595087124;
-    } else if (NA == 14000 && NONZER == 11 && NITER == 15 && SHIFT == 20.0) {
-	class = 'A';
-	zeta_verify_value = 17.130235054029;
-    } else if (NA == 75000 && NONZER == 13 && NITER == 75 && SHIFT == 60.0) {
-	class = 'B';
-	zeta_verify_value = 22.712745482631;
-    } else if (NA == 150000 && NONZER == 15 && NITER == 75 && SHIFT == 110.0) {
-	class = 'C';
-	zeta_verify_value = 28.973605592845;
-    } else {
-	class = 'U';
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s class\n", argv[0]);
+        return EXIT_FAILURE;
     }
+
+    class = argv[1];
+
+    int NA, NONZER, NITER;
+    double RCOND = 1.0e-1;
+    double SHIFT;
+    double zeta_verify_value;
+
+    if (!strcmp(class, "S")) {
+        NA = 1400;
+        NONZER = 7;
+        NITER = 15;
+        SHIFT = 10.0;
+	    zeta_verify_value = 8.5971775078648;
+    } else if (!strcmp(class, "W")) {
+        NA = 7000;
+        NONZER = 7;
+        NITER = 15;
+        SHIFT = 12.0;
+	    zeta_verify_value = 10.362595087124;
+    } else if (!strcmp(class, "A")) {
+        NA = 14000;
+        NONZER = 11;
+        NITER = 15;
+        SHIFT = 20.0;
+	    zeta_verify_value = 17.130235054029;
+    } else if (!strcmp(class, "B")) {
+        NA = 75000;
+        NONZER = 13;
+        NITER = 75;
+        SHIFT = 60.0;
+	    zeta_verify_value = 22.712745482631;
+    } else if (!strcmp(class, "C")) {
+        NA = 150000;
+        NONZER = 15;
+        NITER = 75;
+        SHIFT = 110.0;
+	    zeta_verify_value = 28.973605592845;
+    } else {
+        fprintf(stderr, "Error, class should be in {S, W, A, B, C}\n");
+        return EXIT_FAILURE;
+    }
+
+    int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
+
+    int	i, j, k;
+    double rnorm;
+    double t, mflops;
+    double norm_temp11, norm_temp12;
+
+    int firstrow = 1;
+    int lastrow  = NA;
+    int firstcol = 1;
+    int lastcol  = NA;
 
     fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured OpenMP C version"
 	   " - CG Benchmark\n");
     fprintf(stderr, " Size: %10d\n", NA);
     fprintf(stderr, " Iterations: %5d\n", NITER);
 
-    naa = NA;
-    nzz = NZ;
+    int naa = NA;
+    int nzz = NZ;
 
 /*--------------------------------------------------------------------
 c  Initialize random number generator
 c-------------------------------------------------------------------*/
     tran    = 314159265.0;
     amult   = 1220703125.0;
-    zeta    = randlc( &tran, amult );
+    double zeta    = randlc( &tran, amult );
 
 /*--------------------------------------------------------------------
 c
 c-------------------------------------------------------------------*/
 
+    int *colidx = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
+    int *rowstr = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
+    int *iv = malloc((2*NA+1+1) * sizeof(int));	/* iv[1:2*NA+1] */
+    int *arow = malloc((NZ+1) * sizeof(int));		/* arow[1:NZ] */
+    int *acol = malloc((NZ+1) * sizeof(int));		/* acol[1:NZ] */
+
+    double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
+    double *aelt = malloc((NZ+1) * sizeof(double));	/* aelt[1:NZ] */
+    double *x = malloc((NA+2+1) * sizeof(double));	/* x[1:NA+2] */
+    double *z = malloc((NA+2+1) * sizeof(double));	/* z[1:NA+2] */
+    double *p = malloc((NA+2+1) * sizeof(double));	/* p[1:NA+2] */
+    double *q = malloc((NA+2+1) * sizeof(double));	/* q[1:NA+2] */
+    double *r = malloc((NA+2+1) * sizeof(double));	/* r[1:NA+2] */
+    double *a = malloc((NZ+1) * sizeof(double));
+
     double *a2 = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
     makea(naa, nzz, a, colidx, rowstr, NONZER,
 	  firstrow, lastrow, firstcol, lastcol,
 	  RCOND, arow, acol, aelt, v, iv, SHIFT);
+
+    fprintf(stderr, "First 10 values of a:\n");
+    for (int i = 0; i < 10; i++) {
+        fprintf(stderr, "a[%d] = %.17lf\n", i, a[i]);
+    }
 
     int err;
     if ((err = read_sparse("a.cg.C", a2, (NZ + 1) * sizeof(double)))) {
@@ -271,10 +289,10 @@ c-------------------------------------------------------------------*/
     }
 
     bool correct_a = true;
-    for (int i = 0; i < NZ + 1; i++) {
+    for (int i = 0; i < 10; i++) {
         if (a2[i] != a[i]) {
             correct_a = false;
-            printf("Created a[%d] = %.17lf is wrong (should be %.17lf)\n",
+            printf("Read a[%d] = %.17lf is wrong (should be %.17lf)\n",
                     i, a2[i], a[i]);
         }
     }
@@ -320,12 +338,13 @@ c  Do one iteration untimed to init all code and data page tables
 c---->                    (then reinit, start timing, to niter its)
 c-------------------------------------------------------------------*/
 
-    for (it = 1; it <= 1; it++) {
+    for (int it = 1; it <= 1; it++) {
 
 /*--------------------------------------------------------------------
 c  The call to the conjugate gradient routine:
 c-------------------------------------------------------------------*/
-	conj_grad (colidx, rowstr, x, z, a, p, q, r,/* w,*/ &rnorm);
+	conj_grad (colidx, rowstr, x, z, a, p, q, r, &rnorm, naa, firstrow,
+            lastrow, firstcol, lastcol);
 
 /*--------------------------------------------------------------------
 c  zeta = shift + 1/(x.z)
@@ -362,10 +381,7 @@ c-------------------------------------------------------------------*/
     zeta  = 0.0;
 
 
-    struct timeval tv_start;
-    gettimeofday(&tv_start, NULL);
-    double timer_start = (double)tv_start.tv_usec / 1000000 +
-                        (double)tv_start.tv_sec;
+    double timer_start = gettime();
 
 /*--------------------------------------------------------------------
 c---->
@@ -373,12 +389,13 @@ c  Main Iteration for inverse power method
 c---->
 c-------------------------------------------------------------------*/
 
-    for (it = 1; it <= NITER; it++) {
+    for (int it = 1; it <= NITER; it++) {
 
 /*--------------------------------------------------------------------
 c  The call to the conjugate gradient routine:
 c-------------------------------------------------------------------*/
-	conj_grad(colidx, rowstr, x, z, a, p, q, r/*, w*/, &rnorm);
+	conj_grad(colidx, rowstr, x, z, a, p, q, r, &rnorm, naa,
+            firstrow, lastrow, firstcol, lastcol);
 
 /*--------------------------------------------------------------------
 c  zeta = shift + 1/(x.z)
@@ -413,10 +430,7 @@ c-------------------------------------------------------------------*/
 	}
     } /* end of main iter inv pow meth */
 
-    struct timeval tv_stop;
-    gettimeofday(&tv_stop, NULL);
-    double timer_stop = (double)tv_stop.tv_usec / 1000000 +
-                        (double)tv_stop.tv_sec;
+    double timer_stop = gettime();
 
 /*--------------------------------------------------------------------
 c  End of timed section
@@ -426,20 +440,20 @@ c-------------------------------------------------------------------*/
 
     fprintf(stderr, " Benchmark completed\n");
 
-    epsilon = 1.0e-10;
-    if (class != 'U') {
-	if (fabs(zeta - zeta_verify_value) <= epsilon) {
-	    fprintf(stderr, " VERIFICATION SUCCESSFUL\n");
-	    fprintf(stderr, " Zeta is    %20.12e\n", zeta);
-	    fprintf(stderr, " Error is   %20.12e\n", zeta - zeta_verify_value);
-	} else {
-	    fprintf(stderr, " VERIFICATION FAILED\n");
-	    fprintf(stderr, " Zeta                %20.12e\n", zeta);
-	    fprintf(stderr, " The correct zeta is %20.12e\n", zeta_verify_value);
-	}
+    const double epsilon = 1.0e-10;
+    if (strcmp(class, "U")) {
+    	if (fabs(zeta - zeta_verify_value) <= epsilon) {
+    	    fprintf(stderr, " VERIFICATION SUCCESSFUL\n");
+    	    fprintf(stderr, " Zeta is    %20.12e\n", zeta);
+    	    fprintf(stderr, " Error is   %20.12e\n", zeta - zeta_verify_value);
+	    } else {
+	        fprintf(stderr, " VERIFICATION FAILED\n");
+	        fprintf(stderr, " Zeta                %20.12e\n", zeta);
+	        fprintf(stderr, " The correct zeta is %20.12e\n", zeta_verify_value);
+	    }
     } else {
-	fprintf(stderr, " Problem size unknown\n");
-	fprintf(stderr, " NO VERIFICATION PERFORMED\n");
+	    fprintf(stderr, " Problem size unknown\n");
+	    fprintf(stderr, " NO VERIFICATION PERFORMED\n");
     }
 
     if ( t != 0.0 ) {
@@ -452,6 +466,20 @@ c-------------------------------------------------------------------*/
 
     printf("%lf", mflops / 1000.0);
     fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
+
+    free(colidx);
+    free(rowstr);
+    free(iv);
+    free(arow);
+    free(acol);
+
+    free(v);
+    free(a);
+    free(x);
+    free(z);
+    free(p);
+    free(q);
+    free(r);
 }
 
 /*--------------------------------------------------------------------
@@ -465,8 +493,12 @@ static void conj_grad (
     double p[],		/* p[*] */
     double q[],		/* q[*] */
     double r[],		/* r[*] */
-    //double w[],		/* w[*] */
-    double *rnorm )
+    double *rnorm,
+    int naa,
+    int firstrow,
+    int lastrow,
+    int firstcol,
+    int lastcol)
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 
@@ -541,61 +573,6 @@ C        on the Cray t3d - overall speed of code is 1.5 times faster.
             q[j] = sum;
 	}
 
-/* unrolled-by-two version
-#pragma omp for private(i,k)
-        for (j = 1; j <= lastrow-firstrow+1; j++) {
-	    int iresidue;
-	    double sum1, sum2;
-	    i = rowstr[j];
-            iresidue = (rowstr[j+1]-i) % 2;
-            sum1 = 0.0;
-            sum2 = 0.0;
-            if (iresidue == 1) sum1 = sum1 + a[i]*p[colidx[i]];
-	    for (k = i+iresidue; k <= rowstr[j+1]-2; k += 2) {
-		sum1 = sum1 + a[k]   * p[colidx[k]];
-		sum2 = sum2 + a[k+1] * p[colidx[k+1]];
-	    }
-            w[j] = sum1 + sum2;
-        }
-*/
-/* unrolled-by-8 version
-#pragma omp for private(i,k,sum)
-        for (j = 1; j <= lastrow-firstrow+1; j++) {
-	    int iresidue;
-            i = rowstr[j];
-            iresidue = (rowstr[j+1]-i) % 8;
-            sum = 0.0;
-            for (k = i; k <= i+iresidue-1; k++) {
-                sum = sum +  a[k] * p[colidx[k]];
-            }
-            for (k = i+iresidue; k <= rowstr[j+1]-8; k += 8) {
-                sum = sum + a[k  ] * p[colidx[k  ]]
-                          + a[k+1] * p[colidx[k+1]]
-                          + a[k+2] * p[colidx[k+2]]
-                          + a[k+3] * p[colidx[k+3]]
-                          + a[k+4] * p[colidx[k+4]]
-                          + a[k+5] * p[colidx[k+5]]
-                          + a[k+6] * p[colidx[k+6]]
-                          + a[k+7] * p[colidx[k+7]];
-            }
-            w[j] = sum;
-        }
-*/
-/*
-#pragma omp for
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
-            q[j] = w[j];
-	}
-*/
-/*--------------------------------------------------------------------
-c  Clear w for reuse...
-c-------------------------------------------------------------------*/
-/*
-#pragma omp for	nowait
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
-            w[j] = 0.0;
-	}
-*/
 /*--------------------------------------------------------------------
 c  Obtain p.q
 c-------------------------------------------------------------------*/
@@ -607,13 +584,7 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  Obtain alpha = rho / (p.q)
 c-------------------------------------------------------------------*/
-//#pragma omp single
 	alpha = rho0 / d;
-
-/*--------------------------------------------------------------------
-c  Save a temporary of rho
-c-------------------------------------------------------------------*/
-	/*	rho0 = rho;*/
 
 /*---------------------------------------------------------------------
 c  Obtain z = z + alpha*p
@@ -623,23 +594,17 @@ c---------------------------------------------------------------------*/
 	for (j = 1; j <= lastcol-firstcol+1; j++) {
             z[j] = z[j] + alpha*p[j];
             r[j] = r[j] - alpha*q[j];
-//	}
 
 /*---------------------------------------------------------------------
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c---------------------------------------------------------------------*/
-/*
-#pragma omp for
-	for (j = 1; j <= lastcol-firstcol+1; j++) {*/
             rho = rho + r[j]*r[j];
 	}
-//#pragma omp barrier
 
 /*--------------------------------------------------------------------
 c  Obtain beta:
 c-------------------------------------------------------------------*/
-//#pragma omp single
 	beta = rho / rho0;
 
 /*--------------------------------------------------------------------
@@ -679,7 +644,7 @@ c-------------------------------------------------------------------*/
 	d = x[j] - r[j];
 	sum = sum + d*d;
     }
-} //end omp parallel
+}
     (*rnorm) = sqrt(sum);
 }
 
