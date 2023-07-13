@@ -89,7 +89,6 @@ static int acol[NZ+1];		/* acol[1:NZ] */
 /* common /main_flt_mem/ */
 static double v[NA+1+1];	/* v[1:NA+1] */
 static double aelt[NZ+1];	/* aelt[1:NZ] */
-static double a[NZ+1];		/* a[1:NZ] */
 static double x[NA+2+1];	/* x[1:NA+2] */
 static double z[NA+2+1];	/* z[1:NA+2] */
 static double p[NA+2+1];	/* p[1:NA+2] */
@@ -122,6 +121,30 @@ static void vecset(double v[], int iv[], int *nzv, int i, double val);
 /*--------------------------------------------------------------------
  * Utilities
 ----------------------------------------------------------------------*/
+
+int read_sparse(char *name, void *array, size_t size)
+{
+    FILE *stream = fopen(name, "r");
+    if (stream == NULL) {
+        perror("Opening file failed");
+        return 1;
+    }
+
+    size_t read_bytes;
+    if ((read_bytes = fread(array, 1, size, stream)) != size) {
+        printf("We could not read in all items");
+        printf("Read %zu / %zu bytes\n", read_bytes, size);
+        return 1;
+    }
+
+    int err;
+    if ((err = fclose(stream))) {
+        perror("Closing file failed");
+        return err;
+    }
+
+    return 0;
+}
 
 double randlc (double *x, double a) {
 
@@ -235,10 +258,22 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c
 c-------------------------------------------------------------------*/
+
+    double *a = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
+    double *a2 = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
     makea(naa, nzz, a, colidx, rowstr, NONZER,
 	  firstrow, lastrow, firstcol, lastcol,
 	  RCOND, arow, acol, aelt, v, iv, SHIFT);
 
+    int err;
+    if ((err = read_sparse("a.cg.C", a2, (NZ + 1) * sizeof(double)))) {
+        printf("Reading in a failed with code %d\n", err);
+    }
+    for (int i = 0; i < NZ + 1; i++) {
+        if (a[i] != a2[i]) {
+            printf("Failure at %d, %lf != %lf\n", i, a[i], a2[i]);
+        }
+    }
 /*---------------------------------------------------------------------
 c  Note: as a result of the above call to makea:
 c        values of j used in indexing rowstr go from 1 --> lastrow-firstrow+1
@@ -292,7 +327,7 @@ c  So, first: (z.z)
 c-------------------------------------------------------------------*/
 	norm_temp11 = 0.0;
 	norm_temp12 = 0.0;
-#pragma omp parallel for default(shared) private(j) reduction(+:norm_temp11,norm_temp12)
+    #pragma omp parallel for default(shared) private(j) reduction(+:norm_temp11,norm_temp12)
 	for (j = 1; j <= lastcol-firstcol+1; j++) {
             norm_temp11 = norm_temp11 + x[j]*z[j];
             norm_temp12 = norm_temp12 + z[j]*z[j];
@@ -302,7 +337,7 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  Normalize z to obtain x
 c-------------------------------------------------------------------*/
-#pragma omp parallel for default(shared) private(j)
+    #pragma omp parallel for default(shared) private(j)
 	for (j = 1; j <= lastcol-firstcol+1; j++) {
             x[j] = norm_temp12*z[j];
 	}
