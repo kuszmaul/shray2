@@ -12,9 +12,11 @@
 --------------------------------------------------------------------*/
 
 #include <stdlib.h>
+#define __USE_XOPEN2K8 /* FIXME Pretty sure I should not do this... */
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <omp.h>
 #include <string.h>
 
@@ -26,15 +28,15 @@
 
 /* global variables */
 
+char *class;
+
 /* common /partit_size/ */
 static int naa;
-static int nzz;
+static long nzz;
 static int firstrow;
 static int lastrow;
 static int firstcol;
 static int lastcol;
-
-//static double w[NA+2+1];	/* w[1:NA+2] */
 
 /* common /urando/ */
 static double amult;
@@ -57,6 +59,30 @@ static void vecset(double v[], int iv[], int *nzv, int i, double val);
 /*--------------------------------------------------------------------
  * Utilities
 ----------------------------------------------------------------------*/
+
+int read_sparse(char *name, void *array, size_t size)
+{
+    FILE *stream = fopen(name, "r");
+    if (stream == NULL) {
+        perror("Opening file failed");
+        return 1;
+    }
+
+    size_t read_bytes;
+    if ((read_bytes = fread(array, 1, size, stream)) != size) {
+        printf("We could not read in all items");
+        printf("Read %zu / %zu bytes\n", read_bytes, size);
+        return 1;
+    }
+
+    int err;
+    if ((err = fclose(stream))) {
+        perror("Closing file failed");
+        return err;
+    }
+
+    return 0;
+}
 
 double randlc (double *x, double a) {
 
@@ -128,7 +154,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    char *class = argv[1];
+    class = argv[1];
 
     int NA, NONZER, NITER;
     double RCOND = 1.0e-1;
@@ -166,7 +192,7 @@ int main(int argc, char **argv) {
 
     fprintf(stderr, "Generating file for program class %s\n", class);
 
-    int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
+    long NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
 
     firstrow = 1;
     lastrow  = NA;
@@ -177,7 +203,9 @@ int main(int argc, char **argv) {
     nzz = NZ;
 
     int *colidx = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
+    int *colidx2 = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
     int *rowstr = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
+    int *rowstr2 = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
     int *iv = malloc((2*NA+1+1) * sizeof(int));	/* iv[1:2*NA+1] */
     int *arow = malloc((NZ+1) * sizeof(int));		/* arow[1:NZ] */
     int *acol = malloc((NZ+1) * sizeof(int));		/* acol[1:NZ] */
@@ -185,6 +213,7 @@ int main(int argc, char **argv) {
     double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
     double *aelt = malloc((NZ+1) * sizeof(double));	/* aelt[1:NZ] */
     double *a = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
+    double *a2 = malloc((NZ+1) * sizeof(double));		/* a[1:NZ] */
 
 
 /*--------------------------------------------------------------------
@@ -216,25 +245,80 @@ c-------------------------------------------------------------------*/
         return EXIT_FAILURE;
     }
 
-    for (int i = 0; i < NZ + 1; i++) {
-        fprintf(a_stream, "%.17lf\n", a[i]);
+    size_t bytes_written;
+    if ((fwrite(a, sizeof(double), NZ + 1, a_stream) != NZ + 1)) {
+        fprintf(stderr, "Writing %s went wrong, only wrote %lu items\n",
+                a_name, bytes_written);
+        return EXIT_FAILURE;
+    }
+    if ((fwrite(colidx, sizeof(int), NZ + 1, colidx_stream) != NZ + 1)) {
+        fprintf(stderr, "Writing %s went wrong\n", colidx_name);
+        return EXIT_FAILURE;
+    }
+    if ((fwrite(rowstr, sizeof(int), NA + 2, rowstr_stream) != NA + 2)) {
+        fprintf(stderr, "Writing %s went wrong\n", rowstr_name);
+        return EXIT_FAILURE;
     }
 
+    fclose(a_stream);
+    fclose(colidx_stream);
+    fclose(rowstr_stream);
+
+    char name[50];
+    sprintf(name, "a.cg.%s", class);
+    read_sparse(name, a2, (NZ + 1) * sizeof(double));
+    sprintf(name, "colidx.cg.%s", class);
+    read_sparse(name, colidx2, (NZ + 1) * sizeof(int));
+    sprintf(name, "rowstr.cg.%s", class);
+    read_sparse(name, rowstr2, (NA + 1 + 1) * sizeof(int));
+
+    bool correct_a = true;
     for (int i = 0; i < NZ + 1; i++) {
-        fprintf(colidx_stream, "%d\n", colidx[i]);
+        if (a2[i] != a[i]) {
+            correct_a = false;
+            printf("Created a[%d] = %.17lf is wrong (should be %.17lf)\n",
+                    i, a2[i], a[i]);
+        }
     }
 
+    fprintf(stderr, "Checked output of a, is %scorrect!\n",
+            (correct_a) ? "" : "in");
+
+    bool correct_col = true;
+    for (int i = 0; i < NZ + 1; i++) {
+        if (colidx2[i] != colidx[i]) {
+            correct_col = false;
+            printf("Created colidx[%d] = %d is wrong (should be %d)\n",
+                    i, colidx2[i], colidx[i]);
+        }
+    }
+
+    fprintf(stderr, "Checked output of colidx, is %scorrect!\n",
+            (correct_col) ? "" : "in");
+
+    bool correct_row = true;
     for (int i = 0; i < NA + 1 + 1; i++) {
-        fprintf(rowstr_stream, "%d\n", rowstr[i]);
+        if (rowstr2[i] != rowstr[i]) {
+            correct_row = false;
+            printf("Created rowstr[%d] = %d is wrong (should be %d)\n",
+                    i, rowstr2[i], rowstr[i]);
+        }
     }
+
+    fprintf(stderr, "Checked output of rowstr, is %scorrect!\n",
+            (correct_row) ? "" : "in");
 
     free(colidx);
+    free(colidx2);
     free(rowstr);
+    free(rowstr2);
     free(iv);
     free(arow);
     free(acol);
     free(v);
     free(aelt);
+    free(a);
+    free(a2);
 
     return EXIT_SUCCESS;
 }

@@ -1,8 +1,12 @@
 #!/bin/sh
 
+# Splits up the sparse matrix files of a certain CG class into multiple files,
+# one for each processor in a block distribution. Each processor gets a suffix
+# of 2 digits.
+
 set -eu
 
-hash sed
+hash split
 hash wc
 
 if [ "$#" -ne 2 ]; then
@@ -14,20 +18,14 @@ distribute()
 {
     filename="$1"
     ranks="$2"
-    lines=$(wc -l < "$1")
+    wordsize="$3"
+    bytes=$(wc -c < "$1")
+    words=$(( bytes / wordsize ))
+    blocksize=$(( ((words + ranks - 1) / ranks) * wordsize ))
 
-    i=0
-
-    while [ "$i" -lt "$ranks" ]; do
-        start=$(( i * (lines + ranks - 1) / ranks + 1 ))
-        end=$(( (i + 1) * (lines + ranks - 1) / ranks ))
-        # Inefficient, if this becomes a problem I can write something like
-        # split, but with block distribution
-        sed -n "$start,${end}p;${end}q" "$filename" > "${filename}_${i}"
-        i=$((i + 1))
-    done
+    split -d --bytes="$blocksize" "$filename" "$filename"
 }
 
-distribute "a.cg.$1" "$2"
-distribute "colidx.cg.$1" "$2"
-distribute "rowstr.cg.$1" "$2"
+distribute "a.cg.$1" "$2" 8
+distribute "colidx.cg.$1" "$2" 4
+distribute "rowstr.cg.$1" "$2" 4
