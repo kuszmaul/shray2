@@ -26,10 +26,9 @@
            C. Kuszmaul
 
   OpenMP C version: S. Satoh
-
   3.0 structure translation: F. Conti
 
-  Shray version by T. Koopman, S. Schrijvers
+  Modified to single source file, some refactoring by T. Koopman
 
 --------------------------------------------------------------------*/
 
@@ -51,13 +50,11 @@ c---------------------------------------------------------------------
 #include <math.h>
 #include <sys/time.h>
 #include <stdbool.h>
-#include <shray2/shray.h>
 #include <omp.h>
 #include <string.h>
+#include <shray2/shray.h>
 #include <gasnet.h>
 #include <gasnet_coll.h>
-#include <errno.h>
-
 
 /* For random numbers */
 #define r23 pow(0.5, 23.0)
@@ -66,16 +63,8 @@ c---------------------------------------------------------------------
 #define t46 (t23*t23)
 
 /* global variables */
-
-/* common /partit_size/ */
-static char *class;
-static char *matdir;
-static int naa;
-static int nzz;
-static int firstrow;
-static int lastrow;
-static int firstcol;
-static int lastcol;
+char *class;
+char *matdir;
 
 /* common /urando/ */
 static double amult;
@@ -84,12 +73,22 @@ static double tran;
 /* function declarations */
 static void conj_grad (int colidx[], int rowstr[], double x[], double z[],
 		       double a[], double p[], double q[], double r[],
-		       //double w[],
-		       double *rnorm);
+		       double *rnorm, int naa, int firstrow, int lastrow, int firstcol,
+               int lastcol);
 
 /*--------------------------------------------------------------------
  * Utilities
 ----------------------------------------------------------------------*/
+
+int max(int x, int y)
+{
+    return (x > y) ? x : y;
+}
+
+int min(int x, int y)
+{
+    return (x < y) ? x : y;
+}
 
 /* Collective operation, replaces number by its sum over
  * all nodes. */
@@ -104,116 +103,35 @@ void gasnetSum(double *number)
     }
 }
 
-static char *strcatalloc(const char *s)
+double gettime()
 {
-    char suffix[100];
-    snprintf(suffix, 100, ".%s_%d", class,  ShrayRank());
-
-    size_t dirlen = strlen(matdir) + 1;
-    size_t slen = strlen(s);
-    size_t ranklen = strlen(suffix);
-    char *res = malloc(dirlen + slen + ranklen + 1);
-    if (!res) {
-        return NULL;
-    }
-
-    strcpy(res, matdir);
-    strcat(res, "/");
-    strcat(res, s);
-    strcat(res, suffix);
-    res[dirlen + slen + ranklen] = '\0';
-
-    return res;
+    struct timeval tv_start;
+    gettimeofday(&tv_start, NULL);
+    return (double)tv_start.tv_usec / 1000000 + (double)tv_start.tv_sec;
 }
 
-int cg_read_a(double *a)
+int read_sparse(char *name, void *array, size_t size)
 {
-    char *fname = strcatalloc("a.cg");
-    FILE *stream = fopen(fname, "r");
+    FILE *stream = fopen(name, "r");
     if (stream == NULL) {
-        perror("Opening a.cg failed");
+        perror("Opening file failed");
         return 1;
     }
 
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t nread;
-
-    size_t i = 0;
-    while ((nread = getline(&line, &len, stream)) != -1) {
-        a[i] = atof(line);
-        i++;
-    }
-
-    free(line);
-    int err;
-    if ((err = fclose(stream))) {
-        perror("Closing a.cg failed");
-        return err;
-    }
-
-    free(fname);
-    return i - (nzz + 1);
-}
-
-int cg_read_col(int *colidx)
-{
-    char *fname = strcatalloc("colidx.cg");
-    FILE *stream = fopen(fname, "r");
-    if (stream == NULL) {
-        perror("Opening colidx.cg failed");
+    size_t read_bytes;
+    if ((read_bytes = fread(array, 1, size, stream)) != size) {
+        printf("We could not read in all items");
+        printf("Read %zu / %zu bytes\n", read_bytes, size);
         return 1;
     }
 
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t nread;
-
-    size_t i = 0;
-    while ((nread = getline(&line, &len, stream)) != -1) {
-        colidx[i] = atoi(line);
-        i++;
-    }
-
-    free(line);
     int err;
     if ((err = fclose(stream))) {
-        perror("Closing colidx.cg failed");
+        perror("Closing file failed");
         return err;
     }
 
-    free(fname);
-    return i - (nzz + 1);
-}
-
-int cg_read_row(int *rowstr)
-{
-    char *fname = strcatalloc("rowstr.cg");
-    FILE *stream = fopen(fname, "r");
-    if (stream == NULL) {
-        perror("Opening rowstr.cg failed");
-        return 1;
-    }
-
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t nread;
-
-    size_t i = 0;
-    while ((nread = getline(&line, &len, stream)) != -1) {
-        rowstr[i] = atoi(line);
-        i++;
-    }
-
-    free(line);
-    int err;
-    if ((err = fclose(stream))) {
-        perror("Closing rowstr.cg failed");
-        return err;
-    }
-
-    free(fname);
-    return i - (naa + 2);
+    return 0;
 }
 
 double randlc (double *x, double a) {
@@ -271,15 +189,6 @@ c---------------------------------------------------------------------*/
     return (r46 * (*x));
 }
 
-int max(int a, int b)
-{
-    return (a > b) ? a : b;
-}
-
-int min(int a, int b)
-{
-    return (a < b) ? a : b;
-}
 
 /*--------------------------------------------------------------------
       program cg
@@ -287,12 +196,12 @@ int min(int a, int b)
 
 int main(int argc, char **argv) {
 
+    ShrayInit(&argc, &argv);
+
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s class directory\n", argv[0]);
+        fprintf(stderr, "Usage: %s class matdir\n", argv[0]);
         return EXIT_FAILURE;
     }
-
-    ShrayInit(&argc, &argv);
 
     class = argv[1];
     matdir = argv[2];
@@ -338,83 +247,102 @@ int main(int argc, char **argv) {
 
     int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
 
-    int	i, j, k, it;
-    double zeta;
+    int	i, j, k;
     double rnorm;
-    double norm_temp11;
-    double norm_temp12;
     double t, mflops;
-    double epsilon;
+    double norm_temp11, norm_temp12;
 
-    firstrow = 1;
-    lastrow  = NA;
-    firstcol = 1;
-    lastcol  = NA;
+    int firstrow = 1;
+    int lastrow  = NA;
+    int firstcol = 1;
+    int lastcol  = NA;
 
-    fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured Shray C version"
-	   " - CG Benchmark\n");
-    fprintf(stderr, " Size: %10d\n", NA);
-    fprintf(stderr, " Iterations: %5d\n", NITER);
+    if (ShrayRank() == 0) {
+        fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured OpenMP C version"
+    	   " - CG Benchmark\n");
+        fprintf(stderr, " Size: %10d\n", NA);
+        fprintf(stderr, " Iterations: %5d\n", NITER);
+    }
 
-    naa = NA;
-    nzz = NZ;
+    int naa = NA;
 
 /*--------------------------------------------------------------------
 c  Initialize random number generator
 c-------------------------------------------------------------------*/
     tran    = 314159265.0;
     amult   = 1220703125.0;
-    zeta    = randlc( &tran, amult );
+    double zeta    = randlc( &tran, amult );
 
 /*--------------------------------------------------------------------
 c
 c-------------------------------------------------------------------*/
 
-    int *colidx = ShrayMalloc(NZ+1, (NZ+1) * sizeof(int));	/* colidx[1:NZ] */
-    int *rowstr = ShrayMalloc(NA+1+1, (NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
+    int *colidx = ShrayMalloc((NZ+1), (NZ+1) * sizeof(int));	/* colidx[1:NZ] */
+    int *rowstr = ShrayMalloc((NA+1+1), (NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
+    int *iv = ShrayMalloc((2*NA+1+1), (2*NA+1+1) * sizeof(int));	/* iv[1:2*NA+1] */
+    int *arow = ShrayMalloc((NZ+1), (NZ+1) * sizeof(int));		/* arow[1:NZ] */
+    int *acol = ShrayMalloc((NZ+1), (NZ+1) * sizeof(int));		/* acol[1:NZ] */
 
-    double *a = ShrayMalloc(NZ+1, (NZ+1) * sizeof(double));		/* a[1:NZ] */
-    double *x = ShrayMalloc(NA+2+1, (NA+2+1) * sizeof(double));	/* x[1:NA+2] */
-    double *z = ShrayMalloc(NA+2+1, (NA+2+1) * sizeof(double));	/* z[1:NA+2] */
-    double *p = ShrayMalloc(NA+2+1, (NA+2+1) * sizeof(double));	/* p[1:NA+2] */
-    double *q = ShrayMalloc(NA+2+1, (NA+2+1) * sizeof(double));	/* q[1:NA+2] */
-    double *r = ShrayMalloc(NA+2+1, (NA+2+1) * sizeof(double));	/* r[1:NA+2] */
+    double *v = ShrayMalloc((NA+1+1), (NA+1+1) * sizeof(double));	/* v[1:NA+1] */
+    double *x = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* x[1:NA+2] */
+    double *z = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* z[1:NA+2] */
+    double *p = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* p[1:NA+2] */
+    double *q = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* q[1:NA+2] */
+    double *r = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* r[1:NA+2] */
+    double *a = ShrayMalloc((NZ+1), (NZ+1) * sizeof(double));
 
-    cg_read_a(a + ShrayStart(a));
-    cg_read_col(colidx + ShrayStart(colidx));
-    cg_read_row(rowstr + ShrayStart(rowstr));
+//    char *name = malloc(strlen(matdir) + 50);
+    char name[500];
+
+    sprintf(name, "%s/a.cg.%s%.2d", matdir, class, ShrayRank());
+    if (read_sparse(name, a + ShrayStart(a),
+                (ShrayEnd(a) - ShrayStart(a)) * sizeof(double))) {
+        fprintf(stderr, "Reading %s went wrong\n", name);
+    }
+
+    sprintf(name, "%s/colidx.cg.%s%.2d", matdir, class, ShrayRank());
+    if (read_sparse(name, colidx + ShrayStart(colidx),
+                (ShrayEnd(colidx) - ShrayStart(colidx)) * sizeof(int))) {
+        fprintf(stderr, "Reading %s went wrong\n", name);
+    }
+
+    sprintf(name, "%s/rowstr.cg.%s%.2d", matdir, class, ShrayRank());
+    if (read_sparse(name, rowstr + ShrayStart(rowstr),
+                (ShrayEnd(rowstr) - ShrayStart(rowstr)) * sizeof(int))) {
+        fprintf(stderr, "Reading %s went wrong\n", name);
+    }
+
 
 /*---------------------------------------------------------------------
-c  Note: as a result of the above call to makea:
+c  Note: as a result of the generation of makea
 c        values of j used in indexing rowstr go from 1 --> lastrow-firstrow+1
 c        values of colidx which are col indexes go from firstcol --> lastcol
 c        So:
 c        Shift the col index vals from actual (firstcol --> lastcol )
 c        to local, i.e., (1 --> lastcol-firstcol+1)
 c---------------------------------------------------------------------*/
-	for (k = max(ShrayStart(colidx), rowstr[1]);
-            k < min(ShrayEnd(colidx), rowstr[lastrow - firstrow + 1]); k++) {
-        colidx[k] = colidx[k] - firstcol + 1;
+#pragma omp parallel default(shared) private(i,j,k)
+{
+#pragma omp for nowait
+	for (k = rowstr[1]; k < rowstr[lastrow - firstrow + 1]; k++) {
+            colidx[k] = colidx[k] - firstcol + 1;
 	}
-    ShraySync(colidx);
 
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
-    for (i = max(ShrayStart(x), 1); i < min(ShrayEnd(x), NA+2); i++) {
-	    x[i] = 1.0;
+#pragma omp for nowait
+    for (i = 1; i <= NA+1; i++) {
+	x[i] = 1.0;
     }
-    for (j = max(ShrayStart(q), 1); j < min(ShrayStart(q), lastcol-firstcol+2); j++) {
-       q[j] = 0.0;
-       z[j] = 0.0;
-       r[j] = 0.0;
-       p[j] = 0.0;
-    }
-    ShraySync(x);
-    ShraySync(q);
-    ShraySync(z);
-    ShraySync(r);
-    ShraySync(p);
+#pragma omp for nowait
+      for (j = 1; j <= lastcol-firstcol+1; j++) {
+         q[j] = 0.0;
+         z[j] = 0.0;
+         r[j] = 0.0;
+         p[j] = 0.0;
+      }
+}// end omp parallel
     zeta  = 0.0;
 
 /*-------------------------------------------------------------------
@@ -423,12 +351,13 @@ c  Do one iteration untimed to init all code and data page tables
 c---->                    (then reinit, start timing, to niter its)
 c-------------------------------------------------------------------*/
 
-    for (it = 1; it <= 1; it++) {
+    for (int it = 1; it <= 1; it++) {
 
 /*--------------------------------------------------------------------
 c  The call to the conjugate gradient routine:
 c-------------------------------------------------------------------*/
-	conj_grad (colidx, rowstr, x, z, a, p, q, r,/* w,*/ &rnorm);
+	conj_grad (colidx, rowstr, x, z, a, p, q, r, &rnorm, naa, firstrow,
+            lastrow, firstcol, lastcol);
 
 /*--------------------------------------------------------------------
 c  zeta = shift + 1/(x.z)
@@ -438,15 +367,12 @@ c  So, first: (z.z)
 c-------------------------------------------------------------------*/
 	norm_temp11 = 0.0;
 	norm_temp12 = 0.0;
-	for (j = max(ShrayStart(x), 1);
-            j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
-        norm_temp11 = norm_temp11 + x[j]*z[j];
-        norm_temp12 = norm_temp12 + z[j]*z[j];
+	for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
+            norm_temp11 = norm_temp11 + x[j]*z[j];
+            norm_temp12 = norm_temp12 + z[j]*z[j];
 	}
-    ShrayBarrier();
     gasnetSum(&norm_temp11);
     gasnetSum(&norm_temp12);
-
 	norm_temp12 = 1.0 / sqrt( norm_temp12 );
 
 /*--------------------------------------------------------------------
@@ -455,7 +381,6 @@ c-------------------------------------------------------------------*/
 	for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
             x[j] = norm_temp12*z[j];
 	}
-    ShraySync(x);
 
     } /* end of do one iteration untimed */
 
@@ -465,14 +390,10 @@ c-------------------------------------------------------------------*/
     for (i = max(ShrayStart(x), 1); i < min(ShrayEnd(x), NA+2); i++) {
          x[i] = 1.0;
     }
-    ShraySync(x);
     zeta  = 0.0;
 
 
-    struct timeval tv_start;
-    gettimeofday(&tv_start, NULL);
-    double timer_start = (double)tv_start.tv_usec / 1000000 +
-                        (double)tv_start.tv_sec;
+    double timer_start = gettime();
 
 /*--------------------------------------------------------------------
 c---->
@@ -480,12 +401,13 @@ c  Main Iteration for inverse power method
 c---->
 c-------------------------------------------------------------------*/
 
-    for (it = 1; it <= NITER; it++) {
+    for (int it = 1; it <= NITER; it++) {
 
 /*--------------------------------------------------------------------
 c  The call to the conjugate gradient routine:
 c-------------------------------------------------------------------*/
-	conj_grad(colidx, rowstr, x, z, a, p, q, r/*, w*/, &rnorm);
+	conj_grad(colidx, rowstr, x, z, a, p, q, r, &rnorm, naa,
+            firstrow, lastrow, firstcol, lastcol);
 
 /*--------------------------------------------------------------------
 c  zeta = shift + 1/(x.z)
@@ -496,13 +418,10 @@ c-------------------------------------------------------------------*/
 	norm_temp11 = 0.0;
 	norm_temp12 = 0.0;
 
-#pragma omp parallel for default(shared) private(j) reduction(+:norm_temp11,norm_temp12)
-
 	for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
             norm_temp11 = norm_temp11 + x[j]*z[j];
             norm_temp12 = norm_temp12 + z[j]*z[j];
 	}
-    ShrayBarrier();
     gasnetSum(&norm_temp11);
     gasnetSum(&norm_temp12);
 
@@ -510,24 +429,22 @@ c-------------------------------------------------------------------*/
 
 	zeta = SHIFT + 1.0 / norm_temp11;
 
-	if( it == 1 ) {
-	  fprintf(stderr, "   iteration           ||r||                 zeta\n");
-	}
-	fprintf(stderr, "    %5d       %20.14e%20.13e\n", it, rnorm, zeta);
+    if (ShrayRank() == 0) {
+    	if( it == 1 ) {
+    	  fprintf(stderr, "   iteration           ||r||                 zeta\n");
+    	}
+    	fprintf(stderr, "    %5d       %20.14e%20.13e\n", it, rnorm, zeta);
+    }
 
 /*--------------------------------------------------------------------
 c  Normalize z to obtain x
 c-------------------------------------------------------------------*/
-	for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
+	for (j = max(ShrayStart(x), 1); j < min(ShrayStart(x), lastcol-firstcol+2); j++) {
             x[j] = norm_temp12*z[j];
 	}
-    ShraySync(x);
     } /* end of main iter inv pow meth */
 
-    struct timeval tv_stop;
-    gettimeofday(&tv_stop, NULL);
-    double timer_stop = (double)tv_stop.tv_usec / 1000000 +
-                        (double)tv_stop.tv_sec;
+    double timer_stop = gettime();
 
 /*--------------------------------------------------------------------
 c  End of timed section
@@ -535,22 +452,26 @@ c-------------------------------------------------------------------*/
 
     t = timer_stop - timer_start;
 
-    fprintf(stderr, " Benchmark completed\n");
+    if (ShrayRank() == 0) {
+        fprintf(stderr, " Benchmark completed\n");
+    }
 
-    epsilon = 1.0e-10;
+    const double epsilon = 1.0e-10;
     if (strcmp(class, "U")) {
-    	if (fabs(zeta - zeta_verify_value) <= epsilon) {
-    	    fprintf(stderr, " VERIFICATION SUCCESSFUL\n");
-    	    fprintf(stderr, " Zeta is    %20.12e\n", zeta);
-    	    fprintf(stderr, " Error is   %20.12e\n", zeta - zeta_verify_value);
-    	} else {
-    	    fprintf(stderr, " VERIFICATION FAILED\n");
-    	    fprintf(stderr, " Zeta                %20.12e\n", zeta);
-    	    fprintf(stderr, " The correct zeta is %20.12e\n", zeta_verify_value);
-    	}
+        if (ShrayRank() == 0) {
+        	if (fabs(zeta - zeta_verify_value) <= epsilon) {
+        	    fprintf(stderr, " VERIFICATION SUCCESSFUL\n");
+        	    fprintf(stderr, " Zeta is    %20.12e\n", zeta);
+        	    fprintf(stderr, " Error is   %20.12e\n", zeta - zeta_verify_value);
+    	    } else {
+    	        fprintf(stderr, " VERIFICATION FAILED\n");
+    	        fprintf(stderr, " Zeta                %20.12e\n", zeta);
+    	        fprintf(stderr, " The correct zeta is %20.12e\n", zeta_verify_value);
+    	    }
+        }
     } else {
-    	fprintf(stderr, " Problem size unknown\n");
-    	fprintf(stderr, " NO VERIFICATION PERFORMED\n");
+	    fprintf(stderr, " Problem size unknown\n");
+	    fprintf(stderr, " NO VERIFICATION PERFORMED\n");
     }
 
     if ( t != 0.0 ) {
@@ -561,8 +482,24 @@ c-------------------------------------------------------------------*/
 	mflops = 0.0;
     }
 
-    printf("%lf", mflops / 1000.0);
-    fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
+    if (ShrayRank() == 0) {
+        printf("%lf", mflops / 1000.0);
+        fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
+    }
+
+    ShrayFree(colidx);
+    ShrayFree(rowstr);
+    ShrayFree(iv);
+    ShrayFree(arow);
+    ShrayFree(acol);
+
+    ShrayFree(v);
+    ShrayFree(a);
+    ShrayFree(x);
+    ShrayFree(z);
+    ShrayFree(p);
+    ShrayFree(q);
+    ShrayFree(r);
 
     ShrayFinalize(0);
 }
@@ -578,7 +515,12 @@ static void conj_grad (
     double p[],		/* p[*] */
     double q[],		/* q[*] */
     double r[],		/* r[*] */
-    double *rnorm )
+    double *rnorm,
+    int naa,
+    int firstrow,
+    int lastrow,
+    int firstcol,
+    int lastcol)
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 
@@ -597,28 +539,24 @@ c---------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  Initialize the CG algorithm:
 c-------------------------------------------------------------------*/
-    for (j = max(ShrayStart(q), 1); j < min(ShrayEnd(q), naa+2); j++) {
+{
+    for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), naa+2); j++) {
 	q[j] = 0.0;
 	z[j] = 0.0;
 	r[j] = x[j];
 	p[j] = r[j];
 	//w[j] = 0.0;
     }
-    ShraySync(q);
-    ShraySync(z);
-    ShraySync(r);
-    ShraySync(p);
 
 /*--------------------------------------------------------------------
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
-    for (j = max(ShrayStart(r), 1);
-            j < min(ShrayEnd(r), lastcol-firstcol+2); j++) {
+    for (j = max(ShrayStart(r), 1); j < min(ShrayEnd(r), lastcol-firstcol+2); j++) {
 	    rho = rho + r[j]*r[j];
     }
-    ShrayBarrier();
     gasnetSum(&rho);
+}/* end omp parallel */
 /*--------------------------------------------------------------------
 c---->
 c  The conj grad iteration loop
@@ -628,6 +566,7 @@ c-------------------------------------------------------------------*/
       rho0 = rho;
       d = 0.0;
       rho = 0.0;
+{
 
 /*--------------------------------------------------------------------
 c  q = A.p
@@ -648,42 +587,35 @@ C        on the Cray t3d - overall speed of code is 1.5 times faster.
 	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
 		    sum = sum + a[k]*p[colidx[k]];
 	    }
-            //w[j] = sum;
-            q[j] = sum;
+        q[j] = sum;
 	}
-    ShraySync(q);
 
 /*--------------------------------------------------------------------
 c  Obtain p.q
 c-------------------------------------------------------------------*/
-	for (j = max(ShrayStart(p), 1);
-            j < min(ShrayEnd(p), lastcol-firstcol+2); j++) {
-        d = d + p[j]*q[j];
+	for (j = max(ShrayStart(p), 1); j < min(ShrayEnd(q), lastcol-firstcol+2); j++) {
+            d = d + p[j]*q[j];
 	}
-    ShrayBarrier();
     gasnetSum(&d);
 /*--------------------------------------------------------------------
 c  Obtain alpha = rho / (p.q)
 c-------------------------------------------------------------------*/
-//#pragma omp single
 	alpha = rho0 / d;
-
-/*--------------------------------------------------------------------
-c  Save a temporary of rho
-c-------------------------------------------------------------------*/
-	/*	rho0 = rho;*/
 
 /*---------------------------------------------------------------------
 c  Obtain z = z + alpha*p
 c  and    r = r - alpha*q
 c---------------------------------------------------------------------*/
-	for (j = max(ShrayStart(z), 1);
-            j < min(ShrayEnd(z), lastcol-firstcol+2); j++) {
-        z[j] = z[j] + alpha*p[j];
-        r[j] = r[j] - alpha*q[j];
-        rho = rho + r[j]*r[j];
+	for (j = max(ShrayStart(z), 1); j < min(ShrayEnd(z), lastcol-firstcol+2); j++) {
+            z[j] = z[j] + alpha*p[j];
+            r[j] = r[j] - alpha*q[j];
+
+/*---------------------------------------------------------------------
+c  rho = r.r
+c  Now, obtain the norm of r: First, sum squares of r elements locally...
+c---------------------------------------------------------------------*/
+            rho = rho + r[j]*r[j];
 	}
-    ShrayBarrier();
     gasnetSum(&rho);
 
 /*--------------------------------------------------------------------
@@ -694,12 +626,11 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  p = r + beta*p
 c-------------------------------------------------------------------*/
-	for (j = max(ShrayStart(p), 1);
-            j < min(ShrayEnd(p), lastcol-firstcol+2); j++) {
-        p[j] = r[j] + beta*p[j];
+	for (j = 1; j <= lastcol-firstcol+1; j++) {
+            p[j] = r[j] + beta*p[j];
 	}
-    ShraySync(p);
     callcount++;
+    } /* end omp parallel */
     } /* end of do cgit=1,cgitmax */
 
 /*---------------------------------------------------------------------
@@ -709,24 +640,23 @@ c  The partition submatrix-vector multiply
 c---------------------------------------------------------------------*/
     sum = 0.0;
 
+{
     for (j = max(ShrayStart(r), 1); j < min(ShrayEnd(r), lastrow-firstrow+2); j++) {
-    	d = 0.0;
-    	for (k = rowstr[j]; k <= rowstr[j+1]-1; k++) {
-                d = d + a[k]*z[colidx[k]];
-    	}
-    	r[j] = d;
+	d = 0.0;
+	for (k = rowstr[j]; k <= rowstr[j+1]-1; k++) {
+            d = d + a[k]*z[colidx[k]];
+	}
+	r[j] = d;
     }
-    ShraySync(r);
 
 /*--------------------------------------------------------------------
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
-    for (j = max(ShrayStart(x), 1);
-            j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
-    	d = x[j] - r[j];
-	    sum = sum + d*d;
+    for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
+	d = x[j] - r[j];
+	sum = sum + d*d;
     }
-    ShrayBarrier();
     gasnetSum(&sum);
+}
     (*rnorm) = sqrt(sum);
 }
