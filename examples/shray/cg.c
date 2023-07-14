@@ -25,25 +25,12 @@
   Authors: M. Yarrow
            C. Kuszmaul
 
-  OpenMP C version: S. Satoh
+  Shray version: T. Koopman
   3.0 structure translation: F. Conti
 
   Modified to single source file, some refactoring by T. Koopman
 
 --------------------------------------------------------------------*/
-
-/*
-c---------------------------------------------------------------------
-c  Note: please observe that in the routine conj_grad three
-c  implementations of the sparse matrix-vector multiply have
-c  been supplied.  The default matrix-vector multiply is not
-c  loop unrolled.  The alternate implementations are unrolled
-c  to a depth of 2 and unrolled to a depth of 8.  Please
-c  experiment with these to find the fastest for your particular
-c  architecture.  If reporting timing results, any of these three may
-c  be used without penalty.
-c---------------------------------------------------------------------
-*/
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -51,8 +38,8 @@ c---------------------------------------------------------------------
 #include <sys/time.h>
 #include <stdbool.h>
 #include <omp.h>
-#include <string.h>
 #include <shray2/shray.h>
+#include <string.h>
 #include <gasnet.h>
 #include <gasnet_coll.h>
 
@@ -71,24 +58,13 @@ static double amult;
 static double tran;
 
 /* function declarations */
-static void conj_grad (int colidx[], int rowstr[], double x[], double z[],
+static void conj_grad (size_t colidx[], size_t rowstr[], double x[], double z[],
 		       double a[], double p[], double q[], double r[],
-		       double *rnorm, int naa, int firstrow, int lastrow, int firstcol,
-               int lastcol);
+		       double *rnorm);
 
 /*--------------------------------------------------------------------
  * Utilities
 ----------------------------------------------------------------------*/
-
-int max(int x, int y)
-{
-    return (x > y) ? x : y;
-}
-
-int min(int x, int y)
-{
-    return (x < y) ? x : y;
-}
 
 /* Collective operation, replaces number by its sum over
  * all nodes. */
@@ -101,13 +77,7 @@ void gasnetSum(double *number)
         if (i == ShrayRank()) continue;
         *number += numbers[i];
     }
-}
-
-double gettime()
-{
-    struct timeval tv_start;
-    gettimeofday(&tv_start, NULL);
-    return (double)tv_start.tv_usec / 1000000 + (double)tv_start.tv_sec;
+    free(numbers);
 }
 
 int read_sparse(char *name, void *array, size_t size)
@@ -132,6 +102,13 @@ int read_sparse(char *name, void *array, size_t size)
     }
 
     return 0;
+}
+
+double gettime()
+{
+    struct timeval tv_start;
+    gettimeofday(&tv_start, NULL);
+    return (double)tv_start.tv_usec / 1000000 + (double)tv_start.tv_sec;
 }
 
 double randlc (double *x, double a) {
@@ -245,17 +222,13 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
+    /* For the largest problem sizes, NA can be held by an integer, but not NZ
+     * for class >= E. */
+    size_t NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
 
-    int	i, j, k;
     double rnorm;
     double t, mflops;
     double norm_temp11, norm_temp12;
-
-    int firstrow = 1;
-    int lastrow  = NA;
-    int firstcol = 1;
-    int lastcol  = NA;
 
     if (ShrayRank() == 0) {
         fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured OpenMP C version"
@@ -263,8 +236,6 @@ int main(int argc, char **argv) {
         fprintf(stderr, " Size: %10d\n", NA);
         fprintf(stderr, " Iterations: %5d\n", NITER);
     }
-
-    int naa = NA;
 
 /*--------------------------------------------------------------------
 c  Initialize random number generator
@@ -277,72 +248,57 @@ c-------------------------------------------------------------------*/
 c
 c-------------------------------------------------------------------*/
 
-    int *colidx = ShrayMalloc((NZ+1), (NZ+1) * sizeof(int));	/* colidx[1:NZ] */
-    int *rowstr = ShrayMalloc((NA+1+1), (NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
-    int *iv = ShrayMalloc((2*NA+1+1), (2*NA+1+1) * sizeof(int));	/* iv[1:2*NA+1] */
-    int *arow = ShrayMalloc((NZ+1), (NZ+1) * sizeof(int));		/* arow[1:NZ] */
-    int *acol = ShrayMalloc((NZ+1), (NZ+1) * sizeof(int));		/* acol[1:NZ] */
+    size_t *colidx = ShrayMalloc(NZ, NZ * sizeof(size_t));
+    size_t *rowstr = ShrayMalloc((NA + 1), (NA + 1) * sizeof(size_t));
+    double *a = ShrayMalloc(NZ, NZ * sizeof(double));
 
-    double *v = ShrayMalloc((NA+1+1), (NA+1+1) * sizeof(double));	/* v[1:NA+1] */
-    double *x = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* x[1:NA+2] */
-    double *z = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* z[1:NA+2] */
-    double *p = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* p[1:NA+2] */
-    double *q = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* q[1:NA+2] */
-    double *r = ShrayMalloc((NA+2+1), (NA+2+1) * sizeof(double));	/* r[1:NA+2] */
-    double *a = ShrayMalloc((NZ+1), (NZ+1) * sizeof(double));
+    double *x = ShrayMalloc(NA, NA * sizeof(double));
+    double *z = ShrayMalloc(NA, NA * sizeof(double));
+    double *p = ShrayMalloc(NA, NA * sizeof(double));
+    double *q = ShrayMalloc(NA, NA * sizeof(double));
+    double *r = ShrayMalloc(NA, NA * sizeof(double));
 
-//    char *name = malloc(strlen(matdir) + 50);
-    char name[500];
+    char name[50];
 
-    sprintf(name, "%s/a.cg.%s%.2d", matdir, class, ShrayRank());
+    sprintf(name, "a.cg.%s", class);
     if (read_sparse(name, a + ShrayStart(a),
                 (ShrayEnd(a) - ShrayStart(a)) * sizeof(double))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
     }
 
-    sprintf(name, "%s/colidx.cg.%s%.2d", matdir, class, ShrayRank());
+    sprintf(name, "colidx.cg.%s", class);
     if (read_sparse(name, colidx + ShrayStart(colidx),
-                (ShrayEnd(colidx) - ShrayStart(colidx)) * sizeof(int))) {
+                (ShrayEnd(colidx) - ShrayStart(colidx)) * sizeof(size_t))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
     }
 
-    sprintf(name, "%s/rowstr.cg.%s%.2d", matdir, class, ShrayRank());
+    sprintf(name, "rowstr.cg.%s", class);
     if (read_sparse(name, rowstr + ShrayStart(rowstr),
-                (ShrayEnd(rowstr) - ShrayStart(rowstr)) * sizeof(int))) {
+                (ShrayEnd(rowstr) - ShrayStart(rowstr)) * sizeof(size_t))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
     }
 
-
-/*---------------------------------------------------------------------
-c  Note: as a result of the generation of makea
-c        values of j used in indexing rowstr go from 1 --> lastrow-firstrow+1
-c        values of colidx which are col indexes go from firstcol --> lastcol
-c        So:
-c        Shift the col index vals from actual (firstcol --> lastcol )
-c        to local, i.e., (1 --> lastcol-firstcol+1)
-c---------------------------------------------------------------------*/
-#pragma omp parallel default(shared) private(i,j,k)
-{
-#pragma omp for nowait
-	for (k = rowstr[1]; k < rowstr[lastrow - firstrow + 1]; k++) {
-            colidx[k] = colidx[k] - firstcol + 1;
-	}
+    ShraySync(a);
+    ShraySync(colidx);
+    ShraySync(rowstr);
 
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
-#pragma omp for nowait
-    for (i = 1; i <= NA+1; i++) {
-	x[i] = 1.0;
+    for (size_t i = ShrayStart(x); i < ShrayEnd(x); i++) {
+    	x[i] = 1.0;
     }
-#pragma omp for nowait
-      for (j = 1; j <= lastcol-firstcol+1; j++) {
-         q[j] = 0.0;
-         z[j] = 0.0;
-         r[j] = 0.0;
-         p[j] = 0.0;
-      }
-}// end omp parallel
+    for (size_t j = ShrayStart(q); j < ShrayEnd(q); j++) {
+       q[j] = 0.0;
+       z[j] = 0.0;
+       r[j] = 0.0;
+       p[j] = 0.0;
+    }
+    ShraySync(x);
+    ShraySync(q);
+    ShraySync(z);
+    ShraySync(r);
+    ShraySync(p);
     zeta  = 0.0;
 
 /*-------------------------------------------------------------------
@@ -353,43 +309,45 @@ c-------------------------------------------------------------------*/
 
     for (int it = 1; it <= 1; it++) {
 
-/*--------------------------------------------------------------------
-c  The call to the conjugate gradient routine:
-c-------------------------------------------------------------------*/
-	conj_grad (colidx, rowstr, x, z, a, p, q, r, &rnorm, naa, firstrow,
-            lastrow, firstcol, lastcol);
+    /*--------------------------------------------------------------------
+    c  The call to the conjugate gradient routine:
+    c-------------------------------------------------------------------*/
+    	conj_grad (colidx, rowstr, x, z, a, p, q, r, &rnorm);
 
-/*--------------------------------------------------------------------
-c  zeta = shift + 1/(x.z)
-c  So, first: (x.z)
-c  Also, find norm of z
-c  So, first: (z.z)
-c-------------------------------------------------------------------*/
-	norm_temp11 = 0.0;
-	norm_temp12 = 0.0;
-	for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
-            norm_temp11 = norm_temp11 + x[j]*z[j];
-            norm_temp12 = norm_temp12 + z[j]*z[j];
-	}
-    gasnetSum(&norm_temp11);
-    gasnetSum(&norm_temp12);
-	norm_temp12 = 1.0 / sqrt( norm_temp12 );
+    /*--------------------------------------------------------------------
+    c  zeta = shift + 1/(x.z)
+    c  So, first: (x.z)
+    c  Also, find norm of z
+    c  So, first: (z.z)
+    c-------------------------------------------------------------------*/
+    	norm_temp11 = 0.0;
+    	norm_temp12 = 0.0;
+    	for (size_t j = ShrayStart(x); j < ShrayEnd(x); j++) {
+                norm_temp11 = norm_temp11 + x[j]*z[j];
+                norm_temp12 = norm_temp12 + z[j]*z[j];
+    	}
+        ShrayBarrier();
+        gasnetSum(&norm_temp11);
+        gasnetSum(&norm_temp12);
+    	norm_temp12 = 1.0 / sqrt( norm_temp12 );
 
-/*--------------------------------------------------------------------
-c  Normalize z to obtain x
-c-------------------------------------------------------------------*/
-	for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
-            x[j] = norm_temp12*z[j];
-	}
+    /*--------------------------------------------------------------------
+    c  Normalize z to obtain x
+    c-------------------------------------------------------------------*/
+    	for (size_t j = ShrayStart(x); j < ShrayEnd(x); j++) {
+                x[j] = norm_temp12*z[j];
+    	}
+        ShraySync(x);
 
     } /* end of do one iteration untimed */
 
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
-    for (i = max(ShrayStart(x), 1); i < min(ShrayEnd(x), NA+2); i++) {
+    for (size_t i = ShrayStart(x); i < ShrayEnd(x); i++) {
          x[i] = 1.0;
     }
+    ShraySync(x);
     zeta  = 0.0;
 
 
@@ -403,45 +361,46 @@ c-------------------------------------------------------------------*/
 
     for (int it = 1; it <= NITER; it++) {
 
-/*--------------------------------------------------------------------
-c  The call to the conjugate gradient routine:
-c-------------------------------------------------------------------*/
-	conj_grad(colidx, rowstr, x, z, a, p, q, r, &rnorm, naa,
-            firstrow, lastrow, firstcol, lastcol);
+    /*--------------------------------------------------------------------
+    c  The call to the conjugate gradient routine:
+    c-------------------------------------------------------------------*/
+    	conj_grad(colidx, rowstr, x, z, a, p, q, r, &rnorm);
 
-/*--------------------------------------------------------------------
-c  zeta = shift + 1/(x.z)
-c  So, first: (x.z)
-c  Also, find norm of z
-c  So, first: (z.z)
-c-------------------------------------------------------------------*/
-	norm_temp11 = 0.0;
-	norm_temp12 = 0.0;
+    /*--------------------------------------------------------------------
+    c  zeta = shift + 1/(x.z)
+    c  So, first: (x.z)
+    c  Also, find norm of z
+    c  So, first: (z.z)
+    c-------------------------------------------------------------------*/
+    	norm_temp11 = 0.0;
+    	norm_temp12 = 0.0;
 
-	for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
-            norm_temp11 = norm_temp11 + x[j]*z[j];
-            norm_temp12 = norm_temp12 + z[j]*z[j];
-	}
-    gasnetSum(&norm_temp11);
-    gasnetSum(&norm_temp12);
-
-	norm_temp12 = 1.0 / sqrt( norm_temp12 );
-
-	zeta = SHIFT + 1.0 / norm_temp11;
-
-    if (ShrayRank() == 0) {
-    	if( it == 1 ) {
-    	  fprintf(stderr, "   iteration           ||r||                 zeta\n");
+    	for (size_t j = ShrayStart(x); j < ShrayEnd(x); j++) {
+                norm_temp11 = norm_temp11 + x[j]*z[j];
+                norm_temp12 = norm_temp12 + z[j]*z[j];
     	}
-    	fprintf(stderr, "    %5d       %20.14e%20.13e\n", it, rnorm, zeta);
-    }
+        ShrayBarrier();
+        gasnetSum(&norm_temp11);
+        gasnetSum(&norm_temp12);
 
-/*--------------------------------------------------------------------
-c  Normalize z to obtain x
-c-------------------------------------------------------------------*/
-	for (j = max(ShrayStart(x), 1); j < min(ShrayStart(x), lastcol-firstcol+2); j++) {
-            x[j] = norm_temp12*z[j];
-	}
+    	norm_temp12 = 1.0 / sqrt( norm_temp12 );
+
+    	zeta = SHIFT + 1.0 / norm_temp11;
+
+        if (ShrayRank() == 0) {
+        	if( it == 1 ) {
+        	  fprintf(stderr, "   iteration           ||r||                 zeta\n");
+        	}
+        	fprintf(stderr, "    %5d       %20.14e%20.13e\n", it, rnorm, zeta);
+        }
+
+    /*--------------------------------------------------------------------
+    c  Normalize z to obtain x
+    c-------------------------------------------------------------------*/
+    	for (size_t j = ShrayStart(x); j < ShrayEnd(x); j++) {
+                x[j] = norm_temp12*z[j];
+    	}
+        ShraySync(x);
     } /* end of main iter inv pow meth */
 
     double timer_stop = gettime();
@@ -457,8 +416,8 @@ c-------------------------------------------------------------------*/
     }
 
     const double epsilon = 1.0e-10;
-    if (strcmp(class, "U")) {
-        if (ShrayRank() == 0) {
+    if (ShrayRank() == 0) {
+        if (strcmp(class, "U")) {
         	if (fabs(zeta - zeta_verify_value) <= epsilon) {
         	    fprintf(stderr, " VERIFICATION SUCCESSFUL\n");
         	    fprintf(stderr, " Zeta is    %20.12e\n", zeta);
@@ -468,33 +427,27 @@ c-------------------------------------------------------------------*/
     	        fprintf(stderr, " Zeta                %20.12e\n", zeta);
     	        fprintf(stderr, " The correct zeta is %20.12e\n", zeta_verify_value);
     	    }
+        } else {
+    	    fprintf(stderr, " Problem size unknown\n");
+    	    fprintf(stderr, " NO VERIFICATION PERFORMED\n");
         }
-    } else {
-	    fprintf(stderr, " Problem size unknown\n");
-	    fprintf(stderr, " NO VERIFICATION PERFORMED\n");
-    }
 
-    if ( t != 0.0 ) {
-	mflops = (2.0*NITER*NA)
-	    * (3.0+(NONZER*(NONZER+1)) + 25.0*(5.0+(NONZER*(NONZER+1))) + 3.0 )
-	    / t / 1000000.0;
-    } else {
-	mflops = 0.0;
-    }
+        if ( t != 0.0 ) {
+    	mflops = (2.0*NITER*NA)
+    	    * (3.0+(NONZER*(NONZER+1)) + 25.0*(5.0+(NONZER*(NONZER+1))) + 3.0 )
+    	    / t / 1000000.0;
+        } else {
+    	mflops = 0.0;
+        }
 
-    if (ShrayRank() == 0) {
         printf("%lf", mflops / 1000.0);
         fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
     }
 
     ShrayFree(colidx);
     ShrayFree(rowstr);
-    ShrayFree(iv);
-    ShrayFree(arow);
-    ShrayFree(acol);
-
-    ShrayFree(v);
     ShrayFree(a);
+
     ShrayFree(x);
     ShrayFree(z);
     ShrayFree(p);
@@ -507,20 +460,15 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 static void conj_grad (
-    int colidx[],	/* colidx[1:nzz] */
-    int rowstr[],	/* rowstr[1:naa+1] */
-    double x[],		/* x[*] */
-    double z[],		/* z[*] */
-    double a[],		/* a[1:nzz] */
-    double p[],		/* p[*] */
-    double q[],		/* q[*] */
-    double r[],		/* r[*] */
-    double *rnorm,
-    int naa,
-    int firstrow,
-    int lastrow,
-    int firstcol,
-    int lastcol)
+    size_t colidx[],
+    size_t rowstr[],
+    double x[],
+    double z[],
+    double a[],
+    double p[],
+    double q[],
+    double r[],
+    double *rnorm)
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 
@@ -531,7 +479,7 @@ c---------------------------------------------------------------------*/
 {
     static int callcount = 0;
     double d, sum, rho, rho0, alpha, beta;
-    int j, k;
+    size_t j, k;
     int cgit, cgitmax = 25;
 
     rho = 0.0;
@@ -540,21 +488,25 @@ c---------------------------------------------------------------------*/
 c  Initialize the CG algorithm:
 c-------------------------------------------------------------------*/
 {
-    for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), naa+2); j++) {
-	q[j] = 0.0;
-	z[j] = 0.0;
-	r[j] = x[j];
-	p[j] = r[j];
-	//w[j] = 0.0;
+    for (j = ShrayStart(q); j < ShrayEnd(q); j++) {
+    	q[j] = 0.0;
+    	z[j] = 0.0;
+    	r[j] = x[j];
+    	p[j] = r[j];
     }
+    ShraySync(q);
+    ShraySync(z);
+    ShraySync(r);
+    ShraySync(p);
 
 /*--------------------------------------------------------------------
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
-    for (j = max(ShrayStart(r), 1); j < min(ShrayEnd(r), lastcol-firstcol+2); j++) {
-	    rho = rho + r[j]*r[j];
+    for (j = ShrayStart(r); j < ShrayEnd(r); j++) {
+	    rho += r[j]*r[j];
     }
+    ShrayBarrier();
     gasnetSum(&rho);
 }/* end omp parallel */
 /*--------------------------------------------------------------------
@@ -563,74 +515,77 @@ c  The conj grad iteration loop
 c---->
 c-------------------------------------------------------------------*/
     for (cgit = 1; cgit <= cgitmax; cgit++) {
-      rho0 = rho;
-      d = 0.0;
-      rho = 0.0;
-{
+        rho0 = rho;
+        d = 0.0;
+        rho = 0.0;
 
-/*--------------------------------------------------------------------
-c  q = A.p
-c  The partition submatrix-vector multiply: use workspace w
-c---------------------------------------------------------------------
-C
-C  NOTE: this version of the multiply is actually (slightly: maybe %5)
-C        faster on the sp2 on 16 nodes than is the unrolled-by-2 version
-C        below.   On the Cray t3d, the reverse is true, i.e., the
-C        unrolled-by-two version is some 10% faster.
-C        The unrolled-by-8 version below is significantly faster
-C        on the Cray t3d - overall speed of code is 1.5 times faster.
-*/
+    /*--------------------------------------------------------------------
+    c  q = A.p
+    c  The partition submatrix-vector multiply: use workspace w
+    c---------------------------------------------------------------------
+    C
+    C  NOTE: this version of the multiply is actually (slightly: maybe %5)
+    C        faster on the sp2 on 16 nodes than is the unrolled-by-2 version
+    C        below.   On the Cray t3d, the reverse is true, i.e., the
+    C        unrolled-by-two version is some 10% faster.
+    C        The unrolled-by-8 version below is significantly faster
+    C        on the Cray t3d - overall speed of code is 1.5 times faster.
+    */
 
-/* rolled version */
-	for (j = max(ShrayStart(q), 1); j < min(ShrayEnd(q), lastrow-firstrow+2); j++) {
-        sum = 0.0;
-	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
-		    sum = sum + a[k]*p[colidx[k]];
-	    }
-        q[j] = sum;
-	}
+        for (j = ShrayStart(q); j < ShrayEnd(q); j++) {
+            sum = 0.0;
+    	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
+    		    sum += a[k]*p[colidx[k]];
+    	    }
+            q[j] = sum;
+    	}
+        ShraySync(q);
 
-/*--------------------------------------------------------------------
-c  Obtain p.q
-c-------------------------------------------------------------------*/
-	for (j = max(ShrayStart(p), 1); j < min(ShrayEnd(q), lastcol-firstcol+2); j++) {
-            d = d + p[j]*q[j];
-	}
-    gasnetSum(&d);
-/*--------------------------------------------------------------------
-c  Obtain alpha = rho / (p.q)
-c-------------------------------------------------------------------*/
-	alpha = rho0 / d;
+    /*--------------------------------------------------------------------
+    c  Obtain p.q
+    c-------------------------------------------------------------------*/
+    	for (j = ShrayStart(p); j < ShrayEnd(p); j++) {
+                d += p[j]*q[j];
+    	}
+        ShrayBarrier();
+        gasnetSum(&d);
+    /*--------------------------------------------------------------------
+    c  Obtain alpha = rho / (p.q)
+    c-------------------------------------------------------------------*/
+    	alpha = rho0 / d;
 
-/*---------------------------------------------------------------------
-c  Obtain z = z + alpha*p
-c  and    r = r - alpha*q
-c---------------------------------------------------------------------*/
-	for (j = max(ShrayStart(z), 1); j < min(ShrayEnd(z), lastcol-firstcol+2); j++) {
-            z[j] = z[j] + alpha*p[j];
-            r[j] = r[j] - alpha*q[j];
+    /*---------------------------------------------------------------------
+    c  Obtain z = z + alpha*p
+    c  and    r = r - alpha*q
+    c---------------------------------------------------------------------*/
+    	for (j = ShrayStart(q); j < ShrayEnd(z); j++) {
+                z[j] += alpha*p[j];
+                r[j] -= alpha*q[j];
 
-/*---------------------------------------------------------------------
-c  rho = r.r
-c  Now, obtain the norm of r: First, sum squares of r elements locally...
-c---------------------------------------------------------------------*/
-            rho = rho + r[j]*r[j];
-	}
-    gasnetSum(&rho);
+    /*---------------------------------------------------------------------
+    c  rho = r.r
+    c  Now, obtain the norm of r: First, sum squares of r elements locally...
+    c---------------------------------------------------------------------*/
+                rho += r[j]*r[j];
+    	}
+        ShraySync(r);
+        ShraySync(z);
+        ShrayBarrier();
+        gasnetSum(&rho);
 
-/*--------------------------------------------------------------------
-c  Obtain beta:
-c-------------------------------------------------------------------*/
-	beta = rho / rho0;
+    /*--------------------------------------------------------------------
+    c  Obtain beta:
+    c-------------------------------------------------------------------*/
+    	beta = rho / rho0;
 
-/*--------------------------------------------------------------------
-c  p = r + beta*p
-c-------------------------------------------------------------------*/
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
-            p[j] = r[j] + beta*p[j];
-	}
-    callcount++;
-    } /* end omp parallel */
+    /*--------------------------------------------------------------------
+    c  p = r + beta*p
+    c-------------------------------------------------------------------*/
+    	for (j = ShrayStart(p); j < ShrayEnd(p); j++) {
+                p[j] = r[j] + beta*p[j];
+    	}
+        ShraySync(p);
+        callcount++;
     } /* end of do cgit=1,cgitmax */
 
 /*---------------------------------------------------------------------
@@ -640,23 +595,23 @@ c  The partition submatrix-vector multiply
 c---------------------------------------------------------------------*/
     sum = 0.0;
 
-{
-    for (j = max(ShrayStart(r), 1); j < min(ShrayEnd(r), lastrow-firstrow+2); j++) {
-	d = 0.0;
-	for (k = rowstr[j]; k <= rowstr[j+1]-1; k++) {
-            d = d + a[k]*z[colidx[k]];
-	}
-	r[j] = d;
+    for (j = ShrayStart(r); j < ShrayEnd(r); j++) {
+    	d = 0.0;
+	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
+            d += a[k] * z[colidx[k]];
+	    }
+    	r[j] = d;
     }
+    ShraySync(r);
 
 /*--------------------------------------------------------------------
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
-    for (j = max(ShrayStart(x), 1); j < min(ShrayEnd(x), lastcol-firstcol+2); j++) {
-	d = x[j] - r[j];
-	sum = sum + d*d;
+    for (j = ShrayStart(x); j < ShrayEnd(x); j++) {
+    	d = x[j] - r[j];
+	    sum += d*d;
     }
+    ShrayBarrier();
     gasnetSum(&sum);
-}
     (*rnorm) = sqrt(sum);
 }

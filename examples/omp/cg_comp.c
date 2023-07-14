@@ -229,18 +229,13 @@ c-------------------------------------------------------------------*/
 
     size_t *colidx = malloc(NZ * sizeof(size_t));
     size_t *rowstr = malloc((NA + 1) * sizeof(size_t));
-    int *iv = malloc(2 * NA * sizeof(int));
-    int *arow = malloc(NZ * sizeof(int));
-    int *acol = malloc(NZ * sizeof(int));
+    double *a = malloc(NZ * sizeof(double));
 
-    double *v = malloc((NA + 1) * sizeof(double));
-    double *aelt = malloc(NZ * sizeof(double));
     double *x = malloc(NA * sizeof(double));
     double *z = malloc(NA * sizeof(double));
     double *p = malloc(NA * sizeof(double));
     double *q = malloc(NA * sizeof(double));
     double *r = malloc(NA * sizeof(double));
-    double *a = malloc(NZ * sizeof(double));
 
     char name[50];
 
@@ -413,13 +408,8 @@ c-------------------------------------------------------------------*/
 
     free(colidx);
     free(rowstr);
-    free(iv);
-    free(arow);
-    free(acol);
-    free(aelt);
-
-    free(v);
     free(a);
+
     free(x);
     free(z);
     free(p);
