@@ -32,19 +32,6 @@
 
 --------------------------------------------------------------------*/
 
-/*
-c---------------------------------------------------------------------
-c  Note: please observe that in the routine conj_grad three
-c  implementations of the sparse matrix-vector multiply have
-c  been supplied.  The default matrix-vector multiply is not
-c  loop unrolled.  The alternate implementations are unrolled
-c  to a depth of 2 and unrolled to a depth of 8.  Please
-c  experiment with these to find the fastest for your particular
-c  architecture.  If reporting timing results, any of these three may
-c  be used without penalty.
-c---------------------------------------------------------------------
-*/
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -233,11 +220,11 @@ c-------------------------------------------------------------------*/
 
     double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
     double *aelt = malloc((NZ+1) * sizeof(double));	/* aelt[1:NZ] */
-    double *x = malloc((NA+2+1) * sizeof(double));	/* x[1:NA+2] */
-    double *z = malloc((NA+2+1) * sizeof(double));	/* z[1:NA+2] */
-    double *p = malloc((NA+2+1) * sizeof(double));	/* p[1:NA+2] */
-    double *q = malloc((NA+2+1) * sizeof(double));	/* q[1:NA+2] */
-    double *r = malloc((NA+2+1) * sizeof(double));	/* r[1:NA+2] */
+    double *x = malloc((NA+2) * sizeof(double));	/* x[0:NA+1] */
+    double *z = malloc((NA+2) * sizeof(double));	/* z[0:NA+1] */
+    double *p = malloc((NA+2) * sizeof(double));	/* p[0:NA+1] */
+    double *q = malloc((NA+2) * sizeof(double));	/* q[0:NA+1] */
+    double *r = malloc((NA+2) * sizeof(double));	/* r[0:NA+1] */
     double *a = malloc((NZ+1) * sizeof(double));
 
     makea(naa, a, colidx, rowstr, NONZER,
@@ -249,11 +236,11 @@ c-------------------------------------------------------------------*/
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
 #pragma omp for nowait
-    for (i = 1; i <= NA+1; i++) {
+    for (i = 0; i <= NA; i++) {
     	x[i] = 1.0;
     }
 #pragma omp for nowait
-    for (j = 1; j <= NA; j++) {
+    for (j = 0; j < NA; j++) {
        q[j] = 0.0;
        z[j] = 0.0;
        r[j] = 0.0;
@@ -284,7 +271,7 @@ c-------------------------------------------------------------------*/
 	norm_temp11 = 0.0;
 	norm_temp12 = 0.0;
     #pragma omp parallel for default(shared) private(j) reduction(+:norm_temp11,norm_temp12)
-	for (j = 1; j <= NA; j++) {
+	for (j = 0; j < NA; j++) {
             norm_temp11 = norm_temp11 + x[j]*z[j];
             norm_temp12 = norm_temp12 + z[j]*z[j];
 	}
@@ -294,7 +281,7 @@ c-------------------------------------------------------------------*/
 c  Normalize z to obtain x
 c-------------------------------------------------------------------*/
     #pragma omp parallel for default(shared) private(j)
-	for (j = 1; j <= NA; j++) {
+	for (j = 0; j < NA; j++) {
             x[j] = norm_temp12*z[j];
 	}
 
@@ -304,7 +291,7 @@ c-------------------------------------------------------------------*/
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(i)
-    for (i = 1; i <= NA+1; i++) {
+    for (i = 0; i <= NA; i++) {
          x[i] = 1.0;
     }
     zeta  = 0.0;
@@ -335,7 +322,7 @@ c-------------------------------------------------------------------*/
 	norm_temp12 = 0.0;
 
 #pragma omp parallel for default(shared) private(j) reduction(+:norm_temp11,norm_temp12)
-	for (j = 1; j <= NA; j++) {
+	for (j = 0; j < NA; j++) {
             norm_temp11 = norm_temp11 + x[j]*z[j];
             norm_temp12 = norm_temp12 + z[j]*z[j];
 	}
@@ -353,7 +340,7 @@ c-------------------------------------------------------------------*/
 c  Normalize z to obtain x
 c-------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(j)
-	for (j = 1; j <= NA; j++) {
+	for (j = 0; j < NA; j++) {
             x[j] = norm_temp12*z[j];
 	}
     } /* end of main iter inv pow meth */
@@ -444,7 +431,7 @@ c  Initialize the CG algorithm:
 c-------------------------------------------------------------------*/
 {
 #pragma omp for
-    for (j = 1; j <= naa+1; j++) {
+    for (j = 0; j <= naa; j++) {
 	q[j] = 0.0;
 	z[j] = 0.0;
 	r[j] = x[j];
@@ -456,8 +443,8 @@ c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
 #pragma omp for reduction(+:rho)
-    for (j = 1; j <= naa; j++) {
-	rho = rho + r[j]*r[j];
+    for (j = 0; j < naa; j++) {
+	    rho += r[j]*r[j];
     }
 }/* end omp parallel */
 /*--------------------------------------------------------------------
@@ -487,10 +474,10 @@ C        on the Cray t3d - overall speed of code is 1.5 times faster.
 
 /* rolled version */
 #pragma omp for
-	for (j = 1; j <= naa; j++) {
+	for (j = 0; j < naa; j++) {
         sum = 0.0;
-	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
-		    sum = sum + a[k]*p[colidx[k]];
+	    for (k = rowstr[j + 1]; k < rowstr[j+2]; k++) {
+		    sum += a[k]*p[colidx[k] - 1];
 	    }
         q[j] = sum;
 	}
@@ -499,8 +486,8 @@ C        on the Cray t3d - overall speed of code is 1.5 times faster.
 c  Obtain p.q
 c-------------------------------------------------------------------*/
 #pragma omp for reduction(+:d)
-	for (j = 1; j <= naa; j++) {
-            d = d + p[j]*q[j];
+	for (j = 0; j < naa; j++) {
+            d += p[j]*q[j];
 	}
 #pragma omp barrier
 /*--------------------------------------------------------------------
@@ -513,15 +500,15 @@ c  Obtain z = z + alpha*p
 c  and    r = r - alpha*q
 c---------------------------------------------------------------------*/
 #pragma omp for reduction(+:rho)
-	for (j = 1; j <= naa; j++) {
-            z[j] = z[j] + alpha*p[j];
-            r[j] = r[j] - alpha*q[j];
+	for (j = 0; j < naa; j++) {
+            z[j] += alpha*p[j];
+            r[j] -= alpha*q[j];
 
 /*---------------------------------------------------------------------
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c---------------------------------------------------------------------*/
-            rho = rho + r[j]*r[j];
+            rho += r[j]*r[j];
 	}
 
 /*--------------------------------------------------------------------
@@ -533,7 +520,7 @@ c-------------------------------------------------------------------*/
 c  p = r + beta*p
 c-------------------------------------------------------------------*/
 #pragma omp for nowait
-	for (j = 1; j <= naa; j++) {
+	for (j = 0; j < naa; j++) {
             p[j] = r[j] + beta*p[j];
 	}
     callcount++;
@@ -550,10 +537,10 @@ c---------------------------------------------------------------------*/
 #pragma omp parallel default(shared) private(j,d) shared(sum)
 {
 #pragma omp for //private(d, k)
-    for (j = 1; j <= naa; j++) {
+    for (j = 0; j < naa; j++) {
     	d = 0.0;
-	    for (k = rowstr[j]; k <= rowstr[j+1]-1; k++) {
-            d += a[k]*z[colidx[k]];
+	    for (k = rowstr[j + 1]; k <= rowstr[j+2]-1; k++) {
+            d += a[k]*z[colidx[k] - 1];
 	    }
     	r[j] = d;
     }
@@ -562,7 +549,7 @@ c---------------------------------------------------------------------*/
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
 #pragma omp for reduction(+:sum)
-    for (j = 1; j <= naa; j++) {
+    for (j = 0; j < naa; j++) {
     	d = x[j] - r[j];
 	    sum += d*d;
     }
@@ -768,7 +755,7 @@ c              ...loop over the jth row of a
 c-------------------------------------------------------------------*/
 	    for (k = jajp1; k < rowstr[j+1]; k++) {
             i = colidx[k];
-            x[i] = x[i] + a[k];
+            x[i] += a[k];
             if ( mark[i] == false && x[i] != 0.0) {
 	    	    mark[i] = true;
 	    	    nzrow = nzrow + 1;
@@ -820,7 +807,7 @@ static void sprnvc(
     nzrow = 0;
     nn1 = 1;
     do {
-	nn1 = 2 * nn1;
+    	nn1 = 2 * nn1;
     } while (nn1 < n);
 
 /*--------------------------------------------------------------------
