@@ -220,11 +220,11 @@ c-------------------------------------------------------------------*/
 
     double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
     double *aelt = malloc((NZ+1) * sizeof(double));	/* aelt[1:NZ] */
-    double *x = malloc((NA+2) * sizeof(double));	/* x[0:NA+1] */
-    double *z = malloc((NA+2) * sizeof(double));	/* z[0:NA+1] */
-    double *p = malloc((NA+2) * sizeof(double));	/* p[0:NA+1] */
-    double *q = malloc((NA+2) * sizeof(double));	/* q[0:NA+1] */
-    double *r = malloc((NA+2) * sizeof(double));	/* r[0:NA+1] */
+    double *x = malloc(NA * sizeof(double));	/* x[0:NA+1] */
+    double *z = malloc(NA * sizeof(double));	/* z[0:NA+1] */
+    double *p = malloc(NA * sizeof(double));	/* p[0:NA+1] */
+    double *q = malloc(NA * sizeof(double));	/* q[0:NA+1] */
+    double *r = malloc(NA * sizeof(double));	/* r[0:NA+1] */
     double *a = malloc((NZ+1) * sizeof(double));
 
     makea(naa, a, colidx, rowstr, NONZER,
@@ -236,7 +236,7 @@ c-------------------------------------------------------------------*/
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
 #pragma omp for nowait
-    for (i = 0; i <= NA; i++) {
+    for (i = 0; i < NA; i++) {
     	x[i] = 1.0;
     }
 #pragma omp for nowait
@@ -291,7 +291,7 @@ c-------------------------------------------------------------------*/
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(i)
-    for (i = 0; i <= NA; i++) {
+    for (i = 0; i < NA; i++) {
          x[i] = 1.0;
     }
     zeta  = 0.0;
@@ -431,11 +431,11 @@ c  Initialize the CG algorithm:
 c-------------------------------------------------------------------*/
 {
 #pragma omp for
-    for (j = 0; j <= naa; j++) {
-	q[j] = 0.0;
-	z[j] = 0.0;
-	r[j] = x[j];
-	p[j] = r[j];
+    for (j = 0; j < naa; j++) {
+    	q[j] = 0.0;
+    	z[j] = 0.0;
+    	r[j] = x[j];
+    	p[j] = r[j];
     }
 
 /*--------------------------------------------------------------------
