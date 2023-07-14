@@ -214,11 +214,11 @@ c-------------------------------------------------------------------*/
 
     int *colidx = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
     int *rowstr = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
-    int *iv = malloc((2*NA+1+1) * sizeof(int));	/* iv[1:2*NA+1] */
+    int *iv = malloc(2 * NA * sizeof(int));
     int *arow = malloc(NZ * sizeof(int));
     int *acol = malloc(NZ * sizeof(int));
 
-    double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
+    double *v = malloc((NA+1) * sizeof(double));
     double *aelt = malloc(NZ * sizeof(double));
     double *x = malloc(NA * sizeof(double));
     double *z = malloc(NA * sizeof(double));
@@ -592,8 +592,8 @@ static void makea(
     int arow[],
     int acol[],
     double aelt[],
-    double v[],		/* v[1:n+1] */
-    int iv[],		/* iv[1:2*n+1] */
+    double v[],
+    int iv[],
     double shift )
 {
     int i, nnza, iouter, ivelt, ivelt1, irow, nzv;
@@ -621,10 +621,10 @@ c---------------------------------------------------------------------*/
 	    nzv = nonzer;
 	    sprnvc(n, nzv, v, iv, &(colidx[0]), &(colidx[n]));
 	    vecset(v, iv, &nzv, iouter, 0.5);
-	    for (ivelt = 1; ivelt <= nzv; ivelt++) {
+	    for (ivelt = 0; ivelt < nzv; ivelt++) {
 	        jcol = iv[ivelt];
 	    	scale = size * v[ivelt];
-	    	for (ivelt1 = 1; ivelt1 <= nzv; ivelt1++) {
+	    	for (ivelt1 = 0; ivelt1 < nzv; ivelt1++) {
 	            irow = iv[ivelt1];
 	    		acol[nnza] = jcol;
 	    		arow[nnza] = irow;
@@ -795,8 +795,8 @@ c       reinitialization of mark on every one of the n calls to sprnvc
 static void sprnvc(
     int n,
     int nz,
-    double v[],		/* v[1:*] */
-    int iv[],		/* iv[1:*] */
+    double v[],
+    int iv[],
     int nzloc[],	/* nzloc[1:n] */
     int mark[] ) 	/* mark[1:n] */
 {
@@ -832,9 +832,9 @@ c-------------------------------------------------------------------*/
     	    mark[i] = 1;
     	    nzrow++;
     	    nzloc[nzrow] = i;
-    	    nzv++;
     	    v[nzv] = vecelt;
     	    iv[nzv] = i;
+    	    nzv++;
     	}
     }
 
@@ -866,16 +866,16 @@ static void vecset(
     bool set;
 
     set = false;
-    for (k = 1; k <= *nzv; k++) {
+    for (k = 0; k < *nzv; k++) {
     	if (iv[k] == i) {
                 v[k] = val;
                 set  = true;
     	}
     }
     if (set == false) {
-	    *nzv = *nzv + 1;
 	    v[*nzv] = val;
 	    iv[*nzv] = i;
+	    *nzv = *nzv + 1;
     }
 }
 
