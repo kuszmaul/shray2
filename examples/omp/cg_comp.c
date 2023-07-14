@@ -32,19 +32,6 @@
 
 --------------------------------------------------------------------*/
 
-/*
-c---------------------------------------------------------------------
-c  Note: please observe that in the routine conj_grad three
-c  implementations of the sparse matrix-vector multiply have
-c  been supplied.  The default matrix-vector multiply is not
-c  loop unrolled.  The alternate implementations are unrolled
-c  to a depth of 2 and unrolled to a depth of 8.  Please
-c  experiment with these to find the fastest for your particular
-c  architecture.  If reporting timing results, any of these three may
-c  be used without penalty.
-c---------------------------------------------------------------------
-*/
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -67,21 +54,13 @@ static double amult;
 static double tran;
 
 /* function declarations */
-static void conj_grad (int colidx[], int rowstr[], double x[], double z[],
+static void conj_grad (size_t colidx[], size_t rowstr[], double x[], double z[],
 		       double a[], double p[], double q[], double r[],
-		       double *rnorm, int naa, int firstrow, int lastrow, int firstcol,
-               int lastcol);
+		       double *rnorm, int naa);
 
 /*--------------------------------------------------------------------
  * Utilities
 ----------------------------------------------------------------------*/
-
-double gettime()
-{
-    struct timeval tv_start;
-    gettimeofday(&tv_start, NULL);
-    return (double)tv_start.tv_usec / 1000000 + (double)tv_start.tv_sec;
-}
 
 int read_sparse(char *name, void *array, size_t size)
 {
@@ -105,6 +84,13 @@ int read_sparse(char *name, void *array, size_t size)
     }
 
     return 0;
+}
+
+double gettime()
+{
+    struct timeval tv_start;
+    gettimeofday(&tv_start, NULL);
+    return (double)tv_start.tv_usec / 1000000 + (double)tv_start.tv_sec;
 }
 
 double randlc (double *x, double a) {
@@ -214,17 +200,14 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
+    /* For the largest problem sizes, NA can be held by an integer, but not NZ
+     * for class >= E. */
+    size_t NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
 
-    int	i, j, k;
+    int	i, j;
     double rnorm;
     double t, mflops;
     double norm_temp11, norm_temp12;
-
-    int firstrow = 1;
-    int lastrow  = NA;
-    int firstcol = 1;
-    int lastcol  = NA;
 
     fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured OpenMP C version"
 	   " - CG Benchmark\n");
@@ -244,67 +227,54 @@ c-------------------------------------------------------------------*/
 c
 c-------------------------------------------------------------------*/
 
-    int *colidx = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
-    int *rowstr = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
-    int *iv = malloc((2*NA+1+1) * sizeof(int));	/* iv[1:2*NA+1] */
-    int *arow = malloc((NZ+1) * sizeof(int));		/* arow[1:NZ] */
-    int *acol = malloc((NZ+1) * sizeof(int));		/* acol[1:NZ] */
+    size_t *colidx = malloc(NZ * sizeof(size_t));
+    size_t *rowstr = malloc((NA + 1) * sizeof(size_t));
+    int *iv = malloc(2 * NA * sizeof(int));
+    int *arow = malloc(NZ * sizeof(int));
+    int *acol = malloc(NZ * sizeof(int));
 
-    double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
-    double *x = malloc((NA+2+1) * sizeof(double));	/* x[1:NA+2] */
-    double *z = malloc((NA+2+1) * sizeof(double));	/* z[1:NA+2] */
-    double *p = malloc((NA+2+1) * sizeof(double));	/* p[1:NA+2] */
-    double *q = malloc((NA+2+1) * sizeof(double));	/* q[1:NA+2] */
-    double *r = malloc((NA+2+1) * sizeof(double));	/* r[1:NA+2] */
-    double *a = malloc((NZ+1) * sizeof(double));
+    double *v = malloc((NA + 1) * sizeof(double));
+    double *aelt = malloc(NZ * sizeof(double));
+    double *x = malloc(NA * sizeof(double));
+    double *z = malloc(NA * sizeof(double));
+    double *p = malloc(NA * sizeof(double));
+    double *q = malloc(NA * sizeof(double));
+    double *r = malloc(NA * sizeof(double));
+    double *a = malloc(NZ * sizeof(double));
 
     char name[50];
 
     sprintf(name, "a.cg.%s", class);
-    if (read_sparse(name, a, (NZ + 1) * sizeof(double))) {
+    if (read_sparse(name, a, NZ * sizeof(double))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
     }
 
     sprintf(name, "colidx.cg.%s", class);
-    if (read_sparse(name, colidx, (NZ + 1) * sizeof(int))) {
+    if (read_sparse(name, colidx, NZ * sizeof(size_t))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
     }
 
     sprintf(name, "rowstr.cg.%s", class);
-    if (read_sparse(name, rowstr, (NA + 1 + 1) * sizeof(int))) {
+    if (read_sparse(name, rowstr, (NA + 1) * sizeof(size_t))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
     }
 
-
-/*---------------------------------------------------------------------
-c  Note: as a result of the generation of makea
-c        values of j used in indexing rowstr go from 1 --> lastrow-firstrow+1
-c        values of colidx which are col indexes go from firstcol --> lastcol
-c        So:
-c        Shift the col index vals from actual (firstcol --> lastcol )
-c        to local, i.e., (1 --> lastcol-firstcol+1)
-c---------------------------------------------------------------------*/
-#pragma omp parallel default(shared) private(i,j,k)
+#pragma omp parallel default(shared) private(i,j)
 {
-#pragma omp for nowait
-	for (k = rowstr[1]; k < rowstr[lastrow - firstrow + 1]; k++) {
-            colidx[k] = colidx[k] - firstcol + 1;
-	}
-
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
 #pragma omp for nowait
-    for (i = 1; i <= NA+1; i++) {
-	x[i] = 1.0;
+    for (i = 0; i < NA; i++) {
+    	x[i] = 1.0;
     }
 #pragma omp for nowait
-      for (j = 1; j <= lastcol-firstcol+1; j++) {
-         q[j] = 0.0;
-         z[j] = 0.0;
-         r[j] = 0.0;
-         p[j] = 0.0;
-      }
+    for (j = 0; j < NA; j++) {
+       q[j] = 0.0;
+       z[j] = 0.0;
+       r[j] = 0.0;
+       p[j] = 0.0;
+    }
 }// end omp parallel
     zeta  = 0.0;
 
@@ -319,8 +289,7 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  The call to the conjugate gradient routine:
 c-------------------------------------------------------------------*/
-	conj_grad (colidx, rowstr, x, z, a, p, q, r, &rnorm, naa, firstrow,
-            lastrow, firstcol, lastcol);
+	conj_grad (colidx, rowstr, x, z, a, p, q, r, &rnorm, naa);
 
 /*--------------------------------------------------------------------
 c  zeta = shift + 1/(x.z)
@@ -331,7 +300,7 @@ c-------------------------------------------------------------------*/
 	norm_temp11 = 0.0;
 	norm_temp12 = 0.0;
     #pragma omp parallel for default(shared) private(j) reduction(+:norm_temp11,norm_temp12)
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
+	for (j = 0; j < NA; j++) {
             norm_temp11 = norm_temp11 + x[j]*z[j];
             norm_temp12 = norm_temp12 + z[j]*z[j];
 	}
@@ -341,7 +310,7 @@ c-------------------------------------------------------------------*/
 c  Normalize z to obtain x
 c-------------------------------------------------------------------*/
     #pragma omp parallel for default(shared) private(j)
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
+	for (j = 0; j < NA; j++) {
             x[j] = norm_temp12*z[j];
 	}
 
@@ -351,7 +320,7 @@ c-------------------------------------------------------------------*/
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(i)
-    for (i = 1; i <= NA+1; i++) {
+    for (i = 0; i < NA; i++) {
          x[i] = 1.0;
     }
     zeta  = 0.0;
@@ -370,8 +339,7 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  The call to the conjugate gradient routine:
 c-------------------------------------------------------------------*/
-	conj_grad(colidx, rowstr, x, z, a, p, q, r, &rnorm, naa,
-            firstrow, lastrow, firstcol, lastcol);
+	conj_grad(colidx, rowstr, x, z, a, p, q, r, &rnorm, naa);
 
 /*--------------------------------------------------------------------
 c  zeta = shift + 1/(x.z)
@@ -383,7 +351,7 @@ c-------------------------------------------------------------------*/
 	norm_temp12 = 0.0;
 
 #pragma omp parallel for default(shared) private(j) reduction(+:norm_temp11,norm_temp12)
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
+	for (j = 0; j < NA; j++) {
             norm_temp11 = norm_temp11 + x[j]*z[j];
             norm_temp12 = norm_temp12 + z[j]*z[j];
 	}
@@ -401,7 +369,7 @@ c-------------------------------------------------------------------*/
 c  Normalize z to obtain x
 c-------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(j)
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
+	for (j = 0; j < NA; j++) {
             x[j] = norm_temp12*z[j];
 	}
     } /* end of main iter inv pow meth */
@@ -448,6 +416,7 @@ c-------------------------------------------------------------------*/
     free(iv);
     free(arow);
     free(acol);
+    free(aelt);
 
     free(v);
     free(a);
@@ -461,20 +430,16 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 static void conj_grad (
-    int colidx[],	/* colidx[1:nzz] */
-    int rowstr[],	/* rowstr[1:naa+1] */
-    double x[],		/* x[*] */
-    double z[],		/* z[*] */
-    double a[],		/* a[1:nzz] */
-    double p[],		/* p[*] */
-    double q[],		/* q[*] */
-    double r[],		/* r[*] */
+    size_t colidx[],
+    size_t rowstr[],
+    double x[],
+    double z[],
+    double a[],
+    double p[],
+    double q[],
+    double r[],
     double *rnorm,
-    int naa,
-    int firstrow,
-    int lastrow,
-    int firstcol,
-    int lastcol)
+    int naa)
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 
@@ -485,7 +450,7 @@ c---------------------------------------------------------------------*/
 {
     static int callcount = 0;
     double d, sum, rho, rho0, alpha, beta;
-    int j, k;
+    size_t j, k;
     int cgit, cgitmax = 25;
 
     rho = 0.0;
@@ -496,12 +461,11 @@ c  Initialize the CG algorithm:
 c-------------------------------------------------------------------*/
 {
 #pragma omp for
-    for (j = 1; j <= naa+1; j++) {
-	q[j] = 0.0;
-	z[j] = 0.0;
-	r[j] = x[j];
-	p[j] = r[j];
-	//w[j] = 0.0;
+    for (j = 0; j < naa; j++) {
+    	q[j] = 0.0;
+    	z[j] = 0.0;
+    	r[j] = x[j];
+    	p[j] = r[j];
     }
 
 /*--------------------------------------------------------------------
@@ -509,8 +473,8 @@ c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
 #pragma omp for reduction(+:rho)
-    for (j = 1; j <= lastcol-firstcol+1; j++) {
-	rho = rho + r[j]*r[j];
+    for (j = 0; j < naa; j++) {
+	    rho += r[j]*r[j];
     }
 }/* end omp parallel */
 /*--------------------------------------------------------------------
@@ -540,21 +504,20 @@ C        on the Cray t3d - overall speed of code is 1.5 times faster.
 
 /* rolled version */
 #pragma omp for
-	for (j = 1; j <= lastrow-firstrow+1; j++) {
-            sum = 0.0;
+	for (j = 0; j < naa; j++) {
+        sum = 0.0;
 	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
-		sum = sum + a[k]*p[colidx[k]];
+		    sum += a[k]*p[colidx[k]];
 	    }
-            //w[j] = sum;
-            q[j] = sum;
+        q[j] = sum;
 	}
 
 /*--------------------------------------------------------------------
 c  Obtain p.q
 c-------------------------------------------------------------------*/
 #pragma omp for reduction(+:d)
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
-            d = d + p[j]*q[j];
+	for (j = 0; j < naa; j++) {
+            d += p[j]*q[j];
 	}
 #pragma omp barrier
 /*--------------------------------------------------------------------
@@ -567,15 +530,15 @@ c  Obtain z = z + alpha*p
 c  and    r = r - alpha*q
 c---------------------------------------------------------------------*/
 #pragma omp for reduction(+:rho)
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
-            z[j] = z[j] + alpha*p[j];
-            r[j] = r[j] - alpha*q[j];
+	for (j = 0; j < naa; j++) {
+            z[j] += alpha*p[j];
+            r[j] -= alpha*q[j];
 
 /*---------------------------------------------------------------------
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c---------------------------------------------------------------------*/
-            rho = rho + r[j]*r[j];
+            rho += r[j]*r[j];
 	}
 
 /*--------------------------------------------------------------------
@@ -587,7 +550,7 @@ c-------------------------------------------------------------------*/
 c  p = r + beta*p
 c-------------------------------------------------------------------*/
 #pragma omp for nowait
-	for (j = 1; j <= lastcol-firstcol+1; j++) {
+	for (j = 0; j < naa; j++) {
             p[j] = r[j] + beta*p[j];
 	}
     callcount++;
@@ -604,21 +567,21 @@ c---------------------------------------------------------------------*/
 #pragma omp parallel default(shared) private(j,d) shared(sum)
 {
 #pragma omp for //private(d, k)
-    for (j = 1; j <= lastrow-firstrow+1; j++) {
-	d = 0.0;
-	for (k = rowstr[j]; k <= rowstr[j+1]-1; k++) {
-            d = d + a[k]*z[colidx[k]];
-	}
-	r[j] = d;
+    for (j = 0; j < naa; j++) {
+    	d = 0.0;
+	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
+            d += a[k] * z[colidx[k]];
+	    }
+    	r[j] = d;
     }
 
 /*--------------------------------------------------------------------
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
 #pragma omp for reduction(+:sum)
-    for (j = 1; j <= lastcol-firstcol+1; j++) {
-	d = x[j] - r[j];
-	sum = sum + d*d;
+    for (j = 0; j < naa; j++) {
+    	d = x[j] - r[j];
+	    sum += d*d;
     }
 }
     (*rnorm) = sqrt(sum);

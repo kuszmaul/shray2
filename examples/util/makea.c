@@ -1,7 +1,5 @@
 /*--------------------------------------------------------------------
 
-  Only outputs generated matrix
-
   NAS Parallel Benchmarks 3.0 structured OpenMP C versions - CG
 
   This benchmark is an OpenMP C version of the NPB CG code.
@@ -34,19 +32,6 @@
 
 --------------------------------------------------------------------*/
 
-/*
-c---------------------------------------------------------------------
-c  Note: please observe that in the routine conj_grad three
-c  implementations of the sparse matrix-vector multiply have
-c  been supplied.  The default matrix-vector multiply is not
-c  loop unrolled.  The alternate implementations are unrolled
-c  to a depth of 2 and unrolled to a depth of 8.  Please
-c  experiment with these to find the fastest for your particular
-c  architecture.  If reporting timing results, any of these three may
-c  be used without penalty.
-c---------------------------------------------------------------------
-*/
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -69,16 +54,14 @@ static double amult;
 static double tran;
 
 /* function declarations */
-static void makea(int n, int nz, double a[], int colidx[], int rowstr[],
-		  int nonzer, int firstrow, int lastrow, int firstcol,
-		  int lastcol, double rcond, int arow[], int acol[],
+static void makea(int n, size_t nz, double a[], size_t colidx[], size_t rowstr[],
+		  int nonzer, double rcond, int arow[], int acol[],
 		  double aelt[], double v[], int iv[], double shift );
-static void sparse(double a[], int colidx[], int rowstr[], int n,
+static void sparse(double a[], size_t colidx[], size_t rowstr[], int n,
 		   int arow[], int acol[], double aelt[],
-		   int firstrow, int lastrow,
-		   double x[], int mark[], int nzloc[], int nnza);
-static void sprnvc(int n, int nz, double v[], int iv[], int nzloc[],
-		   int mark[]);
+		   double x[], int mark[], int nzloc[], size_t nnza);
+static void sprnvc(int n, size_t nz, double v[], int iv[], size_t nzloc[],
+		   size_t mark[]);
 static int icnvrt(double x, int ipwr2);
 static void vecset(double v[], int iv[], int *nzv, int i, double val);
 
@@ -108,6 +91,13 @@ int read_sparse(char *name, void *array, size_t size)
     }
 
     return 0;
+}
+
+double gettime()
+{
+    struct timeval tv_start;
+    gettimeofday(&tv_start, NULL);
+    return (double)tv_start.tv_usec / 1000000 + (double)tv_start.tv_sec;
 }
 
 double randlc (double *x, double a) {
@@ -181,54 +171,40 @@ int main(int argc, char **argv) {
     int NA, NONZER, NITER;
     double RCOND = 1.0e-1;
     double SHIFT;
-    double zeta_verify_value;
 
     if (!strcmp(class, "S")) {
         NA = 1400;
         NONZER = 7;
         NITER = 15;
         SHIFT = 10.0;
-	    zeta_verify_value = 8.5971775078648;
     } else if (!strcmp(class, "W")) {
         NA = 7000;
         NONZER = 7;
         NITER = 15;
         SHIFT = 12.0;
-	    zeta_verify_value = 10.362595087124;
     } else if (!strcmp(class, "A")) {
         NA = 14000;
         NONZER = 11;
         NITER = 15;
         SHIFT = 20.0;
-	    zeta_verify_value = 17.130235054029;
     } else if (!strcmp(class, "B")) {
         NA = 75000;
         NONZER = 13;
         NITER = 75;
         SHIFT = 60.0;
-	    zeta_verify_value = 22.712745482631;
     } else if (!strcmp(class, "C")) {
         NA = 150000;
         NONZER = 15;
         NITER = 75;
         SHIFT = 110.0;
-	    zeta_verify_value = 28.973605592845;
     } else {
         fprintf(stderr, "Error, class should be in {S, W, A, B, C}\n");
         return EXIT_FAILURE;
     }
 
-    int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
-
-    int	i, j, k;
-    double rnorm;
-    double t, mflops;
-    double norm_temp11, norm_temp12;
-
-    int firstrow = 1;
-    int lastrow  = NA;
-    int firstcol = 1;
-    int lastcol  = NA;
+    /* For the largest problem sizes, NA can be held by an integer, but not NZ
+     * for class >= E. */
+    size_t NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
 
     fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured OpenMP C version"
 	   " - CG Benchmark\n");
@@ -236,45 +212,35 @@ int main(int argc, char **argv) {
     fprintf(stderr, " Iterations: %5d\n", NITER);
 
     int naa = NA;
-    int nzz = NZ;
+    size_t nzz = NZ;
 
 /*--------------------------------------------------------------------
-c  Initialize random number generator
+c  Initialize random number generator and generate one so a is
+c  generated with the right seed.
 c-------------------------------------------------------------------*/
     tran    = 314159265.0;
     amult   = 1220703125.0;
-    double zeta    = randlc( &tran, amult );
+    randlc( &tran, amult );
 
 /*--------------------------------------------------------------------
 c
 c-------------------------------------------------------------------*/
 
-    int *colidx = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
-    int *colidx2 = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
-    int *rowstr = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
-    int *rowstr2 = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
-    int *iv = malloc((2*NA+1+1) * sizeof(int));	/* iv[1:2*NA+1] */
-    int *arow = malloc((NZ+1) * sizeof(int));		/* arow[1:NZ] */
-    int *acol = malloc((NZ+1) * sizeof(int));		/* acol[1:NZ] */
+    size_t *colidx = malloc(NZ * sizeof(size_t));
+    size_t *rowstr = malloc((NA + 1) * sizeof(size_t));
+    size_t *colidx2 = malloc(NZ * sizeof(size_t));
+    size_t *rowstr2 = malloc((NA + 1) * sizeof(size_t));
+    int *iv = malloc(2 * NA * sizeof(int));
+    int *arow = malloc(NZ * sizeof(int));
+    int *acol = malloc(NZ * sizeof(int));
 
-    double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
-    double *aelt = malloc((NZ+1) * sizeof(double));	/* aelt[1:NZ] */
-    double *x = malloc((NA+2+1) * sizeof(double));	/* x[1:NA+2] */
-    double *z = malloc((NA+2+1) * sizeof(double));	/* z[1:NA+2] */
-    double *p = malloc((NA+2+1) * sizeof(double));	/* p[1:NA+2] */
-    double *q = malloc((NA+2+1) * sizeof(double));	/* q[1:NA+2] */
-    double *r = malloc((NA+2+1) * sizeof(double));	/* r[1:NA+2] */
-    double *a = malloc((NZ+1) * sizeof(double));
-    double *a2 = malloc((NZ+1) * sizeof(double));
+    double *v = malloc((NA + 1) * sizeof(double));
+    double *aelt = malloc(NZ * sizeof(double));
+    double *a = malloc(NZ * sizeof(double));
+    double *a2 = malloc(NZ * sizeof(double));
 
     makea(naa, nzz, a, colidx, rowstr, NONZER,
-	  firstrow, lastrow, firstcol, lastcol,
 	  RCOND, arow, acol, aelt, v, iv, SHIFT);
-
-    fprintf(stderr, "First 10 elements of a are:\n");
-    for (int i = 0; i < 10; i++) {
-        fprintf(stderr, "a[%d] = %.17lf\n", i, a[i]);
-    }
 
     char *a_name = malloc(7);
     sprintf(a_name, "a.cg.%s", class);
@@ -293,16 +259,18 @@ c-------------------------------------------------------------------*/
     }
 
     size_t bytes_written;
-    if ((fwrite(a, sizeof(double), NZ + 1, a_stream) != NZ + 1)) {
+    if ((bytes_written = fwrite(a, sizeof(double), NZ, a_stream)) != NZ) {
         fprintf(stderr, "Writing %s went wrong, only wrote %lu items\n",
                 a_name, bytes_written);
         return EXIT_FAILURE;
     }
-    if ((fwrite(colidx, sizeof(int), NZ + 1, colidx_stream) != NZ + 1)) {
+    if ((bytes_written = fwrite(colidx, sizeof(size_t), NZ, colidx_stream))
+            != NZ) {
         fprintf(stderr, "Writing %s went wrong\n", colidx_name);
         return EXIT_FAILURE;
     }
-    if ((fwrite(rowstr, sizeof(int), NA + 2, rowstr_stream) != NA + 2)) {
+    if ((bytes_written = fwrite(rowstr, sizeof(size_t), NA + 1, rowstr_stream))
+            != (size_t)NA + 1) {
         fprintf(stderr, "Writing %s went wrong\n", rowstr_name);
         return EXIT_FAILURE;
     }
@@ -313,17 +281,17 @@ c-------------------------------------------------------------------*/
 
     char name[50];
     sprintf(name, "a.cg.%s", class);
-    read_sparse(name, a2, (NZ + 1) * sizeof(double));
+    read_sparse(name, a2, NZ * sizeof(double));
     sprintf(name, "colidx.cg.%s", class);
-    read_sparse(name, colidx2, (NZ + 1) * sizeof(int));
+    read_sparse(name, colidx2, NZ * sizeof(size_t));
     sprintf(name, "rowstr.cg.%s", class);
-    read_sparse(name, rowstr2, (NA + 1 + 1) * sizeof(int));
+    read_sparse(name, rowstr2, (NA + 1) * sizeof(size_t));
 
     bool correct_a = true;
-    for (int i = 0; i < NZ + 1; i++) {
+    for (size_t i = 0; i < NZ; i++) {
         if (a2[i] != a[i]) {
             correct_a = false;
-            printf("Created a[%d] = %.17lf is wrong (should be %.17lf)\n",
+            printf("Created a[%ld] = %.17lf is wrong (should be %.17lf)\n",
                     i, a2[i], a[i]);
         }
     }
@@ -332,10 +300,10 @@ c-------------------------------------------------------------------*/
             (correct_a) ? "" : "in");
 
     bool correct_col = true;
-    for (int i = 0; i < NZ + 1; i++) {
+    for (size_t i = 0; i < NZ; i++) {
         if (colidx2[i] != colidx[i]) {
             correct_col = false;
-            printf("Created colidx[%d] = %d is wrong (should be %d)\n",
+            printf("Created colidx[%ld] = %ld is wrong (should be %ld)\n",
                     i, colidx2[i], colidx[i]);
         }
     }
@@ -344,10 +312,10 @@ c-------------------------------------------------------------------*/
             (correct_col) ? "" : "in");
 
     bool correct_row = true;
-    for (int i = 0; i < NA + 1 + 1; i++) {
+    for (int i = 0; i < NA + 1; i++) {
         if (rowstr2[i] != rowstr[i]) {
             correct_row = false;
-            printf("Created rowstr[%d] = %d is wrong (should be %d)\n",
+            printf("Created rowstr[%d] = %ld is wrong (should be %ld)\n",
                     i, rowstr2[i], rowstr[i]);
         }
     }
@@ -356,21 +324,12 @@ c-------------------------------------------------------------------*/
             (correct_row) ? "" : "in");
 
     free(colidx);
-    free(colidx2);
     free(rowstr);
-    free(rowstr2);
     free(iv);
     free(arow);
     free(acol);
-
-    free(v);
+    free(aelt);
     free(a);
-    free(a2);
-    free(x);
-    free(z);
-    free(p);
-    free(q);
-    free(r);
 }
 
 /*---------------------------------------------------------------------
@@ -383,7 +342,7 @@ c
 c       input
 c
 c       n            i           number of cols/rows of matrix
-c       nz           i           nonzeros as declared array size
+c       nz           i*8         number of non-zeroes of matrix
 c       rcond        r*8         condition number
 c       shift        r*8         main diagonal shift
 c
@@ -400,24 +359,21 @@ c       v, aelt        r*8
 c---------------------------------------------------------------------*/
 static void makea(
     int n,
-    int nz,
-    double a[],		/* a[1:nz] */
-    int colidx[],	/* colidx[1:nz] */
-    int rowstr[],	/* rowstr[1:n+1] */
+    size_t nz,
+    double a[],
+    size_t colidx[],
+    size_t rowstr[],
     int nonzer,
-    int firstrow,
-    int lastrow,
-    int firstcol,
-    int lastcol,
     double rcond,
-    int arow[],		/* arow[1:nz] */
-    int acol[],		/* acol[1:nz] */
-    double aelt[],	/* aelt[1:nz] */
-    double v[],		/* v[1:n+1] */
-    int iv[],		/* iv[1:2*n+1] */
+    int arow[],
+    int acol[],
+    double aelt[],
+    double v[],
+    int iv[],
     double shift )
 {
-    int i, nnza, iouter, ivelt, ivelt1, irow, nzv;
+    int iouter, ivelt, ivelt1, irow, nzv;
+    size_t i, nnza;
 
 /*--------------------------------------------------------------------
 c      nonzer is approximately  (int(sqrt(nnza /n)));
@@ -431,60 +387,41 @@ c-------------------------------------------------------------------*/
     nnza = 0;
 
 /*---------------------------------------------------------------------
-c  Initialize colidx(n+1 .. 2n) to zero.
+c  Initialize colidx(n .. 2n - 1) to zero.
 c  Used by sprnvc to mark nonzero positions
 c---------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(i)
-    for (i = 1; i <= n; i++) {
+    for (i = 0; i < (size_t)n; i++) {
     	colidx[n+i] = 0;
     }
     for (iouter = 1; iouter <= n; iouter++) {
 	    nzv = nonzer;
 	    sprnvc(n, nzv, v, iv, &(colidx[0]), &(colidx[n]));
 	    vecset(v, iv, &nzv, iouter, 0.5);
-	    for (ivelt = 1; ivelt <= nzv; ivelt++) {
+	    for (ivelt = 0; ivelt < nzv; ivelt++) {
 	        jcol = iv[ivelt];
-	        if (jcol >= firstcol && jcol <= lastcol) {
-	    	    scale = size * v[ivelt];
-	    	    for (ivelt1 = 1; ivelt1 <= nzv; ivelt1++) {
-	                irow = iv[ivelt1];
-                    if (irow >= firstrow && irow <= lastrow) {
-	    	    	    nnza = nnza + 1;
-	    	    	    if (nnza > nz) {
-	    	    	        printf("Space for matrix elements exceeded in"
-	    	    	    	   " makea\n");
-	    	    	        printf("nnza, nzmax = %d, %d\n", nnza, nz);
-	    	    	        printf("iouter = %d\n", iouter);
-	    	    	        exit(1);
-	    	    	    }
-	    	    	    acol[nnza] = jcol;
-	    	    	    arow[nnza] = irow;
-	    	    	    aelt[nnza] = v[ivelt1] * scale;
-	    	        }
-	    	    }
-	        }
+	    	scale = size * v[ivelt];
+	    	for (ivelt1 = 0; ivelt1 < nzv; ivelt1++) {
+	            irow = iv[ivelt1];
+	    		acol[nnza] = jcol;
+	    		arow[nnza] = irow;
+	    		aelt[nnza] = v[ivelt1] * scale;
+	    		nnza++;
+	    	}
 	    }
-	    size = size * ratio;
+	    size *= ratio;
     }
 
 /*---------------------------------------------------------------------
 c       ... add the identity * rcond to the generated matrix to bound
 c           the smallest eigenvalue from below by rcond
 c---------------------------------------------------------------------*/
-    for (i = firstrow; i <= lastrow; i++) {
-    	if (i >= firstcol && i <= lastcol) {
-    	    iouter = n + i;
-    	    nnza = nnza + 1;
-    	    if (nnza > nz) {
-    		    printf("Space for matrix elements exceeded in makea\n");
-    		    printf("nnza, nzmax = %d, %d\n", nnza, nz);
-    		    printf("iouter = %d\n", iouter);
-    		    exit(1);
-    	    }
-    	    acol[nnza] = i;
-    	    arow[nnza] = i;
-    	    aelt[nnza] = rcond - shift;
-    	}
+    for (i = 1; i <= (size_t)n; i++) {
+    	iouter = n + i;
+    	acol[nnza] = i;
+    	arow[nnza] = i;
+    	aelt[nnza] = rcond - shift;
+    	nnza++;
     }
 
 /*---------------------------------------------------------------------
@@ -492,7 +429,13 @@ c       ... make the sparse matrix from list of elements with duplicates
 c           (v and iv are used as  workspace)
 c---------------------------------------------------------------------*/
     sparse(a, colidx, rowstr, n, arow, acol, aelt,
-	   firstrow, lastrow, v, &(iv[0]), &(iv[n]), nnza);
+	   v, &(iv[0]), &(iv[n]), nnza);
+
+    /* Ugly but we should index the non-zeroes from 0 to n - 1, not 1 to n. */
+    #pragma omp parallel for private(i)
+    for (i = 0; i < nz; i++) {
+        colidx[i]--;
+    }
 }
 
 /*---------------------------------------------------
@@ -500,50 +443,48 @@ c       generate a sparse matrix from a list of
 c       [col, row, element] tri
 c---------------------------------------------------*/
 static void sparse(
-    double a[],		/* a[1:*] */
-    int colidx[],	/* colidx[1:*] */
-    int rowstr[],	/* rowstr[1:*] */
+    double a[],
+    size_t colidx[],
+    size_t rowstr[],
     int n,
-    int arow[],		/* arow[1:*] */
-    int acol[],		/* acol[1:*] */
-    double aelt[],	/* aelt[1:*] */
-    int firstrow,
-    int lastrow,
-    double x[],		/* x[1:n] */
+    int arow[],
+    int acol[],
+    double aelt[],
+    double x[],
     int mark[],	/* mark[1:n] */
     int nzloc[],	/* nzloc[1:n] */
-    int nnza)
+    size_t nnza)
 /*---------------------------------------------------------------------
-c       rows range from firstrow to lastrow
-c       the rowstr pointers are defined for nrows = lastrow-firstrow+1 values
+c       rows range from 1 to n
+c       the rowstr pointers are defined for nrows = n values
 c---------------------------------------------------------------------*/
 {
     int nrows;
-    int i, j, jajp1, nza, k, nzrow;
+    size_t i, j, jajp1, nza, k, nzrow;
     double xi;
 
 /*--------------------------------------------------------------------
 c    how many rows of result
 c-------------------------------------------------------------------*/
-    nrows = lastrow - firstrow + 1;
+    nrows = n;
 
 /*--------------------------------------------------------------------
 c     ...count the number of triples in each row
 c-------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(j)
     for (j = 1; j <= n; j++) {
-	    rowstr[j] = 0;
+	    rowstr[j - 1] = 0;
 	    mark[j] = false;
     }
-    rowstr[n+1] = 0;
+    rowstr[n] = 0;
 
-    for (nza = 1; nza <= nnza; nza++) {
-	    j = (arow[nza] - firstrow + 1) + 1;
-	    rowstr[j] = rowstr[j] + 1;
+    for (nza = 0; nza < nnza; nza++) {
+	    j = arow[nza] + 1;
+	    rowstr[j - 1] = rowstr[j - 1] + 1;
     }
 
-    rowstr[1] = 1;
-    for (j = 2; j <= nrows+1; j++) {
+    rowstr[0] = 0;
+    for (j = 1; j <= (size_t)nrows; j++) {
 	    rowstr[j] = rowstr[j] + rowstr[j-1];
     }
 
@@ -556,15 +497,15 @@ c---------------------------------------------------------------------*/
 c     ... preload data pages
 c---------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(k,j)
-      for(j = 0;j <= nrows-1;j++) {
-         for(k = rowstr[j];k <= rowstr[j+1]-1;k++)
+      for(j = 0; j < nrows; j++) {
+         for (k = rowstr[j]; k < rowstr[j+1]; k++)
 	       a[k] = 0.0;
       }
 /*--------------------------------------------------------------------
 c     ... do a bucket sort of the triples on the row index
 c-------------------------------------------------------------------*/
-    for (nza = 1; nza <= nnza; nza++) {
-	    j = arow[nza] - firstrow + 1;
+    for (nza = 0; nza < nnza; nza++) {
+	    j = arow[nza] - 1;
 	    k = rowstr[j];
 	    a[k] = aelt[nza];
 	    colidx[k] = acol[nza];
@@ -575,9 +516,9 @@ c-------------------------------------------------------------------*/
 c       ... rowstr(j) now points to the first element of row j+1
 c-------------------------------------------------------------------*/
     for (j = nrows; j >= 1; j--) {
-	    rowstr[j+1] = rowstr[j];
+	    rowstr[j] = rowstr[j - 1];
     }
-    rowstr[1] = 1;
+    rowstr[0] = 0;
 
 /*--------------------------------------------------------------------
 c       ... generate the actual output rows by adding elements
@@ -589,16 +530,16 @@ c-------------------------------------------------------------------*/
 	    mark[i] = false;
     }
 
-    jajp1 = rowstr[1];
-    for (j = 1; j <= nrows; j++) {
+    jajp1 = rowstr[0];
+    for (j = 1; j <= (size_t)nrows; j++) {
 	    nzrow = 0;
 
 /*--------------------------------------------------------------------
 c              ...loop over the jth row of a
 c-------------------------------------------------------------------*/
-	    for (k = jajp1; k < rowstr[j+1]; k++) {
+	    for (k = jajp1; k < rowstr[j]; k++) {
             i = colidx[k];
-            x[i] = x[i] + a[k];
+            x[i] += a[k];
             if ( mark[i] == false && x[i] != 0.0) {
 	    	    mark[i] = true;
 	    	    nzrow = nzrow + 1;
@@ -615,13 +556,13 @@ c-------------------------------------------------------------------*/
             xi = x[i];
             x[i] = 0.0;
             if (xi != 0.0) {
-	    	    nza = nza + 1;
 	    	    a[nza] = xi;
 	    	    colidx[nza] = i;
+	    	    nza = nza + 1;
 	        }
 	    }
-	    jajp1 = rowstr[j+1];
-	    rowstr[j+1] = nza + rowstr[1];
+	    jajp1 = rowstr[j];
+	    rowstr[j] = nza + rowstr[0];
     }
 }
 
@@ -636,21 +577,21 @@ c       reinitialization of mark on every one of the n calls to sprnvc
 ---------------------------------------------------------------------*/
 static void sprnvc(
     int n,
-    int nz,
-    double v[],		/* v[1:*] */
-    int iv[],		/* iv[1:*] */
-    int nzloc[],	/* nzloc[1:n] */
-    int mark[] ) 	/* mark[1:n] */
+    size_t nz,
+    double v[],
+    int iv[],
+    size_t nzloc[],	/* nzloc[1:n] */
+    size_t mark[] ) 	/* mark[1:n] */
 {
     int nn1;
-    int nzrow, nzv, ii, i;
+    size_t nzrow, nzv, ii, i;
     double vecelt, vecloc;
 
     nzv = 0;
     nzrow = 0;
     nn1 = 1;
     do {
-	nn1 = 2 * nn1;
+    	nn1 = 2 * nn1;
     } while (nn1 < n);
 
 /*--------------------------------------------------------------------
@@ -658,31 +599,31 @@ c    nn1 is the smallest power of two not less than n
 c-------------------------------------------------------------------*/
 
     while (nzv < nz) {
-	vecelt = randlc(&tran, amult);
+    	vecelt = randlc(&tran, amult);
 
 /*--------------------------------------------------------------------
 c   generate an integer between 1 and n in a portable manner
 c-------------------------------------------------------------------*/
-	vecloc = randlc(&tran, amult);
-	i = icnvrt(vecloc, nn1) + 1;
-	if (i > n) continue;
+    	vecloc = randlc(&tran, amult);
+    	i = icnvrt(vecloc, nn1) + 1;
+    	if (i > (size_t)n) continue;
 
 /*--------------------------------------------------------------------
 c  was this integer generated already?
 c-------------------------------------------------------------------*/
-	if (mark[i] == 0) {
-	    mark[i] = 1;
-	    nzrow = nzrow + 1;
-	    nzloc[nzrow] = i;
-	    nzv = nzv + 1;
-	    v[nzv] = vecelt;
-	    iv[nzv] = i;
-	}
+    	if (mark[i] == 0) {
+    	    mark[i] = 1;
+    	    nzrow++;
+    	    nzloc[nzrow] = i;
+    	    v[nzv] = vecelt;
+    	    iv[nzv] = i;
+    	    nzv++;
+    	}
     }
 
     for (ii = 1; ii <= nzrow; ii++) {
-	i = nzloc[ii];
-	mark[i] = 0;
+	    i = nzloc[ii];
+	    mark[i] = 0;
     }
 }
 
@@ -708,16 +649,16 @@ static void vecset(
     bool set;
 
     set = false;
-    for (k = 1; k <= *nzv; k++) {
-	if (iv[k] == i) {
-            v[k] = val;
-            set  = true;
-	}
+    for (k = 0; k < *nzv; k++) {
+    	if (iv[k] == i) {
+                v[k] = val;
+                set  = true;
+    	}
     }
     if (set == false) {
-	*nzv = *nzv + 1;
-	v[*nzv] = val;
-	iv[*nzv] = i;
+	    v[*nzv] = val;
+	    iv[*nzv] = i;
+	    *nzv = *nzv + 1;
     }
 }
 
