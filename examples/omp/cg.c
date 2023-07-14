@@ -478,7 +478,7 @@ C        on the Cray t3d - overall speed of code is 1.5 times faster.
 	for (j = 0; j < naa; j++) {
         sum = 0.0;
 	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
-		    sum += a[k - 1]*p[colidx[k - 1] - 1];
+		    sum += a[k]*p[colidx[k] - 1];
 	    }
         q[j] = sum;
 	}
@@ -541,7 +541,7 @@ c---------------------------------------------------------------------*/
     for (j = 0; j < naa; j++) {
     	d = 0.0;
 	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
-            d += a[k - 1]*z[colidx[k - 1] - 1];
+            d += a[k] * z[colidx[k] - 1];
 	    }
     	r[j] = d;
     }
@@ -700,7 +700,7 @@ c-------------------------------------------------------------------*/
 	    rowstr[j - 1] = rowstr[j - 1] + 1;
     }
 
-    rowstr[0] = 1;
+    rowstr[0] = 0;
     for (j = 1; j <= nrows; j++) {
 	    rowstr[j] = rowstr[j] + rowstr[j-1];
     }
@@ -716,7 +716,7 @@ c---------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(k,j)
       for(j = 0; j < nrows; j++) {
          for (k = rowstr[j]; k < rowstr[j+1]; k++)
-	       a[k - 1] = 0.0;
+	       a[k] = 0.0;
       }
 /*--------------------------------------------------------------------
 c     ... do a bucket sort of the triples on the row index
@@ -724,8 +724,8 @@ c-------------------------------------------------------------------*/
     for (nza = 0; nza < nnza; nza++) {
 	    j = arow[nza] - 1;
 	    k = rowstr[j];
-	    a[k - 1] = aelt[nza];
-	    colidx[k - 1] = acol[nza];
+	    a[k] = aelt[nza];
+	    colidx[k] = acol[nza];
 	    rowstr[j] = rowstr[j] + 1;
     }
 
@@ -735,7 +735,7 @@ c-------------------------------------------------------------------*/
     for (j = nrows; j >= 1; j--) {
 	    rowstr[j] = rowstr[j - 1];
     }
-    rowstr[0] = 1;
+    rowstr[0] = 0;
 
 /*--------------------------------------------------------------------
 c       ... generate the actual output rows by adding elements
@@ -755,8 +755,8 @@ c-------------------------------------------------------------------*/
 c              ...loop over the jth row of a
 c-------------------------------------------------------------------*/
 	    for (k = jajp1; k < rowstr[j]; k++) {
-            i = colidx[k - 1];
-            x[i] += a[k - 1];
+            i = colidx[k];
+            x[i] += a[k];
             if ( mark[i] == false && x[i] != 0.0) {
 	    	    mark[i] = true;
 	    	    nzrow = nzrow + 1;
