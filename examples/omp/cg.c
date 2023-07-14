@@ -70,7 +70,7 @@ static double tran;
 static void conj_grad (int colidx[], int rowstr[], double x[], double z[],
 		       double a[], double p[], double q[], double r[],
 		       double *rnorm, int naa);
-static void makea(int n, int nz, double a[], int colidx[], int rowstr[],
+static void makea(int n, double a[], int colidx[], int rowstr[],
 		  int nonzer, double rcond, int arow[], int acol[],
 		  double aelt[], double v[], int iv[], double shift );
 static void sparse(double a[], int colidx[], int rowstr[], int n,
@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
 
     int NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
 
-    int	i, j, k;
+    int	i, j;
     double rnorm;
     double t, mflops;
     double norm_temp11, norm_temp12;
@@ -213,7 +213,6 @@ int main(int argc, char **argv) {
     fprintf(stderr, " Iterations: %5d\n", NITER);
 
     int naa = NA;
-    int nzz = NZ;
 
 /*--------------------------------------------------------------------
 c  Initialize random number generator
@@ -241,10 +240,10 @@ c-------------------------------------------------------------------*/
     double *r = malloc((NA+2+1) * sizeof(double));	/* r[1:NA+2] */
     double *a = malloc((NZ+1) * sizeof(double));
 
-    makea(naa, nzz, a, colidx, rowstr, NONZER,
+    makea(naa, a, colidx, rowstr, NONZER,
 	  RCOND, arow, acol, aelt, v, iv, SHIFT);
 
-#pragma omp parallel default(shared) private(i,j,k)
+#pragma omp parallel default(shared) private(i,j)
 {
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
@@ -581,7 +580,6 @@ c
 c       input
 c
 c       n            i           number of cols/rows of matrix
-c       nz           i           nonzeros as declared array size
 c       rcond        r*8         condition number
 c       shift        r*8         main diagonal shift
 c
@@ -598,7 +596,6 @@ c       v, aelt        r*8
 c---------------------------------------------------------------------*/
 static void makea(
     int n,
-    int nz,
     double a[],		/* a[1:nz] */
     int colidx[],	/* colidx[1:nz] */
     int rowstr[],	/* rowstr[1:n+1] */
@@ -638,27 +635,16 @@ c---------------------------------------------------------------------*/
 	    vecset(v, iv, &nzv, iouter, 0.5);
 	    for (ivelt = 1; ivelt <= nzv; ivelt++) {
 	        jcol = iv[ivelt];
-	        if (jcol >= 1 && jcol <= n) {
-	    	    scale = size * v[ivelt];
-	    	    for (ivelt1 = 1; ivelt1 <= nzv; ivelt1++) {
-	                irow = iv[ivelt1];
-                    if (irow >= 1 && irow <= n) {
-	    	    	    nnza = nnza + 1;
-	    	    	    if (nnza > nz) {
-	    	    	        printf("Space for matrix elements exceeded in"
-	    	    	    	   " makea\n");
-	    	    	        printf("nnza, nzmax = %d, %d\n", nnza, nz);
-	    	    	        printf("iouter = %d\n", iouter);
-	    	    	        exit(1);
-	    	    	    }
-	    	    	    acol[nnza] = jcol;
-	    	    	    arow[nnza] = irow;
-	    	    	    aelt[nnza] = v[ivelt1] * scale;
-	    	        }
-	    	    }
-	        }
+	    	scale = size * v[ivelt];
+	    	for (ivelt1 = 1; ivelt1 <= nzv; ivelt1++) {
+	            irow = iv[ivelt1];
+	    		nnza++;
+	    		acol[nnza] = jcol;
+	    		arow[nnza] = irow;
+	    		aelt[nnza] = v[ivelt1] * scale;
+	    	}
 	    }
-	    size = size * ratio;
+	    size *= ratio;
     }
 
 /*---------------------------------------------------------------------
@@ -667,7 +653,7 @@ c           the smallest eigenvalue from below by rcond
 c---------------------------------------------------------------------*/
     for (i = 1; i <= n; i++) {
     	iouter = n + i;
-    	nnza = nnza + 1;
+    	nnza++;
     	acol[nnza] = i;
     	arow[nnza] = i;
     	aelt[nnza] = rcond - shift;
@@ -842,31 +828,31 @@ c    nn1 is the smallest power of two not less than n
 c-------------------------------------------------------------------*/
 
     while (nzv < nz) {
-	vecelt = randlc(&tran, amult);
+    	vecelt = randlc(&tran, amult);
 
 /*--------------------------------------------------------------------
 c   generate an integer between 1 and n in a portable manner
 c-------------------------------------------------------------------*/
-	vecloc = randlc(&tran, amult);
-	i = icnvrt(vecloc, nn1) + 1;
-	if (i > n) continue;
+    	vecloc = randlc(&tran, amult);
+    	i = icnvrt(vecloc, nn1) + 1;
+    	if (i > n) continue;
 
 /*--------------------------------------------------------------------
 c  was this integer generated already?
 c-------------------------------------------------------------------*/
-	if (mark[i] == 0) {
-	    mark[i] = 1;
-	    nzrow = nzrow + 1;
-	    nzloc[nzrow] = i;
-	    nzv = nzv + 1;
-	    v[nzv] = vecelt;
-	    iv[nzv] = i;
-	}
+    	if (mark[i] == 0) {
+    	    mark[i] = 1;
+    	    nzrow++;
+    	    nzloc[nzrow] = i;
+    	    nzv++;
+    	    v[nzv] = vecelt;
+    	    iv[nzv] = i;
+    	}
     }
 
     for (ii = 1; ii <= nzrow; ii++) {
-	i = nzloc[ii];
-	mark[i] = 0;
+	    i = nzloc[ii];
+	    mark[i] = 0;
     }
 }
 
@@ -893,15 +879,15 @@ static void vecset(
 
     set = false;
     for (k = 1; k <= *nzv; k++) {
-	if (iv[k] == i) {
-            v[k] = val;
-            set  = true;
-	}
+    	if (iv[k] == i) {
+                v[k] = val;
+                set  = true;
+    	}
     }
     if (set == false) {
-	*nzv = *nzv + 1;
-	v[*nzv] = val;
-	iv[*nzv] = i;
+	    *nzv = *nzv + 1;
+	    v[*nzv] = val;
+	    iv[*nzv] = i;
     }
 }
 
