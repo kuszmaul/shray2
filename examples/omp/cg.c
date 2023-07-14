@@ -225,7 +225,7 @@ c-------------------------------------------------------------------*/
     double *p = malloc(NA * sizeof(double));	/* p[0:NA+1] */
     double *q = malloc(NA * sizeof(double));	/* q[0:NA+1] */
     double *r = malloc(NA * sizeof(double));	/* r[0:NA+1] */
-    double *a = malloc(NZ * sizeof(double));
+    double *a = malloc((NZ+1) * sizeof(double));
 
     makea(naa, a, colidx, rowstr, NONZER,
 	  RCOND, arow, acol, aelt, v, iv, SHIFT);
@@ -387,6 +387,7 @@ c-------------------------------------------------------------------*/
     free(iv);
     free(arow);
     free(acol);
+    free(aelt);
 
     free(v);
     free(a);
@@ -477,7 +478,7 @@ C        on the Cray t3d - overall speed of code is 1.5 times faster.
 	for (j = 0; j < naa; j++) {
         sum = 0.0;
 	    for (k = rowstr[j + 1]; k < rowstr[j+2]; k++) {
-		    sum += a[k - 1]*p[colidx[k] - 1];
+		    sum += a[k]*p[colidx[k] - 1];
 	    }
         q[j] = sum;
 	}
@@ -540,7 +541,7 @@ c---------------------------------------------------------------------*/
     for (j = 0; j < naa; j++) {
     	d = 0.0;
 	    for (k = rowstr[j + 1]; k <= rowstr[j+2]-1; k++) {
-            d += a[k - 1]*z[colidx[k] - 1];
+            d += a[k]*z[colidx[k] - 1];
 	    }
     	r[j] = d;
     }
@@ -713,9 +714,9 @@ c---------------------------------------------------------------------*/
 c     ... preload data pages
 c---------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(k,j)
-      for(j = 0;j <= nrows-1;j++) {
-         for(k = rowstr[j]; k <= rowstr[j+1]-1; k++)
-	       a[k - 1] = 0.0;
+      for(j = 1; j <= nrows; j++) {
+         for (k = rowstr[j]; k < rowstr[j+1]; k++)
+	       a[k] = 0.0;
       }
 /*--------------------------------------------------------------------
 c     ... do a bucket sort of the triples on the row index
@@ -723,7 +724,7 @@ c-------------------------------------------------------------------*/
     for (nza = 1; nza <= nnza; nza++) {
 	    j = arow[nza];
 	    k = rowstr[j];
-	    a[k - 1] = aelt[nza];
+	    a[k] = aelt[nza];
 	    colidx[k] = acol[nza];
 	    rowstr[j] = rowstr[j] + 1;
     }
@@ -755,7 +756,7 @@ c              ...loop over the jth row of a
 c-------------------------------------------------------------------*/
 	    for (k = jajp1; k < rowstr[j+1]; k++) {
             i = colidx[k];
-            x[i] += a[k - 1];
+            x[i] += a[k];
             if ( mark[i] == false && x[i] != 0.0) {
 	    	    mark[i] = true;
 	    	    nzrow = nzrow + 1;
@@ -772,8 +773,8 @@ c-------------------------------------------------------------------*/
             xi = x[i];
             x[i] = 0.0;
             if (xi != 0.0) {
-	    	    a[nza] = xi;
 	    	    nza = nza + 1;
+	    	    a[nza] = xi;
 	    	    colidx[nza] = i;
 	        }
 	    }
