@@ -215,16 +215,16 @@ c-------------------------------------------------------------------*/
     int *colidx = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
     int *rowstr = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
     int *iv = malloc((2*NA+1+1) * sizeof(int));	/* iv[1:2*NA+1] */
-    int *arow = malloc((NZ+1) * sizeof(int));		/* arow[1:NZ] */
-    int *acol = malloc((NZ+1) * sizeof(int));		/* acol[1:NZ] */
+    int *arow = malloc(NZ * sizeof(int));
+    int *acol = malloc(NZ * sizeof(int));
 
     double *v = malloc((NA+1+1) * sizeof(double));	/* v[1:NA+1] */
-    double *aelt = malloc((NZ+1) * sizeof(double));	/* aelt[1:NZ] */
-    double *x = malloc(NA * sizeof(double));	/* x[0:NA+1] */
-    double *z = malloc(NA * sizeof(double));	/* z[0:NA+1] */
-    double *p = malloc(NA * sizeof(double));	/* p[0:NA+1] */
-    double *q = malloc(NA * sizeof(double));	/* q[0:NA+1] */
-    double *r = malloc(NA * sizeof(double));	/* r[0:NA+1] */
+    double *aelt = malloc(NZ * sizeof(double));
+    double *x = malloc(NA * sizeof(double));
+    double *z = malloc(NA * sizeof(double));
+    double *p = malloc(NA * sizeof(double));
+    double *q = malloc(NA * sizeof(double));
+    double *r = malloc(NA * sizeof(double));
     double *a = malloc(NZ * sizeof(double));
 
     makea(naa, a, colidx, rowstr, NONZER,
@@ -589,9 +589,9 @@ static void makea(
     int rowstr[],	/* rowstr[1:n+1] */
     int nonzer,
     double rcond,
-    int arow[],		/* arow[1:nz] */
-    int acol[],		/* acol[1:nz] */
-    double aelt[],	/* aelt[1:nz] */
+    int arow[],
+    int acol[],
+    double aelt[],
     double v[],		/* v[1:n+1] */
     int iv[],		/* iv[1:2*n+1] */
     double shift )
@@ -626,10 +626,10 @@ c---------------------------------------------------------------------*/
 	    	scale = size * v[ivelt];
 	    	for (ivelt1 = 1; ivelt1 <= nzv; ivelt1++) {
 	            irow = iv[ivelt1];
-	    		nnza++;
 	    		acol[nnza] = jcol;
 	    		arow[nnza] = irow;
 	    		aelt[nnza] = v[ivelt1] * scale;
+	    		nnza++;
 	    	}
 	    }
 	    size *= ratio;
@@ -641,10 +641,10 @@ c           the smallest eigenvalue from below by rcond
 c---------------------------------------------------------------------*/
     for (i = 1; i <= n; i++) {
     	iouter = n + i;
-    	nnza++;
     	acol[nnza] = i;
     	arow[nnza] = i;
     	aelt[nnza] = rcond - shift;
+    	nnza++;
     }
 
 /*---------------------------------------------------------------------
@@ -664,9 +664,9 @@ static void sparse(
     int colidx[],	/* colidx[1:*] */
     int rowstr[],	/* rowstr[1:*] */
     int n,
-    int arow[],		/* arow[1:*] */
-    int acol[],		/* acol[1:*] */
-    double aelt[],	/* aelt[1:*] */
+    int arow[],
+    int acol[],
+    double aelt[],
     double x[],		/* x[1:n] */
     int mark[],	/* mark[1:n] */
     int nzloc[],	/* nzloc[1:n] */
@@ -695,7 +695,7 @@ c-------------------------------------------------------------------*/
     }
     rowstr[n+1] = 0;
 
-    for (nza = 1; nza <= nnza; nza++) {
+    for (nza = 0; nza < nnza; nza++) {
 	    j = arow[nza] + 1;
 	    rowstr[j] = rowstr[j] + 1;
     }
@@ -721,7 +721,7 @@ c---------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c     ... do a bucket sort of the triples on the row index
 c-------------------------------------------------------------------*/
-    for (nza = 1; nza <= nnza; nza++) {
+    for (nza = 0; nza < nnza; nza++) {
 	    j = arow[nza];
 	    k = rowstr[j];
 	    a[k - 1] = aelt[nza];
