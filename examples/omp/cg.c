@@ -212,13 +212,13 @@ c-------------------------------------------------------------------*/
 c
 c-------------------------------------------------------------------*/
 
-    int *colidx = malloc((NZ+1) * sizeof(int));	/* colidx[1:NZ] */
-    int *rowstr = malloc((NA+1+1) * sizeof(int));	/* rowstr[1:NA+1] */
+    int *colidx = malloc(NZ * sizeof(int));
+    int *rowstr = malloc((NA + 1) * sizeof(int));
     int *iv = malloc(2 * NA * sizeof(int));
     int *arow = malloc(NZ * sizeof(int));
     int *acol = malloc(NZ * sizeof(int));
 
-    double *v = malloc((NA+1) * sizeof(double));
+    double *v = malloc((NA + 1) * sizeof(double));
     double *aelt = malloc(NZ * sizeof(double));
     double *x = malloc(NA * sizeof(double));
     double *z = malloc(NA * sizeof(double));
@@ -401,14 +401,14 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 static void conj_grad (
-    int colidx[],	/* colidx[1:nzz] */
-    int rowstr[],	/* rowstr[1:naa+1] */
-    double x[],		/* x[*] */
-    double z[],		/* z[*] */
-    double a[],		/* a[1:nzz] */
-    double p[],		/* p[*] */
-    double q[],		/* q[*] */
-    double r[],		/* r[*] */
+    int colidx[],
+    int rowstr[],
+    double x[],
+    double z[],
+    double a[],
+    double p[],
+    double q[],
+    double r[],
     double *rnorm,
     int naa)
 /*--------------------------------------------------------------------
@@ -477,8 +477,8 @@ C        on the Cray t3d - overall speed of code is 1.5 times faster.
 #pragma omp for
 	for (j = 0; j < naa; j++) {
         sum = 0.0;
-	    for (k = rowstr[j + 1]; k < rowstr[j+2]; k++) {
-		    sum += a[k - 1]*p[colidx[k] - 1];
+	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
+		    sum += a[k - 1]*p[colidx[k - 1] - 1];
 	    }
         q[j] = sum;
 	}
@@ -540,8 +540,8 @@ c---------------------------------------------------------------------*/
 #pragma omp for //private(d, k)
     for (j = 0; j < naa; j++) {
     	d = 0.0;
-	    for (k = rowstr[j + 1]; k <= rowstr[j+2]-1; k++) {
-            d += a[k - 1]*z[colidx[k] - 1];
+	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
+            d += a[k - 1]*z[colidx[k - 1] - 1];
 	    }
     	r[j] = d;
     }
@@ -584,9 +584,9 @@ c       v, aelt        r*8
 c---------------------------------------------------------------------*/
 static void makea(
     int n,
-    double a[],		/* a[1:nz] */
-    int colidx[],	/* colidx[1:nz] */
-    int rowstr[],	/* rowstr[1:n+1] */
+    double a[],
+    int colidx[],
+    int rowstr[],
     int nonzer,
     double rcond,
     int arow[],
@@ -610,11 +610,11 @@ c-------------------------------------------------------------------*/
     nnza = 0;
 
 /*---------------------------------------------------------------------
-c  Initialize colidx(n+1 .. 2n) to zero.
+c  Initialize colidx(n .. 2n - 1) to zero.
 c  Used by sprnvc to mark nonzero positions
 c---------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(i)
-    for (i = 1; i <= n; i++) {
+    for (i = 0; i < n; i++) {
     	colidx[n+i] = 0;
     }
     for (iouter = 1; iouter <= n; iouter++) {
@@ -660,14 +660,14 @@ c       generate a sparse matrix from a list of
 c       [col, row, element] tri
 c---------------------------------------------------*/
 static void sparse(
-    double a[],		/* a[1:*] */
-    int colidx[],	/* colidx[1:*] */
-    int rowstr[],	/* rowstr[1:*] */
+    double a[],
+    int colidx[],
+    int rowstr[],
     int n,
     int arow[],
     int acol[],
     double aelt[],
-    double x[],		/* x[1:n] */
+    double x[],
     int mark[],	/* mark[1:n] */
     int nzloc[],	/* nzloc[1:n] */
     int nnza)
@@ -690,18 +690,18 @@ c     ...count the number of triples in each row
 c-------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(j)
     for (j = 1; j <= n; j++) {
-	    rowstr[j] = 0;
+	    rowstr[j - 1] = 0;
 	    mark[j] = false;
     }
-    rowstr[n+1] = 0;
+    rowstr[n] = 0;
 
     for (nza = 0; nza < nnza; nza++) {
 	    j = arow[nza] + 1;
-	    rowstr[j] = rowstr[j] + 1;
+	    rowstr[j - 1] = rowstr[j - 1] + 1;
     }
 
-    rowstr[1] = 1;
-    for (j = 2; j <= nrows+1; j++) {
+    rowstr[0] = 1;
+    for (j = 1; j <= nrows; j++) {
 	    rowstr[j] = rowstr[j] + rowstr[j-1];
     }
 
@@ -714,7 +714,7 @@ c---------------------------------------------------------------------*/
 c     ... preload data pages
 c---------------------------------------------------------------------*/
 #pragma omp parallel for default(shared) private(k,j)
-      for(j = 1; j <= nrows; j++) {
+      for(j = 0; j < nrows; j++) {
          for (k = rowstr[j]; k < rowstr[j+1]; k++)
 	       a[k - 1] = 0.0;
       }
@@ -722,10 +722,10 @@ c---------------------------------------------------------------------*/
 c     ... do a bucket sort of the triples on the row index
 c-------------------------------------------------------------------*/
     for (nza = 0; nza < nnza; nza++) {
-	    j = arow[nza];
+	    j = arow[nza] - 1;
 	    k = rowstr[j];
 	    a[k - 1] = aelt[nza];
-	    colidx[k] = acol[nza];
+	    colidx[k - 1] = acol[nza];
 	    rowstr[j] = rowstr[j] + 1;
     }
 
@@ -733,9 +733,9 @@ c-------------------------------------------------------------------*/
 c       ... rowstr(j) now points to the first element of row j+1
 c-------------------------------------------------------------------*/
     for (j = nrows; j >= 1; j--) {
-	    rowstr[j+1] = rowstr[j];
+	    rowstr[j] = rowstr[j - 1];
     }
-    rowstr[1] = 1;
+    rowstr[0] = 1;
 
 /*--------------------------------------------------------------------
 c       ... generate the actual output rows by adding elements
@@ -747,15 +747,15 @@ c-------------------------------------------------------------------*/
 	    mark[i] = false;
     }
 
-    jajp1 = rowstr[1];
+    jajp1 = rowstr[0];
     for (j = 1; j <= nrows; j++) {
 	    nzrow = 0;
 
 /*--------------------------------------------------------------------
 c              ...loop over the jth row of a
 c-------------------------------------------------------------------*/
-	    for (k = jajp1; k < rowstr[j+1]; k++) {
-            i = colidx[k];
+	    for (k = jajp1; k < rowstr[j]; k++) {
+            i = colidx[k - 1];
             x[i] += a[k - 1];
             if ( mark[i] == false && x[i] != 0.0) {
 	    	    mark[i] = true;
@@ -774,12 +774,12 @@ c-------------------------------------------------------------------*/
             x[i] = 0.0;
             if (xi != 0.0) {
 	    	    a[nza] = xi;
-	    	    nza = nza + 1;
 	    	    colidx[nza] = i;
+	    	    nza = nza + 1;
 	        }
 	    }
-	    jajp1 = rowstr[j+1];
-	    rowstr[j+1] = nza + rowstr[1];
+	    jajp1 = rowstr[j];
+	    rowstr[j] = nza + rowstr[0];
     }
 }
 
