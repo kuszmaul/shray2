@@ -2,6 +2,7 @@
 foreach(file
         blas
 		matrix
+        cg_single
         monopoly
         monopoly_mt
         1dstencil
@@ -16,6 +17,7 @@ foreach(file
 		PRIVATE
 			${PROJECT_FLAGS}
 			-cpp
+            -fcheck=all
 			-fcoarray=lib)
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE

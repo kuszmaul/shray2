@@ -81,7 +81,7 @@ contains
 !  Initialize the CG algorithm:
 !---------------------------------------------------------------------
 !$omp do
-      do j=1,naa+1
+      do j=1,naa
          q(j) = 0.0d0
          z(j) = 0.0d0
          r(j) = x(j)
@@ -348,11 +348,11 @@ end module conj_mod
       allocate (  &
      &          colidx(nz), rowstr(na+1),  &
      &          a(nz),  &
-     &          x(na+2),  &
-     &          z(na+2),  &
-     &          p(na+2),  &
-     &          q(na+2),  &
-     &          r(na+2))
+     &          x(na),  &
+     &          z(na),  &
+     &          p(na),  &
+     &          q(na),  &
+     &          r(na))
 
 
       inquire(iolength=recl_a) a(1:nz)
@@ -412,7 +412,7 @@ end module conj_mod
 !  set starting vector to (1, 1, .... 1)
 !---------------------------------------------------------------------
 !$omp do
-      do i = 1, na+1
+      do i = 1, na
          x(i) = 1.0D0
       enddo
 !$omp end do nowait
@@ -480,7 +480,7 @@ end module conj_mod
 !
 !
 !$omp parallel do default(shared) private(i)
-      do i = 1, na+1
+      do i = 1, na
          x(i) = 1.0D0
       enddo
 !$omp end parallel do
