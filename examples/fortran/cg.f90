@@ -69,6 +69,8 @@ contains
       double precision ::  x(:)[*], p(:)[*], q(:)[*], r(:)[*], z(:)[*], a(:)[*]
       integer(8) ::  colidx(:)[*], rowstr(:)[*]
 
+      integer(8) :: a_local, a_image, v_local, v_image
+
       data      cgitmax / 25 /
 
       allocate(all_rhos[*], all_ds[*], all_sums[*])
@@ -99,7 +101,10 @@ contains
          p(j) = r(j)
       enddo
 !$omp end do
+
+    !$omp master
     sync all;
+    !$omp end master
 
 !---------------------------------------------------------------------
 !  rho = r.r
@@ -111,6 +116,7 @@ contains
       enddo
 !$omp end do
 
+    !$omp master
     all_rhos = rho
     sync all
 
@@ -119,7 +125,10 @@ contains
         rho = rho + all_rhos[j]
     end do
 
+    write(*, *) "rho = ", rho, " at image ", this_image()
+    !$omp end master
 
+    !FIXME between here
 !---------------------------------------------------------------------
 !---->
 !  The conj grad iteration loop
@@ -149,18 +158,28 @@ contains
 !        The unrolled-by-8 version below is significantly faster
 !        on the Cray t3d - overall speed of code is 1.5 times faster.
 !
+
 !$omp do
          do j=1,na_local
             suml = 0.d0
             do k=rowstr(j),rowstr(j+1)-1
-               suml = suml + a(modulo(k - 1, nz_block) + 1)[(k - 1) / nz_block + 1]* &
-                   p(modulo(colidx(k) - 1, na_block) + 1)[(colidx(k) - 1) / na_block + 1]
+               a_local = modulo(k - 1, nz_block) + 1
+               a_image = (k - 1) / nz_block + 1
+               v_local = modulo(colidx(a_local)[a_image] - 1, na_block) + 1
+               v_image = (colidx(a_local)[a_image] - 1) / na_block + 1
+               suml = suml + a(a_local)[a_image] * &
+                   p(v_local)[v_image]
             enddo
             q(j) = suml
          enddo
 !$omp end do
 
-sync all
+    ! q(1) is accurate (p = 2, class = S), but q(701) is not
+    write(*, *) "q(", (this_image() - 1) * na_block + 1, ") = ", q(1)
+
+    !$omp master
+    sync all
+    !$omp end master
 
 !---------------------------------------------------------------------
 !  Obtain p.q
@@ -170,12 +189,17 @@ sync all
             d = d + p(j)*q(j)
          enddo
 !$omp end do
+
+        !$omp master
         all_ds = d
         sync all
         d = 0
         do j = 1, num_images()
             d = d + all_ds[j]
         end do
+        !FIXME and here something goes wrong
+        write(*, *) "d is ", d, " at image ", this_image()
+        !$omp end master
 
 
 !---------------------------------------------------------------------
@@ -202,12 +226,17 @@ sync all
          enddo
 !$omp end do
 
+    !$omp master
     all_rhos = rho
     sync all
     rho = 0
     do j = 1, num_images()
         rho = rho + all_rhos[j]
     end do
+
+    write(*, *) "rho after = ", rho, " at image ", this_image()
+    !$omp end master
+
 
 !---------------------------------------------------------------------
 !  Obtain beta:
@@ -223,7 +252,9 @@ sync all
     enddo
 !$omp end do
 
+    !$omp master
     sync all
+    !$omp end master
 
       enddo                             ! end of do cgit=1,cgitmax
 
@@ -236,14 +267,19 @@ sync all
       do j=1,na_local
          suml = 0.d0
          do k=rowstr(j),rowstr(j+1)-1
-            suml = suml + a(modulo(k - 1, nz_block) + 1)[(k - 1) / nz_block + 1] * &
-                z(modulo(colidx(k) - 1, na_block) + 1)[(colidx(k) - 1) / na_block + 1]
+            a_local = modulo(k - 1, nz_block) + 1
+            a_image = (k - 1) / nz_block + 1
+            v_local = modulo(colidx(a_local)[a_image] - 1, na_block) + 1
+            v_image = (colidx(a_local)[a_image] - 1) / na_block + 1
+            suml = suml + a(a_local)[a_image] * z(v_local)[v_image]
          enddo
          r(j) = suml
       enddo
 !$omp end do
 
+    !$omp master
     sync all;
+    !$omp end master
 
 
 !---------------------------------------------------------------------
@@ -257,12 +293,15 @@ sync all
 !$omp end do nowait
 !$omp end parallel
 
+    !$omp master
     all_sums = sum
     sync all
     sum = 0
     do j = 1, num_images()
         sum = sum + all_sums[j]
     end do
+    write(*, *) "sum is ", sum, " at image ", this_image()
+    !$omp end master
 
       rnorm = sqrt( sum )
 
@@ -395,21 +434,21 @@ end module conj_mod
 
     nz_block = (nz + num_images() - 1) / num_images()
     if (nz_block * this_image() .gt. nz) then
-        nz_local = nz - nz_block * (this_image() - 1)
+        nz_local = nz - nz_block * (this_image() - 1) + 1
     else
         nz_local = nz_block
     end if
 
     na_block = (na + num_images() - 1) / num_images()
     if (na_block * this_image() .gt. na) then
-        na_local = na - na_block * (this_image() - 1)
+        na_local = na - na_block * (this_image() - 1) + 1
     else
         na_local = na_block
     end if
 
     row_block = (na + 1 + num_images() - 1) / num_images()
     if (row_block * this_image() .gt. na + 1) then
-        row_local = na + 1 - row_block * (this_image() - 1)
+        row_local = na + 1 - row_block * (this_image() - 1) + 1
     else
         row_local = row_block
     end if
@@ -440,14 +479,14 @@ end module conj_mod
 
       read(io_col, rec=this_image()) colidx
 
-      do i = 1, nz
+      do i = 1, nz_local
           ! C ordering -> Fortran ordering
           colidx(i) = colidx(i) + 1
       end do
 
       read(io_row, rec=this_image()) rowstr
 
-      do i = 1, na + 1
+      do i = 1, row_local
           ! C ordering -> Fortran ordering
           rowstr(i) = rowstr(i) + 1
       end do
@@ -458,16 +497,18 @@ end module conj_mod
 
       sync all
 
-      write( *,1000 )
-      write( *,1001 ) na
-      write( *,1002 ) niter
-!$    write( *,1003 ) omp_get_max_threads()
-      write( *,* )
- 1000 format(//,' NAS Parallel Benchmarks (NPB3.4-OMP)',  &
-     &          ' - CG Benchmark', /)
- 1001 format(' Size: ', i11 )
- 1002 format(' Iterations:                  ', i5 )
- 1003 format(' Number of available threads: ', i5)
+      if (this_image() .eq. 1) then
+          write( *,1000 )
+          write( *,1001 ) na
+          write( *,1002 ) niter
+    !$    write( *,1003 ) omp_get_max_threads()
+          write( *,* )
+     1000 format(//,' NAS Parallel Benchmarks (NPB3.4-OMP)',  &
+         &          ' - CG Benchmark', /)
+     1001 format(' Size: ', i11 )
+     1002 format(' Iterations:                  ', i5 )
+     1003 format(' Number of available threads: ', i5)
+     end if
 
       naa = na
       nzz = nz
@@ -524,7 +565,7 @@ end module conj_mod
          norm_temp2 = 0.0d0
 !$omp parallel default(shared) private(j,norm_temp3)
 !$omp do reduction(+:norm_temp1,norm_temp2)
-         do j=1, na
+         do j=1, na_local
             norm_temp1 = norm_temp1 + x(j)*z(j)
             norm_temp2 = norm_temp2 + z(j)*z(j)
          enddo
@@ -543,6 +584,10 @@ end module conj_mod
         end do
 
          norm_temp3 = 1.0d0 / sqrt( norm_temp2 )
+
+         !$omp master
+         write(*, *) "norm_temp3 is ", norm_temp3, " at ", this_image()
+         !$omp end master
 
 
 !---------------------------------------------------------------------
@@ -609,8 +654,8 @@ end module conj_mod
          enddo
 !$omp end do
 
-        all_norm_temp1 = norm_temp1
-        all_norm_temp2 = norm_temp2
+        all_norm_temp1[this_image()] = norm_temp1
+        all_norm_temp2[this_image()] = norm_temp2
         sync all
 
         norm_temp1 = 0.0d0
@@ -628,8 +673,10 @@ end module conj_mod
 
 !$omp master
          zeta = shift + 1.0d0 / norm_temp1
-         if( it .eq. 1 ) write( *,9000 )
-         write( *,9001 ) it, rnorm, zeta
+         if (this_image() .eq. 1) then
+            if( it .eq. 1 ) write( *,9000 )
+                write( *,9001 ) it, rnorm, zeta
+        end if
 !$omp end master
 
  9000    format( /,'   iteration           ||r||                 zeta' )
@@ -639,7 +686,7 @@ end module conj_mod
 !  Normalize z to obtain x
 !---------------------------------------------------------------------
 !$omp do
-         do j=1, na
+         do j=1, na_local
             x(j) = norm_temp3*z(j)
          enddo
 !$omp end do nowait
@@ -654,6 +701,7 @@ end module conj_mod
 !---------------------------------------------------------------------
     t = real((cpu_count2 - cpu_count) / count_rate)
 
+    if (this_image() .eq. 1) then
       write(*,100)
  100  format(' Benchmark completed ')
 
@@ -695,7 +743,7 @@ end module conj_mod
      &                 + 3. ) / t
 
     write(*, *) gflops, " Gflops/s"
-
+    end if
       end                              ! end main
 
 

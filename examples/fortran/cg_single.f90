@@ -48,7 +48,7 @@
 !---------------------------------------------------------------------
 !---------------------------------------------------------------------
 
-module conj_mod
+module conj_mod_s
 contains
       subroutine conj_grad ( rnorm, a, colidx, rowstr, x, p, q, r, z, naa)
 !---------------------------------------------------------------------
@@ -100,6 +100,7 @@ contains
       enddo
 !$omp end do
 
+    write(*, *) "rho = ", rho
 !---------------------------------------------------------------------
 !---->
 !  The conj grad iteration loop
@@ -139,6 +140,8 @@ contains
          enddo
 !$omp end do
 
+        write(*, *) "q(1) = ", q(1)
+        write(*, *) "q(701) = ", q(701)
 !---------------------------------------------------------------------
 !  Obtain p.q
 !---------------------------------------------------------------------
@@ -148,6 +151,9 @@ contains
          enddo
 !$omp end do
 
+    !$omp master
+    write(*, *) "d is ", d
+    !$omp end master
 
 !---------------------------------------------------------------------
 !  Obtain alpha = rho / (p.q)
@@ -173,6 +179,9 @@ contains
          enddo
 !$omp end do
 
+    !$omp master
+    write(*, *) "rho after = ", rho
+    !$omp end master
 !---------------------------------------------------------------------
 !  Obtain beta:
 !---------------------------------------------------------------------
@@ -218,13 +227,17 @@ contains
 !$omp end do nowait
 !$omp end parallel
 
+    !$omp master
+    write(*, *) "sum is ", sum
+    !$omp end master
+
       rnorm = sqrt( sum )
 
 
 
       return
       end                               ! end of routine conj_grad
-end module conj_mod
+end module conj_mod_s
 
 
 !---------------------------------------------------------------------
@@ -234,7 +247,7 @@ end module conj_mod
 !---------------------------------------------------------------------
 
       use, intrinsic :: ieee_arithmetic, only : ieee_is_nan
-      use conj_mod
+      use conj_mod_s
 
       implicit none
 
@@ -458,7 +471,9 @@ end module conj_mod
 
          norm_temp3 = 1.0d0 / sqrt( norm_temp2 )
 
-
+         !$omp master
+        write(*, *) "norm_temp3 is ", norm_temp3
+        !$omp end master
 !---------------------------------------------------------------------
 !  Normalize z to obtain x
 !---------------------------------------------------------------------

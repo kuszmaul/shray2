@@ -3,6 +3,7 @@ foreach(file
         blas
 		matrix
         cg_single
+        cg
         monopoly
         monopoly_mt
         1dstencil
