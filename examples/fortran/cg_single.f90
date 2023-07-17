@@ -247,12 +247,7 @@ end module conj_mod
      &                         r(:)
 
 ! ... partition size
-      integer(8)               naa,  &
-     &                         firstrow,  &
-     &                         lastrow,  &
-     &                         firstcol,  &
-     &                         lastcol
-      integer(8)              nzz
+      integer(8)               naa, nzz
 
       double precision         amult, tran
 !$omp threadprivate (amult, tran)
@@ -360,9 +355,9 @@ end module conj_mod
      &          r(na+2))
 
 
-      inquire(iolength=recl_a) a(1)
-      inquire(iolength=recl_col) colidx(1)
-      inquire(iolength=recl_row) rowstr(1)
+      inquire(iolength=recl_a) a(1:nz)
+      inquire(iolength=recl_col) colidx(1:nz)
+      inquire(iolength=recl_row) rowstr(1:na + 1)
 
       open(newunit=io_a, file="a.cg." // class, form='unformatted', &
           access='direct', recl=recl_a)
@@ -371,15 +366,18 @@ end module conj_mod
       open(newunit=io_row, file="rowstr.cg." // class, form='unformatted', &
           access='direct', recl=recl_row)
 
+      read(io_a, rec=1) a
+
+      read(io_col, rec=1) colidx
+
       do i = 1, nz
-          read(io_a, rec=i) a(i)
-          read(io_col, rec=i) colidx(i)
           ! C ordering -> Fortran ordering
           colidx(i) = colidx(i) + 1
       end do
 
+      read(io_row, rec=1) rowstr
+
       do i = 1, na + 1
-          read(io_row, rec=i) rowstr(i)
           ! C ordering -> Fortran ordering
           rowstr(i) = rowstr(i) + 1
       end do
@@ -387,12 +385,6 @@ end module conj_mod
       close(io_a)
       close(io_col)
       close(io_row)
-
-
-      firstrow = 1
-      lastrow  = na
-      firstcol = 1
-      lastcol  = na
 
       write( *,1000 )
       write( *,1001 ) na
@@ -417,22 +409,6 @@ end module conj_mod
       zeta    = randlc( tran, amult )
 
 !---------------------------------------------------------------------
-!  Note: as a result of the above call to makea:
-!        values of j used in indexing rowstr go from 1 --> lastrow-firstrow+1
-!        values of colidx which are col indexes go from firstcol --> lastcol
-!        So:
-!        Shift the col index vals from actual (firstcol --> lastcol )
-!        to local, i.e., (1 --> lastcol-firstcol+1)
-!---------------------------------------------------------------------
-!$omp do
-      do j=1,lastrow-firstrow+1
-         do k=rowstr(j),rowstr(j+1)-1
-            colidx(k) = colidx(k) - firstcol + 1
-         enddo
-      enddo
-!$omp end do nowait
-
-!---------------------------------------------------------------------
 !  set starting vector to (1, 1, .... 1)
 !---------------------------------------------------------------------
 !$omp do
@@ -441,7 +417,7 @@ end module conj_mod
       enddo
 !$omp end do nowait
 !$omp do
-      do j=1, lastcol-firstcol+1
+      do j=1, na
          q(j) = 0.0d0
          z(j) = 0.0d0
          r(j) = 0.0d0
@@ -474,7 +450,7 @@ end module conj_mod
          norm_temp2 = 0.0d0
 !$omp parallel default(shared) private(j,norm_temp3)
 !$omp do reduction(+:norm_temp1,norm_temp2)
-         do j=1, lastcol-firstcol+1
+         do j=1, na
             norm_temp1 = norm_temp1 + x(j)*z(j)
             norm_temp2 = norm_temp2 + z(j)*z(j)
          enddo
@@ -487,7 +463,7 @@ end module conj_mod
 !  Normalize z to obtain x
 !---------------------------------------------------------------------
 !$omp do
-         do j=1, lastcol-firstcol+1
+         do j=1, na
             x(j) = norm_temp3*z(j)
          enddo
 !$omp end do nowait
@@ -538,7 +514,7 @@ end module conj_mod
          norm_temp2 = 0.0d0
 !$omp parallel default(shared) private(j,norm_temp3)
 !$omp do reduction(+:norm_temp1,norm_temp2)
-         do j=1, lastcol-firstcol+1
+         do j=1, na
             norm_temp1 = norm_temp1 + x(j)*z(j)
             norm_temp2 = norm_temp2 + z(j)*z(j)
          enddo
@@ -561,7 +537,7 @@ end module conj_mod
 !  Normalize z to obtain x
 !---------------------------------------------------------------------
 !$omp do
-         do j=1, lastcol-firstcol+1
+         do j=1, na
             x(j) = norm_temp3*z(j)
          enddo
 !$omp end do nowait
@@ -683,5 +659,3 @@ end module conj_mod
 
       return
       end
-
-
