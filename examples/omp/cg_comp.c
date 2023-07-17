@@ -54,7 +54,7 @@ static double amult;
 static double tran;
 
 /* function declarations */
-static void conj_grad (size_t colidx[], size_t rowstr[], double x[], double z[],
+static void conj_grad (long colidx[], long rowstr[], double x[], double z[],
 		       double a[], double p[], double q[], double r[],
 		       double *rnorm, int naa);
 
@@ -227,8 +227,8 @@ c-------------------------------------------------------------------*/
 c
 c-------------------------------------------------------------------*/
 
-    size_t *colidx = malloc(NZ * sizeof(size_t));
-    size_t *rowstr = malloc((NA + 1) * sizeof(size_t));
+    long *colidx = malloc(NZ * sizeof(long));
+    long *rowstr = malloc((NA + 1) * sizeof(long));
     double *a = malloc(NZ * sizeof(double));
 
     double *x = malloc(NA * sizeof(double));
@@ -245,12 +245,12 @@ c-------------------------------------------------------------------*/
     }
 
     sprintf(name, "colidx.cg.%s", class);
-    if (read_sparse(name, colidx, NZ * sizeof(size_t))) {
+    if (read_sparse(name, colidx, NZ * sizeof(long))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
     }
 
     sprintf(name, "rowstr.cg.%s", class);
-    if (read_sparse(name, rowstr, (NA + 1) * sizeof(size_t))) {
+    if (read_sparse(name, rowstr, (NA + 1) * sizeof(long))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
     }
 
@@ -420,8 +420,8 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 static void conj_grad (
-    size_t colidx[],
-    size_t rowstr[],
+    long colidx[],
+    long rowstr[],
     double x[],
     double z[],
     double a[],
@@ -440,7 +440,7 @@ c---------------------------------------------------------------------*/
 {
     static int callcount = 0;
     double d, sum, rho, rho0, alpha, beta;
-    size_t j, k;
+    long j, k;
     int cgit, cgitmax = 25;
 
     rho = 0.0;

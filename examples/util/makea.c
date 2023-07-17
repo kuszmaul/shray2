@@ -54,10 +54,10 @@ static double amult;
 static double tran;
 
 /* function declarations */
-static void makea(int n, size_t nz, double a[], size_t colidx[], size_t rowstr[],
+static void makea(int n, size_t nz, double a[], long colidx[], long rowstr[],
 		  int nonzer, double rcond, int arow[], int acol[],
 		  double aelt[], double v[], int iv[], double shift );
-static void sparse(double a[], size_t colidx[], size_t rowstr[], int n,
+static void sparse(double a[], long colidx[], long rowstr[], int n,
 		   int arow[], int acol[], double aelt[],
 		   double x[], int mark[], int nzloc[], size_t nnza);
 static void sprnvc(int n, size_t nz, double v[], int iv[], size_t nzloc[],
@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
 
     class = argv[1];
 
-    int NA, NONZER, NITER;
+    long NA, NONZER, NITER;
     double RCOND = 1.0e-1;
     double SHIFT;
 
@@ -204,15 +204,15 @@ int main(int argc, char **argv) {
 
     /* For the largest problem sizes, NA can be held by an integer, but not NZ
      * for class >= E. */
-    size_t NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
+    long NZ = NA * (NONZER + 1) * (NONZER + 1) + NA * (NONZER + 2);
 
     fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured OpenMP C version"
 	   " - CG Benchmark\n");
-    fprintf(stderr, " Size: %10d\n", NA);
-    fprintf(stderr, " Iterations: %5d\n", NITER);
+    fprintf(stderr, " Size: %10ld\n", NA);
+    fprintf(stderr, " Iterations: %5ld\n", NITER);
 
     int naa = NA;
-    size_t nzz = NZ;
+    long nzz = NZ;
 
 /*--------------------------------------------------------------------
 c  Initialize random number generator and generate one so a is
@@ -226,10 +226,10 @@ c-------------------------------------------------------------------*/
 c
 c-------------------------------------------------------------------*/
 
-    size_t *colidx = malloc(NZ * sizeof(size_t));
-    size_t *rowstr = malloc((NA + 1) * sizeof(size_t));
-    size_t *colidx2 = malloc(NZ * sizeof(size_t));
-    size_t *rowstr2 = malloc((NA + 1) * sizeof(size_t));
+    long *colidx = malloc(NZ * sizeof(long));
+    long *rowstr = malloc((NA + 1) * sizeof(long));
+    long *colidx2 = malloc(NZ * sizeof(long));
+    long *rowstr2 = malloc((NA + 1) * sizeof(long));
     int *iv = malloc(2 * NA * sizeof(int));
     int *arow = malloc(NZ * sizeof(int));
     int *acol = malloc(NZ * sizeof(int));
@@ -241,6 +241,21 @@ c-------------------------------------------------------------------*/
 
     makea(naa, nzz, a, colidx, rowstr, NONZER,
 	  RCOND, arow, acol, aelt, v, iv, SHIFT);
+
+    fprintf(stderr, "First 10 values of a\n");
+    for (int i = 0; i < 10; i++) {
+        fprintf(stderr, "%lf\n", a[i]);
+    }
+
+    fprintf(stderr, "First 10 values of colidx\n");
+    for (int i = 0; i < 10; i++) {
+        fprintf(stderr, "%ld\n", colidx[i]);
+    }
+
+    fprintf(stderr, "First 10 values of rowstr\n");
+    for (int i = 0; i < 10; i++) {
+        fprintf(stderr, "%ld\n", colidx[i]);
+    }
 
     char *a_name = malloc(7);
     sprintf(a_name, "a.cg.%s", class);
@@ -264,13 +279,13 @@ c-------------------------------------------------------------------*/
                 a_name, bytes_written);
         return EXIT_FAILURE;
     }
-    if ((bytes_written = fwrite(colidx, sizeof(size_t), NZ, colidx_stream))
+    if ((bytes_written = fwrite(colidx, sizeof(long), NZ, colidx_stream))
             != NZ) {
         fprintf(stderr, "Writing %s went wrong\n", colidx_name);
         return EXIT_FAILURE;
     }
-    if ((bytes_written = fwrite(rowstr, sizeof(size_t), NA + 1, rowstr_stream))
-            != (size_t)NA + 1) {
+    if ((bytes_written = fwrite(rowstr, sizeof(long), NA + 1, rowstr_stream))
+            != NA + 1) {
         fprintf(stderr, "Writing %s went wrong\n", rowstr_name);
         return EXIT_FAILURE;
     }
@@ -283,9 +298,9 @@ c-------------------------------------------------------------------*/
     sprintf(name, "a.cg.%s", class);
     read_sparse(name, a2, NZ * sizeof(double));
     sprintf(name, "colidx.cg.%s", class);
-    read_sparse(name, colidx2, NZ * sizeof(size_t));
+    read_sparse(name, colidx2, NZ * sizeof(long));
     sprintf(name, "rowstr.cg.%s", class);
-    read_sparse(name, rowstr2, (NA + 1) * sizeof(size_t));
+    read_sparse(name, rowstr2, (NA + 1) * sizeof(long));
 
     bool correct_a = true;
     for (size_t i = 0; i < NZ; i++) {
@@ -361,8 +376,8 @@ static void makea(
     int n,
     size_t nz,
     double a[],
-    size_t colidx[],
-    size_t rowstr[],
+    long colidx[],
+    long rowstr[],
     int nonzer,
     double rcond,
     int arow[],
@@ -444,8 +459,8 @@ c       [col, row, element] tri
 c---------------------------------------------------*/
 static void sparse(
     double a[],
-    size_t colidx[],
-    size_t rowstr[],
+    long colidx[],
+    long rowstr[],
     int n,
     int arow[],
     int acol[],
