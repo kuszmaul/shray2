@@ -254,7 +254,7 @@ c-------------------------------------------------------------------*/
 
     fprintf(stderr, "First 10 values of rowstr\n");
     for (int i = 0; i < 10; i++) {
-        fprintf(stderr, "%ld\n", colidx[i]);
+        fprintf(stderr, "%ld\n", rowstr[i]);
     }
 
     char *a_name = malloc(7);
