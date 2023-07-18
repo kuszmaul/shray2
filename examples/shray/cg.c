@@ -66,18 +66,16 @@ static void conj_grad (size_t colidx[], size_t rowstr[], double x[], double z[],
  * Utilities
 ----------------------------------------------------------------------*/
 
-/* Collective operation, replaces number by its sum over
- * all nodes. */
-void gasnetSum(double *number)
+void gasnetSum(double *number, double *scratch)
 {
-    double *numbers = malloc(ShraySize() * sizeof(double));
-    gasnet_coll_gather_all(gasnete_coll_team_all, numbers, number,
+    /* We could optimise multiple of these calls after each other by using a
+     * non-blocking variant. */
+    gasnet_coll_gather_all(gasnete_coll_team_all, scratch, number,
             sizeof(double), GASNET_COLL_DST_IN_SEGMENT);
     for (size_t i = 0; i < ShraySize(); i++) {
         if (i == ShrayRank()) continue;
-        *number += numbers[i];
+        *number += scratch[i];
     }
-    free(numbers);
 }
 
 static char *strcatalloc(const char *s)
@@ -328,6 +326,8 @@ c  Do one iteration untimed to init all code and data page tables
 c---->                    (then reinit, start timing, to niter its)
 c-------------------------------------------------------------------*/
 
+    double *scratch = malloc(ShraySize() * sizeof(double));
+
     for (int it = 1; it <= 1; it++) {
 
     /*--------------------------------------------------------------------
@@ -347,9 +347,8 @@ c-------------------------------------------------------------------*/
                 norm_temp11 = norm_temp11 + x[j]*z[j];
                 norm_temp12 = norm_temp12 + z[j]*z[j];
     	}
-        ShrayBarrier();
-        gasnetSum(&norm_temp11);
-        gasnetSum(&norm_temp12);
+        gasnetSum(&norm_temp11, scratch);
+        gasnetSum(&norm_temp12, scratch);
     	norm_temp12 = 1.0 / sqrt( norm_temp12 );
 
     /*--------------------------------------------------------------------
@@ -400,9 +399,8 @@ c-------------------------------------------------------------------*/
                 norm_temp11 = norm_temp11 + x[j]*z[j];
                 norm_temp12 = norm_temp12 + z[j]*z[j];
     	}
-        ShrayBarrier();
-        gasnetSum(&norm_temp11);
-        gasnetSum(&norm_temp12);
+        gasnetSum(&norm_temp11, scratch);
+        gasnetSum(&norm_temp12, scratch);
 
     	norm_temp12 = 1.0 / sqrt( norm_temp12 );
 
@@ -476,6 +474,8 @@ c-------------------------------------------------------------------*/
     ShrayFree(q);
     ShrayFree(r);
 
+    free(scratch);
+
     ShrayFinalize(0);
 }
 
@@ -503,7 +503,7 @@ c---------------------------------------------------------------------*/
     double d, sum, rho, rho0, alpha, beta;
     size_t j, k;
     int cgit, cgitmax = 25;
-
+    double *scratch = malloc(ShraySize() * sizeof(double));
     rho = 0.0;
 
 /*--------------------------------------------------------------------
@@ -516,7 +516,6 @@ c-------------------------------------------------------------------*/
     	r[j] = x[j];
     	p[j] = r[j];
     }
-    ShraySync(q, z, r, p);
 
 /*--------------------------------------------------------------------
 c  rho = r.r
@@ -525,8 +524,8 @@ c-------------------------------------------------------------------*/
     for (j = ShrayStart(r); j < ShrayEnd(r); j++) {
 	    rho += r[j]*r[j];
     }
-    ShrayBarrier();
-    gasnetSum(&rho);
+    ShraySync(q, z, r, p);
+    gasnetSum(&rho, scratch);
 }/* end omp parallel */
 /*--------------------------------------------------------------------
 c---->
@@ -558,7 +557,6 @@ c-------------------------------------------------------------------*/
     	    }
             q[j] = sum;
     	}
-        ShraySync(q);
 
     /*--------------------------------------------------------------------
     c  Obtain p.q
@@ -566,8 +564,8 @@ c-------------------------------------------------------------------*/
     	for (j = ShrayStart(p); j < ShrayEnd(p); j++) {
                 d += p[j]*q[j];
     	}
-        ShrayBarrier();
-        gasnetSum(&d);
+        ShraySync(q);
+        gasnetSum(&d, scratch);
     /*--------------------------------------------------------------------
     c  Obtain alpha = rho / (p.q)
     c-------------------------------------------------------------------*/
@@ -587,9 +585,7 @@ c-------------------------------------------------------------------*/
     c---------------------------------------------------------------------*/
                 rho += r[j]*r[j];
     	}
-        ShraySync(r, z);
-        ShrayBarrier();
-        gasnetSum(&rho);
+        gasnetSum(&rho, scratch);
 
     /*--------------------------------------------------------------------
     c  Obtain beta:
@@ -602,7 +598,7 @@ c-------------------------------------------------------------------*/
     	for (j = ShrayStart(p); j < ShrayEnd(p); j++) {
                 p[j] = r[j] + beta*p[j];
     	}
-        ShraySync(p);
+        ShraySync(r, z, p);
         callcount++;
     } /* end of do cgit=1,cgitmax */
 
@@ -629,7 +625,8 @@ c-------------------------------------------------------------------*/
     	d = x[j] - r[j];
 	    sum += d*d;
     }
-    ShrayBarrier();
-    gasnetSum(&sum);
+    gasnetSum(&sum, scratch);
     (*rnorm) = sqrt(sum);
+
+    free(scratch);
 }
