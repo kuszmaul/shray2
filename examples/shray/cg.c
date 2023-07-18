@@ -80,6 +80,28 @@ void gasnetSum(double *number)
     free(numbers);
 }
 
+static char *strcatalloc(const char *s)
+{
+    char suffix[100];
+    snprintf(suffix, 100, ".%s%.2d", class, ShrayRank());
+
+    size_t dirlen = strlen(matdir) + 1;
+    size_t slen = strlen(s);
+    size_t ranklen = strlen(suffix);
+    char *res = malloc(dirlen + slen + ranklen + 1);
+    if (!res) {
+        return NULL;
+    }
+
+    strcpy(res, matdir);
+    strcat(res, "/");
+    strcat(res, s);
+    strcat(res, suffix);
+    res[dirlen + slen + ranklen] = '\0';
+
+    return res;
+}
+
 int read_sparse(char *name, void *array, size_t size)
 {
     FILE *stream = fopen(name, "r");
@@ -90,8 +112,8 @@ int read_sparse(char *name, void *array, size_t size)
 
     size_t read_bytes;
     if ((read_bytes = fread(array, 1, size, stream)) != size) {
-        printf("We could not read in all items");
-        printf("Read %zu / %zu bytes\n", read_bytes, size);
+        fprintf(stderr, "We could not read in all items\n");
+        fprintf(stderr, "Read %zu / %zu bytes\n", read_bytes, size);
         return 1;
     }
 
@@ -231,7 +253,7 @@ int main(int argc, char **argv) {
     double norm_temp11, norm_temp12;
 
     if (ShrayRank() == 0) {
-        fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured OpenMP C version"
+        fprintf(stderr, "\n\n NAS Parallel Benchmarks 3.0 structured Shray version"
     	   " - CG Benchmark\n");
         fprintf(stderr, " Size: %10d\n", NA);
         fprintf(stderr, " Iterations: %5d\n", NITER);
@@ -258,25 +280,30 @@ c-------------------------------------------------------------------*/
     double *q = ShrayMalloc(NA, NA * sizeof(double));
     double *r = ShrayMalloc(NA, NA * sizeof(double));
 
-    char name[50];
 
-    sprintf(name, "a.cg.%s", class);
+    char *name = strcatalloc("a.cg");
     if (read_sparse(name, a + ShrayStart(a),
                 (ShrayEnd(a) - ShrayStart(a)) * sizeof(double))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
+	ShrayFinalize(1);
     }
+    free(name);
 
-    sprintf(name, "colidx.cg.%s", class);
+    name = strcatalloc("colidx.cg");
     if (read_sparse(name, colidx + ShrayStart(colidx),
                 (ShrayEnd(colidx) - ShrayStart(colidx)) * sizeof(size_t))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
+	ShrayFinalize(1);
     }
+    free(name);
 
-    sprintf(name, "rowstr.cg.%s", class);
+    name = strcatalloc("rowstr.cg");
     if (read_sparse(name, rowstr + ShrayStart(rowstr),
                 (ShrayEnd(rowstr) - ShrayStart(rowstr)) * sizeof(size_t))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
+	ShrayFinalize(1);
     }
+    free(name);
 
     ShraySync(a);
     ShraySync(colidx);
@@ -426,6 +453,7 @@ c-------------------------------------------------------------------*/
     	        fprintf(stderr, " VERIFICATION FAILED\n");
     	        fprintf(stderr, " Zeta                %20.12e\n", zeta);
     	        fprintf(stderr, " The correct zeta is %20.12e\n", zeta_verify_value);
+		ShrayFinalize(1);
     	    }
         } else {
     	    fprintf(stderr, " Problem size unknown\n");
@@ -558,7 +586,7 @@ c-------------------------------------------------------------------*/
     c  Obtain z = z + alpha*p
     c  and    r = r - alpha*q
     c---------------------------------------------------------------------*/
-    	for (j = ShrayStart(q); j < ShrayEnd(z); j++) {
+    	for (j = ShrayStart(z); j < ShrayEnd(z); j++) {
                 z[j] += alpha*p[j];
                 r[j] -= alpha*q[j];
 
