@@ -27,5 +27,5 @@ distribute()
 }
 
 distribute "a.cg.$1" "$2" 8
-distribute "colidx.cg.$1" "$2" 4
-distribute "rowstr.cg.$1" "$2" 4
+distribute "colidx.cg.$1" "$2" 8
+distribute "rowstr.cg.$1" "$2" 8
