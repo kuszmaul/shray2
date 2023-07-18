@@ -756,7 +756,9 @@ unsigned int ShraySize(void)
 void ShrayFinalize(int exit_code)
 {
     DBUG_PRINT("Terminating with code %d", exit_code);
-    gasnetBarrier();
+    if (exit_code == 0) {
+        gasnetBarrier();
+    }
     for (unsigned int i = 0; i < heap.numberOfAllocs; i++) {
         Allocation *alloc = heap.allocs + i;
         queue_free(alloc->prefetchCaches);
