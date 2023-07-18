@@ -101,7 +101,7 @@ contains
 !$omp end do
 
     !$omp master
-    write(*, *) "rho = ", rho
+    !write(*, *) "rho = ", rho
     !$omp end master
 !---------------------------------------------------------------------
 !---->
@@ -146,10 +146,10 @@ contains
 !$omp end do
 
         !$omp master
-        write(*, *) "q(1) = ", q(1)
-        write(*, *) "q(701) = ", q(701)
-        write(*, *) "p(1) = ", p(1)
-        write(*, *) "p(701) = ", p(701)
+        !write(*, *) "q(1) = ", q(1)
+        !write(*, *) "q(701) = ", q(701)
+        !write(*, *) "p(1) = ", p(1)
+        !write(*, *) "p(701) = ", p(701)
         !$omp end master
 !---------------------------------------------------------------------
 !  Obtain p.q
@@ -161,7 +161,7 @@ contains
 !$omp end do
 
     !$omp master
-    write(*, *) "d is ", d
+    !write(*, *) "d is ", d
     !$omp end master
 
 !---------------------------------------------------------------------
@@ -189,7 +189,7 @@ contains
 !$omp end do
 
     !$omp master
-    write(*, *) "rho after = ", rho
+    !write(*, *) "rho after = ", rho
     !$omp end master
 !---------------------------------------------------------------------
 !  Obtain beta:
@@ -237,7 +237,7 @@ contains
 !$omp end parallel
 
     !$omp master
-    write(*, *) "sum is ", sum
+    !write(*, *) "sum is ", sum
     !$omp end master
 
       rnorm = sqrt( sum )
@@ -315,7 +315,7 @@ end module conj_mod_s
           zeta_verify_value = 8.5971775078648d0
       else if (class .eq. 'W') then
           na = 7000
-          nonzer = 8
+          nonzer = 7
           niter = 15
           shift = 12.d0
           zeta_verify_value = 10.362595087124d0

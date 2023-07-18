@@ -228,12 +228,9 @@ contains
 !        do j=1,1
          do j=1,na_local
             suml = 0.d0
-!            write(*, *) "j = "
-!            write(*, *) "k from ", loc_i(rowstr, j), " to ", loc_i(rowstr, j + 1) - 1
             ! j is local index of q, not of rowstr, so we cannot use loc_i!
             do k=glob_i(rowstr, (this_image() - 1) * size(q) + j), &
                 glob_i(rowstr, (this_image() - 1) * size(q) + j + 1) - 1
-!            do k=loc_i(rowstr, j),loc_i(rowstr, j+1)-1
 !               write(*, *) "suml += ", glob_r(a, k), " * ", glob_r(p, glob_i(colidx, k))
                suml = suml + glob_r(a, k) * glob_r(p, glob_i(colidx, k))
             enddo
@@ -448,7 +445,7 @@ end module conj_mod
           zeta_verify_value = 8.5971775078648d0
       else if (class .eq. 'W') then
           na = 7000
-          nonzer = 8
+          nonzer = 7
           niter = 15
           shift = 12.d0
           zeta_verify_value = 10.362595087124d0

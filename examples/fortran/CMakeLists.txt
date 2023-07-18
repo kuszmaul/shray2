@@ -2,7 +2,6 @@
 foreach(file
         blas
 		matrix
-        cg_single
         cg
         dist_module
         monopoly
@@ -20,7 +19,8 @@ foreach(file
 			${PROJECT_FLAGS}
 			-cpp
             -fcheck=all
-			-fcoarray=lib)
+            -fcoarray=lib
+        )
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_LINKER_FLAGS}
