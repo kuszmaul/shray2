@@ -623,18 +623,27 @@ static void UpdateRightPage(Allocation *alloc)
     }
 }
 
-void ShraySync(void *array)
+void ShraySync(void *unused, ...)
 {
     lockIfMultithread();
-    Allocation *alloc = findAlloc(array);
 
-    UpdateLeftPage(alloc);
-    UpdateRightPage(alloc);
+    void *array;
+    va_list ap;
+    va_start(ap, unused);
 
-    ShrayResetCache(alloc);
+    /* Note that in shray2.h the ShraySync macro appends a NULL after the
+     * arguments, and a NULL before the arguments. */
+    while ((array = va_arg(ap, void *)) != NULL) {
+        Allocation *alloc = findAlloc(array);
+        UpdateLeftPage(alloc);
+        UpdateRightPage(alloc);
+        ShrayResetCache(alloc);
+        DBUG_PRINT("We are updating pages for %p", array);
+    }
+
+    va_end(ap);
 
     gasnet_wait_syncnbi_puts();
-    DBUG_PRINT("We are done updating pages for %p", array);
 
     /* So no one reads from us before the communications are completed. */
     gasnetBarrier();

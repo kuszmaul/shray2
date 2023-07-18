@@ -16,7 +16,7 @@ void ShrayInit_debug(int *argc, char ***argv);
 void *ShrayMalloc_debug(size_t firstDimension, size_t totalSize);
 __attribute__((pure)) size_t ShrayStart_debug(void *array);
 __attribute__((pure)) size_t ShrayEnd_debug(void *array);
-void ShraySync_debug(void *array);
+void ShraySync_debug(void *unused, ...);
 void ShrayFree_debug(void *address);
 void ShrayReport_debug(void);
 __attribute__((pure)) unsigned int ShrayRank_debug(void);
@@ -32,7 +32,7 @@ void ShrayInit_profile(int *argc, char ***argv);
 void *ShrayMalloc_profile(size_t firstDimension, size_t totalSize);
 __attribute__((pure)) size_t ShrayStart_profile(void *array);
 __attribute__((pure)) size_t ShrayEnd_profile(void *array);
-void ShraySync_profile(void *array);
+void ShraySync_profile(void *unused, ...);
 void ShrayFree_profile(void *address);
 void ShrayReport_profile(void);
 __attribute__((pure)) unsigned int ShrayRank_profile(void);
@@ -48,7 +48,7 @@ void ShrayInit_normal(int *argc, char ***argv);
 void *ShrayMalloc_normal(size_t firstDimension, size_t totalSize);
 __attribute__((pure)) size_t ShrayStart_normal(void *array);
 __attribute__((pure)) size_t ShrayEnd_normal(void *array);
-void ShraySync_normal(void *array);
+void ShraySync_normal(void *unused, ...);
 void ShrayFree_normal(void *address);
 void ShrayReport_normal(void);
 __attribute__((pure)) unsigned int ShrayRank_normal(void);
@@ -65,7 +65,7 @@ void ShrayBarrier_normal(void);
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_debug(firstDimension, totalSize)
 #define ShrayStart(array) ShrayStart_debug(array)
 #define ShrayEnd(array) ShrayEnd_debug(array)
-#define ShraySync(array) ShraySync_debug(array)
+#define ShraySync(...) ShraySync_debug(NULL, __VA_ARGS__, NULL)
 #define ShrayFree(address) ShrayFree_debug(address)
 #define ShrayReport() ShrayReport_debug()
 #define ShrayRank() ShrayRank_debug()
@@ -83,7 +83,7 @@ void ShrayBarrier_normal(void);
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_profile(firstDimension, totalSize)
 #define ShrayStart(array) ShrayStart_profile(array)
 #define ShrayEnd(array) ShrayEnd_profile(array)
-#define ShraySync(array) ShraySync_profile(array)
+#define ShraySync(...) ShraySync_profile(NULL, __VA_ARGS__, NULL)
 #define ShrayFree(address) ShrayFree_profile(address)
 #define ShrayReport() ShrayReport_profile()
 #define ShrayRank() ShrayRank_profile()
@@ -99,7 +99,7 @@ void ShrayBarrier_normal(void);
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_normal(firstDimension, totalSize)
 #define ShrayStart(array) ShrayStart_normal(array)
 #define ShrayEnd(array) ShrayEnd_normal(array)
-#define ShraySync(array) ShraySync_normal(array)
+#define ShraySync(...) ShraySync_normal(NULL, __VA_ARGS__, NULL)
 #define ShrayFree(address) ShrayFree_normal(address)
 #define ShrayReport() ShrayReport_normal()
 #define ShrayRank() ShrayRank_normal()
@@ -174,9 +174,9 @@ void ShrayBarrier_normal(void);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShraySync(void *array)
+ * @fn void ShraySync(void *array, ...)
  *
- *   @brief         Makes distributed array available for reading, to be called
+ *   @brief         Makes distributed array(s) available for reading, to be called
  *                  after writing is finished.
  *
  *   @param array   Array we have finished writing to.
