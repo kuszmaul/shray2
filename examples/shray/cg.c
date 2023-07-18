@@ -308,9 +308,11 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
+    #pragma omp parallel for
     for (size_t i = ShrayStart(x); i < ShrayEnd(x); i++) {
     	x[i] = 1.0;
     }
+    #pragma omp parallel for
     for (size_t j = ShrayStart(q); j < ShrayEnd(q); j++) {
        q[j] = 0.0;
        z[j] = 0.0;
@@ -343,6 +345,7 @@ c-------------------------------------------------------------------*/
     c-------------------------------------------------------------------*/
     	norm_temp11 = 0.0;
     	norm_temp12 = 0.0;
+        #pragma omp parallel for reduction(+:norm_temp11, norm_temp12)
     	for (size_t j = ShrayStart(x); j < ShrayEnd(x); j++) {
                 norm_temp11 = norm_temp11 + x[j]*z[j];
                 norm_temp12 = norm_temp12 + z[j]*z[j];
@@ -354,6 +357,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  Normalize z to obtain x
     c-------------------------------------------------------------------*/
+        #pragma omp parallel
     	for (size_t j = ShrayStart(x); j < ShrayEnd(x); j++) {
                 x[j] = norm_temp12*z[j];
     	}
@@ -364,6 +368,7 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
+    #pragma omp parallel
     for (size_t i = ShrayStart(x); i < ShrayEnd(x); i++) {
          x[i] = 1.0;
     }
@@ -395,6 +400,7 @@ c-------------------------------------------------------------------*/
     	norm_temp11 = 0.0;
     	norm_temp12 = 0.0;
 
+        #pragma omp parallel for reduction(+:norm_temp11, norm_temp12)
     	for (size_t j = ShrayStart(x); j < ShrayEnd(x); j++) {
                 norm_temp11 = norm_temp11 + x[j]*z[j];
                 norm_temp12 = norm_temp12 + z[j]*z[j];
@@ -416,6 +422,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  Normalize z to obtain x
     c-------------------------------------------------------------------*/
+        #pragma omp parallel for
     	for (size_t j = ShrayStart(x); j < ShrayEnd(x); j++) {
                 x[j] = norm_temp12*z[j];
     	}
@@ -510,6 +517,7 @@ c---------------------------------------------------------------------*/
 c  Initialize the CG algorithm:
 c-------------------------------------------------------------------*/
 {
+    #pragma omp parallel for
     for (j = ShrayStart(q); j < ShrayEnd(q); j++) {
     	q[j] = 0.0;
     	z[j] = 0.0;
@@ -521,6 +529,7 @@ c-------------------------------------------------------------------*/
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
+    #pragma omp parallel for reduction(+:rho)
     for (j = ShrayStart(r); j < ShrayEnd(r); j++) {
 	    rho += r[j]*r[j];
     }
@@ -550,6 +559,7 @@ c-------------------------------------------------------------------*/
     C        on the Cray t3d - overall speed of code is 1.5 times faster.
     */
 
+        #pragma omp parallel for
         for (j = ShrayStart(q); j < ShrayEnd(q); j++) {
             sum = 0.0;
     	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
@@ -561,6 +571,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  Obtain p.q
     c-------------------------------------------------------------------*/
+        #pragma omp parallel for reduction(+:d)
     	for (j = ShrayStart(p); j < ShrayEnd(p); j++) {
                 d += p[j]*q[j];
     	}
@@ -575,6 +586,7 @@ c-------------------------------------------------------------------*/
     c  Obtain z = z + alpha*p
     c  and    r = r - alpha*q
     c---------------------------------------------------------------------*/
+        #pragma omp parallel for reduction(+:rho)
     	for (j = ShrayStart(z); j < ShrayEnd(z); j++) {
                 z[j] += alpha*p[j];
                 r[j] -= alpha*q[j];
@@ -595,6 +607,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  p = r + beta*p
     c-------------------------------------------------------------------*/
+        #pragma omp parallel for
     	for (j = ShrayStart(p); j < ShrayEnd(p); j++) {
                 p[j] = r[j] + beta*p[j];
     	}
@@ -609,6 +622,7 @@ c  The partition submatrix-vector multiply
 c---------------------------------------------------------------------*/
     sum = 0.0;
 
+    #pragma omp parallel for
     for (j = ShrayStart(r); j < ShrayEnd(r); j++) {
     	d = 0.0;
 	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
@@ -621,6 +635,7 @@ c---------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
+    #pragma omp parallel for reduction(+:d)
     for (j = ShrayStart(x); j < ShrayEnd(x); j++) {
     	d = x[j] - r[j];
 	    sum += d*d;
