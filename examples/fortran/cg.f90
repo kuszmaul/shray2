@@ -49,8 +49,74 @@
 !---------------------------------------------------------------------
 
 module conj_mod
+    use, intrinsic :: ieee_arithmetic, only : ieee_is_nan
+
 contains
-      subroutine conj_grad ( rnorm, a, colidx, rowstr, x, p, q, r, z, naa, nzz)
+    function loc_ind(j, blocksize) result(i)
+        integer(8), intent(in) :: j, blocksize
+        integer(8) :: i
+
+        i = modulo(j - 1, blocksize) + 1
+    end function loc_ind
+
+    function loc_proc(j, blocksize) result(s)
+        integer(8), intent(in) :: j, blocksize
+        integer(8) :: s
+
+        s = (j - 1) / blocksize + 1
+    end function loc_proc
+
+    ! j is global index
+    function glob_r(a, j) result(res)
+        integer(8), intent(in) :: j
+        double precision, intent(in) :: a(:)[*]
+        double precision :: res
+        integer(8) :: blocksize
+
+        blocksize = size(a)
+
+        res = a(loc_ind(j, blocksize))[loc_proc(j, blocksize)]
+    end function glob_r
+
+    ! j is global index
+    function glob_i(a, j) result(res)
+        integer(8), intent(in) :: j
+        integer(8), intent(in) :: a(:)[*]
+        integer(8) :: res
+        integer(8) :: blocksize
+
+        blocksize = size(a)
+
+        res = a(loc_ind(j, blocksize))[loc_proc(j, blocksize)]
+    end function glob_i
+
+    ! j is local index
+    function loc_r(a, j) result(res)
+        integer(8), intent(in) :: j
+        double precision, intent(in) :: a(:)[*]
+        double precision :: res
+        integer(8) :: blocksize, k
+
+        blocksize = size(a)
+        k = (this_image() - 1) * blocksize + j
+
+        res = a(loc_ind(k, blocksize))[loc_proc(k, blocksize)]
+    end function loc_r
+
+    ! j is local index
+    function loc_i(a, j) result(res)
+        integer(8), intent(in) :: j
+        integer(8), intent(in) :: a(:)[*]
+        integer(8) :: res
+        integer(8) :: blocksize, k
+
+        blocksize = size(a)
+        k = (this_image() - 1) * blocksize + j
+
+        res = a(loc_ind(k, blocksize))[loc_proc(k, blocksize)]
+    end function loc_i
+
+    subroutine conj_grad ( rnorm, a, colidx, rowstr, x, p, q, r, z, naa, nzz)
 !---------------------------------------------------------------------
 !---------------------------------------------------------------------
 
@@ -64,12 +130,10 @@ contains
       integer   cgit, cgitmax
       integer(8) j, k, naa, nz_block, na_block, nzz, na_local
 
-      double precision   d, sum, rho, rho0, alpha, beta, rnorm, suml
+      double precision   d, sum, rho, rho0, alpha, beta, rnorm, suml, d_acc, sum_acc, rho_acc
       double precision, allocatable :: all_rhos[:], all_ds[:], all_sums[:]
       double precision ::  x(:)[*], p(:)[*], q(:)[*], r(:)[*], z(:)[*], a(:)[*]
       integer(8) ::  colidx(:)[*], rowstr(:)[*]
-
-      integer(8) :: a_local, a_image, v_local, v_image
 
       data      cgitmax / 25 /
 
@@ -120,15 +184,15 @@ contains
     all_rhos = rho
     sync all
 
-    rho = 0
+    rho_acc = 0
     do j = 1, num_images()
-        rho = rho + all_rhos[j]
+        rho_acc = rho_acc + all_rhos[j]
     end do
+    rho = rho_acc
 
-    write(*, *) "rho = ", rho, " at image ", this_image()
+    !write(*, *) "rho = ", rho, " at image ", this_image()
     !$omp end master
 
-    !FIXME between here
 !---------------------------------------------------------------------
 !---->
 !  The conj grad iteration loop
@@ -159,23 +223,26 @@ contains
 !        on the Cray t3d - overall speed of code is 1.5 times faster.
 !
 
+!   if (this_image() .eq. 2) then
 !$omp do
+!        do j=1,1
          do j=1,na_local
             suml = 0.d0
-            do k=rowstr(j),rowstr(j+1)-1
-               a_local = modulo(k - 1, nz_block) + 1
-               a_image = (k - 1) / nz_block + 1
-               v_local = modulo(colidx(a_local)[a_image] - 1, na_block) + 1
-               v_image = (colidx(a_local)[a_image] - 1) / na_block + 1
-               suml = suml + a(a_local)[a_image] * &
-                   p(v_local)[v_image]
+!            write(*, *) "j = "
+!            write(*, *) "k from ", loc_i(rowstr, j), " to ", loc_i(rowstr, j + 1) - 1
+            ! j is local index of q, not of rowstr, so we cannot use loc_i!
+            do k=glob_i(rowstr, (this_image() - 1) * size(q) + j), &
+                glob_i(rowstr, (this_image() - 1) * size(q) + j + 1) - 1
+!            do k=loc_i(rowstr, j),loc_i(rowstr, j+1)-1
+!               write(*, *) "suml += ", glob_r(a, k), " * ", glob_r(p, glob_i(colidx, k))
+               suml = suml + glob_r(a, k) * glob_r(p, glob_i(colidx, k))
             enddo
             q(j) = suml
          enddo
 !$omp end do
+!end if
 
-    ! q(1) is accurate (p = 2, class = S), but q(701) is not
-    write(*, *) "q(", (this_image() - 1) * na_block + 1, ") = ", q(1)
+    !write(*, *) "q(", (this_image() - 1) * na_block + 1, ") = ", q(1)
 
     !$omp master
     sync all
@@ -190,15 +257,17 @@ contains
          enddo
 !$omp end do
 
+        ! FIXME correct at image 2, but not 1. q appears to have been calculated
+        ! correctly
         !$omp master
         all_ds = d
         sync all
-        d = 0
+        d_acc = 0
         do j = 1, num_images()
-            d = d + all_ds[j]
+            d_acc = d_acc + all_ds[j]
         end do
-        !FIXME and here something goes wrong
-        write(*, *) "d is ", d, " at image ", this_image()
+        d = d_acc
+!        write(*, *) "d is ", d, " at image ", this_image()
         !$omp end master
 
 
@@ -229,12 +298,13 @@ contains
     !$omp master
     all_rhos = rho
     sync all
-    rho = 0
+    rho_acc = 0
     do j = 1, num_images()
-        rho = rho + all_rhos[j]
+        rho_acc = rho_acc + all_rhos[j]
     end do
+    rho = rho_acc
 
-    write(*, *) "rho after = ", rho, " at image ", this_image()
+!    write(*, *) "rho after = ", rho, " at image ", this_image()
     !$omp end master
 
 
@@ -266,12 +336,9 @@ contains
 !$omp do
       do j=1,na_local
          suml = 0.d0
-         do k=rowstr(j),rowstr(j+1)-1
-            a_local = modulo(k - 1, nz_block) + 1
-            a_image = (k - 1) / nz_block + 1
-            v_local = modulo(colidx(a_local)[a_image] - 1, na_block) + 1
-            v_image = (colidx(a_local)[a_image] - 1) / na_block + 1
-            suml = suml + a(a_local)[a_image] * z(v_local)[v_image]
+         !write(*, *) "k from ", loc_i(rowstr, j), " to ", loc_i(rowstr, j + 1) - 1
+         do k=loc_i(rowstr,j),loc_i(rowstr,j+1)-1
+            suml = suml + glob_r(a, k) * glob_r(z, glob_i(colidx, k))
          enddo
          r(j) = suml
       enddo
@@ -296,11 +363,12 @@ contains
     !$omp master
     all_sums = sum
     sync all
-    sum = 0
+    sum_acc = 0
     do j = 1, num_images()
-        sum = sum + all_sums[j]
+        sum_acc = sum_acc + all_sums[j]
     end do
-    write(*, *) "sum is ", sum, " at image ", this_image()
+    sum = sum_acc
+    !write(*, *) "sum is ", sum, " at image ", this_image()
     !$omp end master
 
       rnorm = sqrt( sum )
@@ -339,7 +407,7 @@ end module conj_mod
 
       double precision   zeta, randlc
       double precision   rnorm
-      double precision   norm_temp1,norm_temp2,norm_temp3
+      double precision   norm_temp1,norm_temp2,norm_temp3, norm_temp1_acc, norm_temp2_acc
       double precision, allocatable :: all_norm_temp1[:], all_norm_temp2[:]
 
       double precision   t, gflops
@@ -575,18 +643,21 @@ end module conj_mod
         all_norm_temp2 = norm_temp2
         sync all
 
-        norm_temp1 = 0.0d0
-        norm_temp2 = 0.0d0
+        norm_temp1_acc = 0.0d0
+        norm_temp2_acc = 0.0d0
 
         do j = 1, num_images()
-            norm_temp1 = norm_temp1 + all_norm_temp1[j]
-            norm_temp2 = norm_temp2 + all_norm_temp2[j]
+            norm_temp1_acc = norm_temp1_acc + all_norm_temp1[j]
+            norm_temp2_acc = norm_temp2_acc + all_norm_temp2[j]
         end do
+
+        norm_temp1 = norm_temp1_acc
+        norm_temp2 = norm_temp2_acc
 
          norm_temp3 = 1.0d0 / sqrt( norm_temp2 )
 
          !$omp master
-         write(*, *) "norm_temp3 is ", norm_temp3, " at ", this_image()
+         !write(*, *) "norm_temp3 is ", norm_temp3, " at ", this_image()
          !$omp end master
 
 
@@ -658,14 +729,16 @@ end module conj_mod
         all_norm_temp2[this_image()] = norm_temp2
         sync all
 
-        norm_temp1 = 0.0d0
-        norm_temp2 = 0.0d0
+        norm_temp1_acc = 0.0d0
+        norm_temp2_acc = 0.0d0
 
         do j = 1, num_images()
-            norm_temp1 = norm_temp1 + all_norm_temp1[j]
-            norm_temp2 = norm_temp2 + all_norm_temp2[j]
+            norm_temp1_acc = norm_temp1_acc + all_norm_temp1[j]
+            norm_temp2_acc = norm_temp2_acc + all_norm_temp2[j]
         end do
 
+        norm_temp1 = norm_temp1_acc
+        norm_temp2 = norm_temp2_acc
 
 
          norm_temp3 = 1.0d0 / sqrt( norm_temp2 )

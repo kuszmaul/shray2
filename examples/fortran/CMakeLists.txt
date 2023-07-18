@@ -4,6 +4,7 @@ foreach(file
 		matrix
         cg_single
         cg
+        dist_module
         monopoly
         monopoly_mt
         1dstencil
@@ -23,8 +24,8 @@ foreach(file
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_LINKER_FLAGS}
-			-lcaf_mpich
-			#-lcaf_openmpi
+            #-lcaf_mpich
+            -lcaf_openmpi
 			BLAS::BLAS
 			-fopenmp)
 endforeach(file)

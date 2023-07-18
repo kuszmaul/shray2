@@ -100,7 +100,9 @@ contains
       enddo
 !$omp end do
 
+    !$omp master
     write(*, *) "rho = ", rho
+    !$omp end master
 !---------------------------------------------------------------------
 !---->
 !  The conj grad iteration loop
@@ -131,17 +133,24 @@ contains
 !        on the Cray t3d - overall speed of code is 1.5 times faster.
 !
 !$omp do
+!        do j=701,701
          do j=1,naa
             suml = 0.d0
+!            write(*, *) "k from ", rowstr(j), " to ", rowstr(j + 1) - 1
             do k=rowstr(j),rowstr(j+1)-1
+!               write(*, *) "suml += ", a(k), " * ", p(colidx(k))
                suml = suml + a(k)*p(colidx(k))
             enddo
             q(j) = suml
          enddo
 !$omp end do
 
+        !$omp master
         write(*, *) "q(1) = ", q(1)
         write(*, *) "q(701) = ", q(701)
+        write(*, *) "p(1) = ", p(1)
+        write(*, *) "p(701) = ", p(701)
+        !$omp end master
 !---------------------------------------------------------------------
 !  Obtain p.q
 !---------------------------------------------------------------------
@@ -472,7 +481,7 @@ end module conj_mod_s
          norm_temp3 = 1.0d0 / sqrt( norm_temp2 )
 
          !$omp master
-        write(*, *) "norm_temp3 is ", norm_temp3
+!        write(*, *) "norm_temp3 is ", norm_temp3
         !$omp end master
 !---------------------------------------------------------------------
 !  Normalize z to obtain x
