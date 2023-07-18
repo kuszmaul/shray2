@@ -115,10 +115,9 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 ]]])m4_dnl
 
 	if [ "$test_type" = shray ]; then
-		# TODO: change _debug_ back to _profile
 		runtest_wrapper "$outfile" "$gflopsfile" \
 			mpirun.openmpi m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
-			"$bindir/examples/$test_type/${example}_debug_${test_type}" \
+			"$bindir/examples/$test_type/${example}_profile_${test_type}" \
 			"$@"
 	elif [ "$test_type" = chapel ]; then
 		runtest_wrapper "$outfile" "$gflopsfile" \
@@ -175,7 +174,11 @@ scriptdirabs=$(realpath -s "$scriptdir")
 curdir="$PWD"
 cd "$cgdatadir"
 "$bindirabs/examples/util/makea" "$cgclass"
+m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 "$scriptdirabs/cg_dist.sh" "$cgclass" "__NODES__"
+]]], [[[m4_dnl
+"$scriptdirabs/cg_dist.sh" "$cgclass" "__NTASKS__"
+]]])m4_dnl
 cd "$curdir"
 
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
@@ -282,6 +285,7 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 	runtest shray cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
 ]]], [[[m4_dnl
+	runtest shray cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
 ]]])m4_dnl
 
 done
