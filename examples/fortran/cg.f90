@@ -151,36 +151,26 @@ contains
       rho = 0.0d0
       sum = 0.0d0
 
-!$omp parallel default(shared) private(j,k,cgit,suml,alpha,beta)  &
-!$omp&  shared(d,rho0,rho,sum)
-
 !---------------------------------------------------------------------
 !  Initialize the CG algorithm:
 !---------------------------------------------------------------------
-!$omp do
       do j=1,na_local
          q(j) = 0.0d0
          z(j) = 0.0d0
          r(j) = x(j)
          p(j) = r(j)
       enddo
-!$omp end do
 
-    !$omp master
     sync all;
-    !$omp end master
 
 !---------------------------------------------------------------------
 !  rho = r.r
 !  Now, obtain the norm of r: First, sum squares of r elements locally...
 !---------------------------------------------------------------------
-!$omp do reduction(+:rho)
       do j=1, na_local
          rho = rho + r(j)*r(j)
       enddo
-!$omp end do
 
-    !$omp master
     all_rhos = rho
     sync all
 
@@ -191,7 +181,6 @@ contains
     rho = rho_acc
 
     !write(*, *) "rho = ", rho, " at image ", this_image()
-    !$omp end master
 
 !---------------------------------------------------------------------
 !---->
@@ -200,15 +189,12 @@ contains
 !---------------------------------------------------------------------
       do cgit = 1, cgitmax
 
-!$omp master
 !---------------------------------------------------------------------
 !  Save a temporary of rho and initialize reduction variables
 !---------------------------------------------------------------------
          rho0 = rho
          d = 0.d0
          rho = 0.d0
-!$omp end master
-!$omp barrier
 
 !---------------------------------------------------------------------
 !  q = A.p
@@ -224,7 +210,6 @@ contains
 !
 
 !   if (this_image() .eq. 2) then
-!$omp do
 !        do j=1,1
          do j=1,na_local
             suml = 0.d0
@@ -236,27 +221,20 @@ contains
             enddo
             q(j) = suml
          enddo
-!$omp end do
 !end if
 
     !write(*, *) "q(", (this_image() - 1) * na_block + 1, ") = ", q(1)
 
-    !$omp master
     sync all
-    !$omp end master
 
 !---------------------------------------------------------------------
 !  Obtain p.q
 !---------------------------------------------------------------------
-!$omp do reduction(+:d)
          do j=1, na_local
             d = d + p(j)*q(j)
          enddo
-!$omp end do
 
-        ! FIXME correct at image 2, but not 1. q appears to have been calculated
-        ! correctly
-        !$omp master
+        ! WARNING: does not work with mpich
         all_ds = d
         sync all
         d_acc = 0
@@ -265,7 +243,6 @@ contains
         end do
         d = d_acc
 !        write(*, *) "d is ", d, " at image ", this_image()
-        !$omp end master
 
 
 !---------------------------------------------------------------------
@@ -277,7 +254,6 @@ contains
 !  Obtain z = z + alpha*p
 !  and    r = r - alpha*q
 !---------------------------------------------------------------------
-!$omp do reduction(+:rho)
          do j=1, na_local
             z(j) = z(j) + alpha*p(j)
             r(j) = r(j) - alpha*q(j)
@@ -290,9 +266,7 @@ contains
 !         do j=1, lastcol-firstcol+1
             rho = rho + r(j)*r(j)
          enddo
-!$omp end do
 
-    !$omp master
     all_rhos = rho
     sync all
     rho_acc = 0
@@ -302,7 +276,6 @@ contains
     rho = rho_acc
 
 !    write(*, *) "rho after = ", rho, " at image ", this_image()
-    !$omp end master
 
 
 !---------------------------------------------------------------------
@@ -313,15 +286,11 @@ contains
 !---------------------------------------------------------------------
 !  p = r + beta*p
 !---------------------------------------------------------------------
-!$omp do
     do j=1, na_local
         p(j) = r(j) + beta*p(j)
     enddo
-!$omp end do
 
-    !$omp master
     sync all
-    !$omp end master
 
       enddo                             ! end of do cgit=1,cgitmax
 
@@ -330,7 +299,6 @@ contains
 !  First, form A.z
 !  The partition submatrix-vector multiply
 !---------------------------------------------------------------------
-!$omp do
       do j=1,na_local
          suml = 0.d0
          !write(*, *) "k from ", loc_i(rowstr, j), " to ", loc_i(rowstr, j + 1) - 1
@@ -339,25 +307,18 @@ contains
          enddo
          r(j) = suml
       enddo
-!$omp end do
 
-    !$omp master
     sync all;
-    !$omp end master
 
 
 !---------------------------------------------------------------------
 !  At this point, r contains A.z
 !---------------------------------------------------------------------
-!$omp do reduction(+:sum)
       do j=1, na_local
          suml = x(j) - r(j)
          sum  = sum + suml*suml
       enddo
-!$omp end do nowait
-!$omp end parallel
 
-    !$omp master
     all_sums = sum
     sync all
     sum_acc = 0
@@ -366,7 +327,6 @@ contains
     end do
     sum = sum_acc
     !write(*, *) "sum is ", sum, " at image ", this_image()
-    !$omp end master
 
       rnorm = sqrt( sum )
 
@@ -400,7 +360,6 @@ end module conj_mod
       integer(8)               naa, nzz
 
       double precision         amult, tran
-!$omp threadprivate (amult, tran)
 
       double precision   zeta, randlc
       double precision   rnorm
@@ -412,10 +371,6 @@ end module conj_mod
       logical            verified
       double precision   zeta_verify_value, epsilon, err
 
-!$    integer   omp_get_max_threads
-!$    external  omp_get_max_threads
-
-
       ! Parameters
       integer(8) :: na, nz, nonzer, niter, na_local, nz_local, &
           na_block, nz_block, row_block, row_local, recl_a, recl_col, recl_row
@@ -426,7 +381,7 @@ end module conj_mod
       integer :: io_a, io_col, io_row
 
       ! Index variables
-      integer(8) :: i, j, it, k
+      integer(8) :: i, j, it
 
       ! Commandline arguments
       character(len=12) :: arg
@@ -566,13 +521,11 @@ end module conj_mod
           write( *,1000 )
           write( *,1001 ) na
           write( *,1002 ) niter
-    !$    write( *,1003 ) omp_get_max_threads()
           write( *,* )
      1000 format(//,' NAS Parallel Benchmarks (NPB3.4-OMP)',  &
          &          ' - CG Benchmark', /)
      1001 format(' Size: ', i11 )
      1002 format(' Iterations:                  ', i5 )
-     1003 format(' Number of available threads: ', i5)
      end if
 
       naa = na
@@ -581,7 +534,6 @@ end module conj_mod
 !---------------------------------------------------------------------
 !  Inialize random number generator
 !---------------------------------------------------------------------
-!$omp parallel default(shared) private(i,j,k,zeta)
       tran    = 314159265.0D0
       amult   = 1220703125.0D0
       zeta    = randlc( tran, amult )
@@ -589,20 +541,15 @@ end module conj_mod
 !---------------------------------------------------------------------
 !  set starting vector to (1, 1, .... 1)
 !---------------------------------------------------------------------
-!$omp do
       do i = 1, na_local
          x(i) = 1.0D0
       enddo
-!$omp end do nowait
-!$omp do
       do j=1, na_local
          q(j) = 0.0d0
          z(j) = 0.0d0
          r(j) = 0.0d0
          p(j) = 0.0d0
       enddo
-!$omp end do nowait
-!$omp end parallel
 
     sync all
 
@@ -628,13 +575,10 @@ end module conj_mod
 !---------------------------------------------------------------------
          norm_temp1 = 0.0d0
          norm_temp2 = 0.0d0
-!$omp parallel default(shared) private(j,norm_temp3)
-!$omp do reduction(+:norm_temp1,norm_temp2)
          do j=1, na_local
             norm_temp1 = norm_temp1 + x(j)*z(j)
             norm_temp2 = norm_temp2 + z(j)*z(j)
          enddo
-!$omp end do
 
         all_norm_temp1 = norm_temp1
         all_norm_temp2 = norm_temp2
@@ -653,20 +597,15 @@ end module conj_mod
 
          norm_temp3 = 1.0d0 / sqrt( norm_temp2 )
 
-         !$omp master
          !write(*, *) "norm_temp3 is ", norm_temp3, " at ", this_image()
-         !$omp end master
 
 
 !---------------------------------------------------------------------
 !  Normalize z to obtain x
 !---------------------------------------------------------------------
-!$omp do
          do j=1, na_local
             x(j) = norm_temp3*z(j)
          enddo
-!$omp end do nowait
-!$omp end parallel
 
     sync all
 
@@ -679,11 +618,9 @@ end module conj_mod
 !
 !
 !
-!$omp parallel do default(shared) private(i)
       do i = 1, na_local
          x(i) = 1.0D0
       enddo
-!$omp end parallel do
 
     sync all
 
@@ -714,13 +651,10 @@ end module conj_mod
 !---------------------------------------------------------------------
          norm_temp1 = 0.0d0
          norm_temp2 = 0.0d0
-!$omp parallel default(shared) private(j,norm_temp3)
-!$omp do reduction(+:norm_temp1,norm_temp2)
          do j=1, na_local
             norm_temp1 = norm_temp1 + x(j)*z(j)
             norm_temp2 = norm_temp2 + z(j)*z(j)
          enddo
-!$omp end do
 
         all_norm_temp1[this_image()] = norm_temp1
         all_norm_temp2[this_image()] = norm_temp2
@@ -741,13 +675,11 @@ end module conj_mod
          norm_temp3 = 1.0d0 / sqrt( norm_temp2 )
 
 
-!$omp master
          zeta = shift + 1.0d0 / norm_temp1
          if (this_image() .eq. 1) then
             if( it .eq. 1 ) write( *,9000 )
                 write( *,9001 ) it, rnorm, zeta
         end if
-!$omp end master
 
  9000    format( /,'   iteration           ||r||                 zeta' )
  9001    format( 4x, i5, 6x, e21.14, f20.13 )
@@ -755,12 +687,9 @@ end module conj_mod
 !---------------------------------------------------------------------
 !  Normalize z to obtain x
 !---------------------------------------------------------------------
-!$omp do
          do j=1, na_local
             x(j) = norm_temp3*z(j)
          enddo
-!$omp end do nowait
-!$omp end parallel
 
 
       enddo                              ! end of main iter inv pow meth
