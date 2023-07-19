@@ -1,6 +1,7 @@
 find_package(GlobalArrays REQUIRED)
 
 foreach(file
+		cg
 		1dstencil
 		1dstencil_mt
 		matrix

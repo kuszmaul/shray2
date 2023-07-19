@@ -66,7 +66,7 @@ void matmul(int g_a, int g_b, int g_c, size_t n)
 
 	free(Bt);
 	NGA_Release(g_a, lo_A, hi_A);
-	NGA_Release(g_c, lo_C, hi_C);
+	NGA_Release_update(g_c, lo_C, hi_C);
 }
 
 int main(int argc, char **argv)
