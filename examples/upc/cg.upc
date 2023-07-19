@@ -108,9 +108,7 @@ void read_double(char *name, shared double *array, size_t n)
 {
     upc_file_t *fd = upc_all_fopen(name, UPC_RDONLY|UPC_COMMON_FP, 0, NULL);
 
-    size_t blocksize = (n + THREADS - 1) / THREADS;
-
-    upc_all_fread_shared(fd, array, blocksize, sizeof(double),
+    upc_all_fread_shared(fd, array, 1, sizeof(double),
                          n, UPC_IN_ALLSYNC | UPC_OUT_ALLSYNC);
 
     upc_all_fclose(fd);
@@ -120,9 +118,7 @@ void read_size_t(char *name, shared size_t *array, size_t n)
 {
     upc_file_t *fd = upc_all_fopen(name, UPC_RDONLY|UPC_COMMON_FP, 0, NULL);
 
-    size_t blocksize = (n + THREADS - 1) / THREADS;
-
-    upc_all_fread_shared(fd, array, blocksize, sizeof(size_t),
+    upc_all_fread_shared(fd, array, 1, sizeof(size_t),
                          n, UPC_IN_ALLSYNC | UPC_OUT_ALLSYNC);
 
     upc_all_fclose(fd);
