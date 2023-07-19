@@ -70,8 +70,8 @@ static int rank;
 static int nnodes;
 
 /* function declarations */
-static void conj_grad (size_t colidx[], size_t rowstr[], double x[], int g_z,
-		       double a[], int g_p, double q[], double r[],
+static void conj_grad (int g_colidx, size_t rowstr[], double x[], int g_z,
+		       int g_a, int g_p, double q[], double r[],
 		       double *rnorm, int g_scratch, double *scratch);
 
 /*--------------------------------------------------------------------
@@ -362,6 +362,7 @@ c-------------------------------------------------------------------*/
         fprintf(stderr, "Reading %s went wrong\n", name);
 	    GA_Error("Failed to read file", 1);
     }
+    NGA_Release_update(g_a, lo_a, hi_a);
     free(name);
 
     name = strcatalloc("colidx.cg");
@@ -369,6 +370,7 @@ c-------------------------------------------------------------------*/
         fprintf(stderr, "Reading %s went wrong\n", name);
 	    GA_Error("Failed to read file", 1);
     }
+    NGA_Release_update(g_colidx, lo_colidx, hi_colidx);
     free(name);
 
     name = strcatalloc("rowstr.cg");
@@ -377,7 +379,17 @@ c-------------------------------------------------------------------*/
 	    GA_Error("Failed to read file", 1);
     }
     free(name);
+    NGA_Release_update(g_rowstr, lo_rowstr, hi_rowstr);
+    GA_Sync();
 
+    // Because rowstr is accessed with + 1 we have overlapping boundaries, so we
+    // can not simply use NGA_Access to read. Simply get the chunk of
+    // rowstr that we need to calculate the local vector.
+    rowstr= malloc(sizeof(size_t) * rowstr_chunks[0]);
+    int lo[1] = { lo_q[0] };
+    int hi[1] = { hi_q[0] + 1 };
+    int ld[1] = { 0 };
+    NGA_Get(g_rowstr, lo, hi, rowstr, ld);
     GA_Sync();
 
 /*--------------------------------------------------------------------
@@ -414,7 +426,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  The call to the conjugate gradient routine:
     c-------------------------------------------------------------------*/
-    	conj_grad (colidx, rowstr, x, g_z, a, g_p, q, r, &rnorm, g_scratch, scratch);
+    	conj_grad (g_colidx, rowstr, x, g_z, g_a, g_p, q, r, &rnorm, g_scratch, scratch);
 
     /*--------------------------------------------------------------------
     c  zeta = shift + 1/(x.z)
@@ -465,7 +477,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  The call to the conjugate gradient routine:
     c-------------------------------------------------------------------*/
-    	conj_grad(colidx, rowstr, x, g_z, a, g_p, q, r, &rnorm, g_scratch, scratch);
+    	conj_grad(g_colidx, rowstr, x, g_z, g_a, g_p, q, r, &rnorm, g_scratch, scratch);
 
     /*--------------------------------------------------------------------
     c  zeta = shift + 1/(x.z)
@@ -547,9 +559,6 @@ c-------------------------------------------------------------------*/
         fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
     }
 
-    NGA_Release(g_colidx, lo_colidx, hi_colidx);
-    NGA_Release(g_rowstr, lo_rowstr, hi_rowstr);
-    NGA_Release(g_a, lo_a, hi_a);
     NGA_Release_update(g_q, lo_q, hi_q);
     NGA_Release_update(g_p, lo_p, hi_p);
     NGA_Release_update(g_z, lo_z, hi_z);
@@ -566,6 +575,7 @@ c-------------------------------------------------------------------*/
     NGA_Destroy(g_r);
 
     free(scratch);
+    free(rowstr);
 
     GA_Terminate();
     MPI_Finalize();
@@ -574,11 +584,11 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 static void conj_grad (
-    size_t colidx[],
+    int g_colidx,
     size_t rowstr[],
     double x[],
     int g_z,
-    double a[],
+    int g_a,
     int g_p,
     double q[],
     double r[],
@@ -649,14 +659,23 @@ c-------------------------------------------------------------------*/
 
         for (j = lo_q[0]; j <= hi_q[0]; j++) {
             sum = 0.0;
-    	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
-                    double val;
-                    size_t col = colidx[k];
-                    int lo_val[1] = { col };
-                    int hi_val[1] = { col };
-                    int ld_val[1] = { 0 };
-                    NGA_Get(g_p, lo_val, hi_val, &val, ld_val);
-    		    sum += a[k] * val;
+    	    for (k = rowstr[j - lo_q[0]]; k < rowstr[j+1 - lo_q[0]]; k++) {
+                    int lo[1];
+                    int hi[1];
+                    int ld[1] = { 0 };
+                    size_t col;
+                    double vval, aval;
+
+		    lo[0] = k;
+		    hi[0] = k;
+                    NGA_Get(g_colidx, lo, hi, &col, ld);
+                    NGA_Get(g_a, lo, hi, &aval, ld);
+
+		    lo[0] = col;
+		    hi[0] = col;
+                    NGA_Get(g_p, lo, hi, &vval, ld);
+
+    		    sum += aval * vval;
     	    }
             q[j - lo_q[0]] = sum;
     	}
@@ -718,16 +737,24 @@ c---------------------------------------------------------------------*/
 
     for (j = lo_r[0]; j <= hi_r[0]; j++) {
     	d = 0.0;
-	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
-                    double val;
-                    size_t col = colidx[k];
-                    int lo_val[1] = { col };
-                    int hi_val[1] = { col };
-                    int ld_val[1] = { 0 };
-                    NGA_Get(g_z, lo_val, hi_val, &val, ld_val);
-                    d += a[k] * val;
-	    }
-    	r[j] = d;
+            for (k = rowstr[j - lo_r[0]]; k < rowstr[j+1 - lo_r[0]]; k++) {
+                    int lo[1];
+                    int hi[1];
+                    int ld[1] = { 0 };
+                    size_t col;
+                    double vval, aval;
+
+		    lo[0] = k;
+		    hi[0] = k;
+                    NGA_Get(g_colidx, lo, hi, &col, ld);
+                    NGA_Get(g_a, lo, hi, &aval, ld);
+
+		    lo[0] = col;
+		    hi[0] = col;
+                    NGA_Get(g_p, lo, hi, &vval, ld);
+
+    		    sum += aval * vval;
+            }
     	r[j - lo_r[0]] = d;
     }
 
