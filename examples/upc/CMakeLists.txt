@@ -1,6 +1,7 @@
 foreach(file
 		matrix
 		1dstencil
+        cg
 		monopoly)
 	set(EXAMPLE_TARGET "${file}_upc")
 
