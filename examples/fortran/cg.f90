@@ -385,11 +385,13 @@ end module conj_mod
 
       ! Commandline arguments
       character(len=12) :: arg
+      character(len=100) :: matdir
 
       ! Timing
       integer :: cpu_count, cpu_count2, count_rate, count_max
 
       call get_command_argument(1, arg)
+      call get_command_argument(2, matdir)
       read(unit=arg, fmt=*) class
 
       if (class .eq. 'S') then
@@ -488,11 +490,11 @@ end module conj_mod
       inquire(iolength=recl_col) colidx(1:nz_block)
       inquire(iolength=recl_row) rowstr(1:row_block)
 
-      open(newunit=io_a, file="a.cg." // class, form='unformatted', &
+      open(newunit=io_a, file=trim(matdir) // "/a.cg." // class, form='unformatted', &
           access='direct', recl=recl_a)
-      open(newunit=io_col, file="colidx.cg." // class, form='unformatted', &
+      open(newunit=io_col, file=trim(matdir) // "/colidx.cg." // class, form='unformatted', &
           access='direct', recl=recl_col)
-      open(newunit=io_row, file="rowstr.cg." // class, form='unformatted', &
+      open(newunit=io_row, file=trim(matdir) // "/rowstr.cg." // class, form='unformatted', &
           access='direct', recl=recl_row)
 
       read(io_a, rec=this_image()) a
