@@ -48,7 +48,7 @@ void spmv(csr_t *matrix, int g_vector, int g_out)
 		out[offset] = outval;
 	}
 
-	NGA_Release(g_out, lo_out, hi_out);
+	NGA_Release_update(g_out, lo_out, hi_out);
 }
 
 void steady_state(csr_t *matrix, int g_vector, int g_out, size_t iterations)

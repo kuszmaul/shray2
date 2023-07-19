@@ -26,7 +26,7 @@ void init_2d(int g_a)
 		}
 	}
 
-	NGA_Release(g_a, lo, hi);
+	NGA_Release_update(g_a, lo, hi);
 }
 
 void init_1d(int g_a)
@@ -42,7 +42,7 @@ void init_1d(int g_a)
 		a[i] = i;
 	}
 
-	NGA_Release(g_a, lo, hi);
+	NGA_Release_update(g_a, lo, hi);
 }
 
 void accelerate(double *res, double *pos1, double *pos2, double mass)
@@ -176,9 +176,9 @@ void advance(int g_pos, int g_vel, int g_masses, int g_accel, double dt, int n)
 		}
 	}
 
-	NGA_Release(g_pos, lo_pos, hi_pos);
-	NGA_Release(g_vel, lo_vel, hi_vel);
-	NGA_Release(g_accel, lo_accel, hi_accel);
+	NGA_Release_update(g_pos, lo_pos, hi_pos);
+	NGA_Release_update(g_vel, lo_vel, hi_vel);
+	NGA_Release_update(g_accel, lo_accel, hi_accel);
 
 	GA_Sync();
 }
