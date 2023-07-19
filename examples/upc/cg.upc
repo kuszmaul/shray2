@@ -37,6 +37,7 @@
 #include <math.h>
 #include <upc.h>
 #include <upc_collective.h>
+#include <upc_io.h>
 #include <stdbool.h>
 #include <sys/time.h>
 #include <omp.h>
@@ -105,34 +106,17 @@ size_t max(size_t a, size_t b)
 
 int read_sparse(char *name, shared void *array, size_t n, size_t typewidth)
 {
-    FILE *stream = fopen(name, "r");
-    if (stream == NULL) {
-        perror("Opening file failed");
-        return 1;
-    }
+    upc_file_t *fd = upc_all_fopen(name, UPC_RDONLY|UPC_COMMON_FP, 0,
+                                   NULL);
 
     size_t blocksize = (n + THREADS - 1) / THREADS;
     size_t start = MYTHREAD * blocksize;
     size_t end = max((MYTHREAD + 1) * blocksize, n);
-    size_t size = (end - start) * typewidth;
-    long offset = start * typewidth;
-    if ((fseek(stream, offset, SEEK_SET)) != 0) {
-        perror("fseek failed");
-        return 1;
-    }
 
-    size_t read_bytes;
-    if ((read_bytes = fread((void *)array, 1, size, stream)) != size) {
-        fprintf(stderr, "We could not read in all items\n");
-        fprintf(stderr, "Read %zu / %zu bytes\n", read_bytes, size);
-        return 1;
-    }
+    upc_all_fread_shared(fd, array, blocksize * typewidth, typewidth,
+                         start - end, UPC_IN_ALLSYNC | UPC_OUT_ALLSYNC);
 
-    int err;
-    if ((err = fclose(stream))) {
-        perror("Closing file failed");
-        return err;
-    }
+    upc_all_fclose(fd);
 
     return 0;
 }
