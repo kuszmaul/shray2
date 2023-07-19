@@ -605,7 +605,6 @@ c---------------------------------------------------------------------*/
 {
     static int callcount = 0;
     double d, sum, rho, rho0, alpha, beta;
-    size_t j, k;
     double *p, *z;
     int cgit, cgitmax = 25;
     rho = 0.0;
@@ -616,7 +615,7 @@ c-------------------------------------------------------------------*/
 {
     NGA_Access(g_p, lo_p, hi_p, &p, ld_p);
     NGA_Access(g_z, lo_z, hi_z, &z, ld_z);
-    for (j = lo_q[0]; j <= hi_q[0]; j++) {
+    for (int j = lo_q[0]; j <= hi_q[0]; j++) {
     	q[j - lo_q[0]] = 0.0;
     	z[j - lo_q[0]] = 0.0;
     	r[j - lo_q[0]] = x[j - lo_q[0]];
@@ -629,7 +628,7 @@ c-------------------------------------------------------------------*/
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
-    for (j = lo_r[0]; j <= hi_r[0]; j++) {
+    for (int j = lo_r[0]; j <= hi_r[0]; j++) {
 	    rho += r[j - lo_r[0]]*r[j - lo_r[0]];
     }
     gaSum(&rho, scratch, g_scratch);
@@ -657,9 +656,9 @@ c-------------------------------------------------------------------*/
     C        on the Cray t3d - overall speed of code is 1.5 times faster.
     */
 
-        for (j = lo_q[0]; j <= hi_q[0]; j++) {
+        for (int j = lo_q[0]; j <= hi_q[0]; j++) {
             sum = 0.0;
-    	    for (k = rowstr[j - lo_q[0]]; k < rowstr[j+1 - lo_q[0]]; k++) {
+    	    for (size_t k = rowstr[j - lo_q[0]]; k < rowstr[j+1 - lo_q[0]]; k++) {
                     int lo[1];
                     int hi[1];
                     int ld[1] = { 0 };
@@ -684,7 +683,7 @@ c-------------------------------------------------------------------*/
     c  Obtain p.q
     c-------------------------------------------------------------------*/
         NGA_Access(g_p, lo_p, hi_p, &p, ld_p);
-    	for (j = lo_p[0]; j <= hi_p[0]; j++) {
+    	for (int j = lo_p[0]; j <= hi_p[0]; j++) {
                 d += p[j - lo_p[0]]*q[j - lo_p[0]];
     	}
         gaSum(&d, scratch, g_scratch);
@@ -697,7 +696,7 @@ c-------------------------------------------------------------------*/
     c  Obtain z = z + alpha*p
     c  and    r = r - alpha*q
     c---------------------------------------------------------------------*/
-    	for (j = lo_z[0]; j <= hi_z[0]; j++) {
+    	for (int j = lo_z[0]; j <= hi_z[0]; j++) {
                 z[j - lo_z[0]] += alpha*p[j - lo_z[0]];
                 r[j - lo_z[0]] -= alpha*q[j - lo_z[0]];
 
@@ -718,7 +717,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  p = r + beta*p
     c-------------------------------------------------------------------*/
-    	for (j = lo_p[0]; j <= hi_p[0]; j++) {
+    	for (int j = lo_p[0]; j <= hi_p[0]; j++) {
                 p[j - lo_p[0]] = r[j - lo_p[0]] + beta*p[j - lo_p[0]];
     	}
         callcount++;
@@ -735,9 +734,9 @@ c  The partition submatrix-vector multiply
 c---------------------------------------------------------------------*/
     sum = 0.0;
 
-    for (j = lo_r[0]; j <= hi_r[0]; j++) {
+    for (int j = lo_r[0]; j <= hi_r[0]; j++) {
     	d = 0.0;
-            for (k = rowstr[j - lo_r[0]]; k < rowstr[j+1 - lo_r[0]]; k++) {
+            for (size_t k = rowstr[j - lo_r[0]]; k < rowstr[j+1 - lo_r[0]]; k++) {
                     int lo[1];
                     int hi[1];
                     int ld[1] = { 0 };
@@ -761,7 +760,7 @@ c---------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
-    for (j = lo_x[0]; j <= hi_x[0]; j++) {
+    for (int j = lo_x[0]; j <= hi_x[0]; j++) {
     	d = x[j - lo_x[0]] - r[j - lo_x[0]];
 	    sum += d*d;
     }
