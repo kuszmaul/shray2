@@ -104,21 +104,28 @@ size_t max(size_t a, size_t b)
     return (a > b) ? a : b;
 }
 
-int read_sparse(char *name, shared void *array, size_t n, size_t typewidth)
+void read_double(char *name, shared double *array, size_t n)
 {
-    upc_file_t *fd = upc_all_fopen(name, UPC_RDONLY|UPC_COMMON_FP, 0,
-                                   NULL);
+    upc_file_t *fd = upc_all_fopen(name, UPC_RDONLY|UPC_COMMON_FP, 0, NULL);
 
     size_t blocksize = (n + THREADS - 1) / THREADS;
-    size_t start = MYTHREAD * blocksize;
-    size_t end = max((MYTHREAD + 1) * blocksize, n);
 
-    upc_all_fread_shared(fd, array, blocksize * typewidth, typewidth,
-                         start - end, UPC_IN_ALLSYNC | UPC_OUT_ALLSYNC);
+    upc_all_fread_shared(fd, array, blocksize, sizeof(double),
+                         n, UPC_IN_ALLSYNC | UPC_OUT_ALLSYNC);
 
     upc_all_fclose(fd);
+}
 
-    return 0;
+void read_size_t(char *name, shared size_t *array, size_t n)
+{
+    upc_file_t *fd = upc_all_fopen(name, UPC_RDONLY|UPC_COMMON_FP, 0, NULL);
+
+    size_t blocksize = (n + THREADS - 1) / THREADS;
+
+    upc_all_fread_shared(fd, array, blocksize, sizeof(size_t),
+                         n, UPC_IN_ALLSYNC | UPC_OUT_ALLSYNC);
+
+    upc_all_fclose(fd);
 }
 
 double gettime()
@@ -281,24 +288,25 @@ c-------------------------------------------------------------------*/
                             (NA + THREADS - 1) / THREADS * sizeof(double));
 
     char *name = strcatalloc("a.cg");
-    if (read_sparse(name, (shared void *)a, NZ, sizeof(double))) {
-        fprintf(stderr, "Reading %s went wrong\n", name);
-        return 1;
+    read_double(name, a, NZ);
+    if (MYTHREAD == 0) {
+        for (int i = 0; i < 10; i++) {
+            fprintf(stderr, "a[%d] = %lf\n", i, a[i]);
+        }
     }
     free(name);
 
     name = strcatalloc("colidx.cg");
-    if (read_sparse(name, (shared void *)colidx, NZ, sizeof(size_t))) {
-        fprintf(stderr, "Reading %s went wrong\n", name);
-        return 1;
+    read_size_t(name, colidx, NZ);
+    if (MYTHREAD == 0) {
+        for (int i = 0; i < 10; i++) {
+            fprintf(stderr, "colidx[%d] = %ld\n", i, colidx[i]);
+        }
     }
     free(name);
 
     name = strcatalloc("rowstr.cg");
-    if (read_sparse(name, (shared void *)rowstr, NA + 1, sizeof(size_t))) {
-        fprintf(stderr, "Reading %s went wrong\n", name);
-        return 1;
-    }
+    read_size_t(name, rowstr, NA + 1);
     free(name);
 
     upc_barrier;
