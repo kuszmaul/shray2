@@ -80,8 +80,8 @@ void gasnetSum(double *number, double *scratch)
 
 static char *strcatalloc(const char *s)
 {
-    char suffix[100];
-    snprintf(suffix, 100, ".%s%.2d", class, ShrayRank());
+    char suffix[3];
+    snprintf(suffix, 3, ".%s", class);
 
     size_t dirlen = strlen(matdir) + 1;
     size_t slen = strlen(s);
@@ -100,7 +100,7 @@ static char *strcatalloc(const char *s)
     return res;
 }
 
-int read_sparse(char *name, void *array, size_t size)
+int read_sparse(char *name, void *array, size_t typewidth)
 {
     FILE *stream = fopen(name, "r");
     if (stream == NULL) {
@@ -108,8 +108,15 @@ int read_sparse(char *name, void *array, size_t size)
         return 1;
     }
 
+    size_t size = (ShrayEnd(array) - ShrayStart(array)) * typewidth;
+    long offset = ShrayStart(array) * typewidth;
+    if ((fseek(stream, offset, SEEK_SET)) != 0) {
+        perror("fseek failed");
+        return 1;
+    }
+
     size_t read_bytes;
-    if ((read_bytes = fread(array, 1, size, stream)) != size) {
+    if ((read_bytes = fread(array + offset, 1, size, stream)) != size) {
         fprintf(stderr, "We could not read in all items\n");
         fprintf(stderr, "Read %zu / %zu bytes\n", read_bytes, size);
         return 1;
@@ -280,26 +287,23 @@ c-------------------------------------------------------------------*/
 
 
     char *name = strcatalloc("a.cg");
-    if (read_sparse(name, a + ShrayStart(a),
-                (ShrayEnd(a) - ShrayStart(a)) * sizeof(double))) {
+    if (read_sparse(name, a, sizeof(double))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
-	ShrayFinalize(1);
+	    ShrayFinalize(1);
     }
     free(name);
 
     name = strcatalloc("colidx.cg");
-    if (read_sparse(name, colidx + ShrayStart(colidx),
-                (ShrayEnd(colidx) - ShrayStart(colidx)) * sizeof(size_t))) {
+    if (read_sparse(name, colidx, sizeof(size_t))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
-	ShrayFinalize(1);
+    	ShrayFinalize(1);
     }
     free(name);
 
     name = strcatalloc("rowstr.cg");
-    if (read_sparse(name, rowstr + ShrayStart(rowstr),
-                (ShrayEnd(rowstr) - ShrayStart(rowstr)) * sizeof(size_t))) {
+    if (read_sparse(name, rowstr, sizeof(size_t))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
-	ShrayFinalize(1);
+	    ShrayFinalize(1);
     }
     free(name);
 
