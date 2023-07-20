@@ -57,7 +57,7 @@ static double amult;
 static double tran;
 
 /* GA distributions */
-static int lo_a[1], hi_a[1], ld_a[1];
+static int lo_a[1], hi_a[1];
 static int lo_x[1], hi_x[1], ld_x[1];
 static int lo_q[1], hi_q[1], ld_q[1];
 static int lo_z[1], hi_z[1], ld_z[1];
@@ -343,7 +343,7 @@ c-------------------------------------------------------------------*/
 	GA_Error("Could not allocate array", 1);
     }
 
-    double *a, *x, *q, *z, *r, *p;
+    double *x, *q, *z, *r, *p;
 
     NGA_Distribution(g_a, rank, lo_a, hi_a);
     NGA_Distribution(g_x, rank, lo_x, hi_x);
@@ -354,7 +354,6 @@ c-------------------------------------------------------------------*/
     NGA_Distribution(g_rowstr, rank, lo_rowstr, hi_rowstr);
     NGA_Distribution(g_colidx, rank, lo_colidx, hi_colidx);
     NGA_Distribution(g_scratch, rank, lo_scratch, hi_scratch);
-    NGA_Access(g_a, lo_a, hi_a, &a, ld_a);
     NGA_Access(g_x, lo_x, hi_x, &x, ld_x);
     NGA_Access(g_q, lo_q, hi_q, &q, ld_q);
     NGA_Access(g_r, lo_r, hi_r, &r, ld_r);
@@ -558,11 +557,11 @@ c-------------------------------------------------------------------*/
         fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
     }
 
+    NGA_Release_update(g_x, lo_x, hi_x);
     NGA_Release_update(g_q, lo_q, hi_q);
-    NGA_Release_update(g_p, lo_p, hi_p);
-    NGA_Release_update(g_z, lo_z, hi_z);
     NGA_Release_update(g_r, lo_r, hi_r);
 
+    NGA_Destroy(g_scratch);
     NGA_Destroy(g_colidx);
     NGA_Destroy(g_rowstr);
     NGA_Destroy(g_a);
