@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <assert.h>
 #include <upc.h>
 #include <upc_collective.h>
 #include <upc_io.h>
@@ -99,9 +100,9 @@ static char *strcatalloc(const char *s)
     return res;
 }
 
-size_t max(size_t a, size_t b)
+size_t min(size_t a, size_t b)
 {
-    return (a > b) ? a : b;
+    return (a < b) ? a : b;
 }
 
 void read_double(char *name, shared double *array, size_t n)
@@ -310,15 +311,17 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
-    upc_forall (size_t i = 0; i < NA; i++; i) {
-    	x[i] = 1.0;
-    }
-    upc_forall (size_t j = 0; j < NA; j++; j) {
+    size_t block = (NA + THREADS - 1) / THREADS;
+    fprintf(stderr, "Thread %d: init vectors from %zu to %zu (block = %zu)\n",
+        MYTHREAD, MYTHREAD * block, min((MYTHREAD + 1) * block, NA), block);
+    for (size_t j = MYTHREAD * block; min((MYTHREAD + 1) * block, NA); j++) {
+       x[j] = 1.0;
        q[j] = 0.0;
        z[j] = 0.0;
        r[j] = 0.0;
        p[j] = 0.0;
     }
+    fprintf(stderr, "End init vectors\n");
     upc_barrier;
     zeta  = 0.0;
 
@@ -344,7 +347,7 @@ c-------------------------------------------------------------------*/
         norm_temp11_all[MYTHREAD] = 0.0;
         norm_temp12_all[MYTHREAD] = 0.0;
 
-    	upc_forall (size_t j = 0; j < NA; j++; j) {
+        for (size_t j = MYTHREAD * block; min((MYTHREAD + 1) * block, NA); j++) {
                 norm_temp11_all[MYTHREAD] = norm_temp11 + x[j]*z[j];
                 norm_temp12_all[MYTHREAD] = norm_temp12 + z[j]*z[j];
     	}
@@ -359,7 +362,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  Normalize z to obtain x
     c-------------------------------------------------------------------*/
-    	upc_forall (size_t j = 0; j < NA; j++; j) {
+        for (size_t j = MYTHREAD * block; min((MYTHREAD + 1) * block, NA); j++) {
                 x[j] = norm_temp12*z[j];
     	}
 
@@ -368,8 +371,8 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
-    upc_forall (size_t i = 0; i < NA; i++; i) {
-         x[i] = 1.0;
+    for (size_t j = MYTHREAD * block; min((MYTHREAD + 1) * block, NA); j++) {
+         x[j] = 1.0;
     }
     upc_barrier;
     zeta  = 0.0;
@@ -399,7 +402,7 @@ c-------------------------------------------------------------------*/
         norm_temp11_all[MYTHREAD] = 0.0;
         norm_temp12_all[MYTHREAD] = 0.0;
 
-    	upc_forall (size_t j = 0; j < NA; j++; j) {
+        for (size_t j = MYTHREAD * block; min((MYTHREAD + 1) * block, NA); j++) {
                 norm_temp11 = norm_temp11 + x[j]*z[j];
                 norm_temp12 = norm_temp12 + z[j]*z[j];
     	}
@@ -423,7 +426,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  Normalize z to obtain x
     c-------------------------------------------------------------------*/
-    	upc_forall (size_t j = 0; j < 0; j++; j) {
+        for (size_t j = MYTHREAD * block; min((MYTHREAD + 1) * block, NA); j++) {
                 x[j] = norm_temp12*z[j];
     	}
         upc_barrier;
@@ -508,6 +511,7 @@ c  Floaging point arrays here are named as in NPB1 spec discussion of
 c  CG algorithm
 c---------------------------------------------------------------------*/
 {
+    fprintf(stderr, "Enter conj_grad\n");
     static int callcount = 0;
     double rho0, alpha, beta;
     size_t j, k;
@@ -519,7 +523,8 @@ c---------------------------------------------------------------------*/
 c  Initialize the CG algorithm:
 c-------------------------------------------------------------------*/
 {
-    upc_forall (size_t j = 0; j < naa; j++; j) {
+    size_t block = (naa + THREADS - 1) / THREADS;
+    for (size_t j = MYTHREAD * block; min((MYTHREAD + 1) * block, naa); j++) {
     	q[j] = 0.0;
     	z[j] = 0.0;
     	r[j] = x[j];
@@ -530,12 +535,15 @@ c-------------------------------------------------------------------*/
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
-    upc_forall (size_t j = 0; j < naa; j++; j) {
+    for (size_t j = MYTHREAD * block; j < min((MYTHREAD + 1) * block, naa); j++) {
 	    rho += r[j]*r[j];
+        assert(r[j] == 1);
     }
     rho_all[MYTHREAD] = rho;
+    fprintf(stderr, "rho[%d] = %lf\n", MYTHREAD, rho_all[MYTHREAD]);
     upc_all_reduceD(&rho, rho_all, UPC_ADD, THREADS, 1,
                     NULL, UPC_IN_ALLSYNC|UPC_OUT_ALLSYNC);
+    fprintf(stderr, "rho = %lf\n", rho);
 
 }/* end omp parallel */
 /*--------------------------------------------------------------------
@@ -561,7 +569,8 @@ c-------------------------------------------------------------------*/
     C        on the Cray t3d - overall speed of code is 1.5 times faster.
     */
 
-        upc_forall (size_t j = 0; j < naa; j++; j) {
+        size_t block = (naa + THREADS - 1) / THREADS;
+        for (size_t j = MYTHREAD * block; j < min((MYTHREAD + 1) * block, naa); j++) {
             sum = 0.0;
     	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
     		    sum += a[k]*p[colidx[k]];
@@ -575,7 +584,7 @@ c-------------------------------------------------------------------*/
     c  Obtain p.q
     c-------------------------------------------------------------------*/
         d_all[MYTHREAD] = d;
-    	upc_forall (size_t j = 0; j < naa; j++; j) {
+        for (size_t j = MYTHREAD * block; j < min((MYTHREAD + 1) * block, naa); j++) {
                 d_all[MYTHREAD] += p[j]*q[j];
     	}
         upc_all_reduceD(&d, d_all, UPC_ADD, THREADS, 1,
@@ -590,7 +599,7 @@ c-------------------------------------------------------------------*/
     c  and    r = r - alpha*q
     c---------------------------------------------------------------------*/
         rho_all[MYTHREAD] = rho;
-    	upc_forall (j = 0; j < naa; j++; j) {
+        for (size_t j = MYTHREAD * block; j < min((MYTHREAD + 1) * block, naa); j++) {
                 z[j] += alpha*p[j];
                 r[j] -= alpha*q[j];
 
@@ -612,7 +621,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  p = r + beta*p
     c-------------------------------------------------------------------*/
-    	upc_forall (size_t j = 0; j < naa; j++; j) {
+        for (size_t j = MYTHREAD * block; j < min((MYTHREAD + 1) * block, naa); j++) {
                 p[j] = r[j] + beta*p[j];
     	}
         upc_barrier;
@@ -626,7 +635,8 @@ c  The partition submatrix-vector multiply
 c---------------------------------------------------------------------*/
     sum = 0.0;
 
-    upc_forall (size_t j = 0; j < naa; j++; j) {
+    size_t block = (naa + THREADS - 1) / THREADS;
+    for (size_t j = MYTHREAD * block; j < min((MYTHREAD + 1) * block, naa); j++) {
     	d = 0.0;
 	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
             d += a[k] * z[colidx[k]];
@@ -639,7 +649,7 @@ c---------------------------------------------------------------------*/
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
     d_all[MYTHREAD] = d;
-    upc_forall (j = 0; j < naa; j++; j) {
+    for (size_t j = MYTHREAD * block; j < min((MYTHREAD + 1) * block, naa); j++) {
     	d_all[MYTHREAD] = x[j] - r[j];
 	    sum += d*d;
     }
