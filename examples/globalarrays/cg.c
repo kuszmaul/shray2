@@ -394,18 +394,18 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
-    for (int i = lo_x[0]; i <= hi_x[0]; i++) {
-    	x[i - lo_x[0]] = 1.0;
+    for (int i = 0; i <= hi_x[0] - lo_x[0]; i++) {
+    	x[i] = 1.0;
     }
 
     NGA_Access(g_p, lo_p, hi_p, &p, ld_p);
     NGA_Access(g_z, lo_z, hi_z, &z, ld_z);
 
-    for (int j = lo_q[0]; j <= hi_q[0]; j++) {
-       q[j - lo_q[0]] = 0.0;
-       z[j - lo_q[0]] = 0.0;
-       r[j - lo_q[0]] = 0.0;
-       p[j - lo_q[0]] = 0.0;
+    for (int j = 0; j <= hi_q[0] - lo_q[0]; j++) {
+       q[j] = 0.0;
+       z[j] = 0.0;
+       r[j] = 0.0;
+       p[j] = 0.0;
     }
     NGA_Release_update(g_p, lo_p, hi_p);
     NGA_Release_update(g_z, lo_z, hi_z);
@@ -436,9 +436,9 @@ c-------------------------------------------------------------------*/
     	norm_temp11 = 0.0;
     	norm_temp12 = 0.0;
         NGA_Access(g_z, lo_z, hi_z, &z, ld_z);
-    	for (int j = lo_x[0]; j <= hi_x[0]; j++) {
-                norm_temp11 = norm_temp11 + x[j - lo_x[0]]*z[j - lo_x[0]];
-                norm_temp12 = norm_temp12 + z[j - lo_x[0]]*z[j - lo_x[0]];
+    	for (int j = 0; j <= hi_x[0] - lo_x[0]; j++) {
+                norm_temp11 = norm_temp11 + x[j]*z[j];
+                norm_temp12 = norm_temp12 + z[j]*z[j];
     	}
 	gaSum(&norm_temp11, scratch, g_scratch);
 	gaSum(&norm_temp12, scratch, g_scratch);
@@ -447,8 +447,8 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  Normalize z to obtain x
     c-------------------------------------------------------------------*/
-    	for (int j = lo_x[0]; j <= hi_x[0]; j++) {
-                x[j - lo_x[0]] = norm_temp12*z[j - lo_x[0]];
+    	for (int j = 0; j <= hi_x[0] - lo_x[0]; j++) {
+                x[j] = norm_temp12*z[j];
     	}
 
     	NGA_Release(g_z, lo_z, hi_z);
@@ -457,8 +457,8 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
-    for (int i = lo_x[0]; i <= hi_x[0]; i++) {
-         x[i - lo_x[0]] = 1.0;
+    for (int i = 0; i <= hi_x[0] - lo_x[0]; i++) {
+         x[i] = 1.0;
     }
     zeta  = 0.0;
 
@@ -488,9 +488,9 @@ c-------------------------------------------------------------------*/
     	norm_temp12 = 0.0;
 
         NGA_Access(g_z, lo_z, hi_z, &z, ld_z);
-    	for (int j = lo_x[0]; j <= hi_x[0]; j++) {
-                norm_temp11 = norm_temp11 + x[j - lo_x[0]]*z[j - lo_x[0]];
-                norm_temp12 = norm_temp12 + z[j - lo_x[0]]*z[j - lo_x[0]];
+    	for (int j = 0; j <= hi_x[0] - lo_x[0]; j++) {
+                norm_temp11 = norm_temp11 + x[j]*z[j];
+                norm_temp12 = norm_temp12 + z[j]*z[j];
     	}
     	gaSum(&norm_temp11, scratch, g_scratch);
         gaSum(&norm_temp12, scratch, g_scratch);
@@ -509,8 +509,8 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  Normalize z to obtain x
     c-------------------------------------------------------------------*/
-    	for (int j = lo_x[0]; j <= hi_x[0]; j++) {
-                x[j - lo_x[0]] = norm_temp12*z[j - lo_x[0]];
+    	for (int j = 0; j <= hi_x[0] - lo_x[0]; j++) {
+                x[j] = norm_temp12*z[j];
     	}
     	NGA_Release(g_z, lo_z, hi_z);
         GA_Sync();
@@ -614,11 +614,11 @@ c-------------------------------------------------------------------*/
 {
     NGA_Access(g_p, lo_p, hi_p, &p, ld_p);
     NGA_Access(g_z, lo_z, hi_z, &z, ld_z);
-    for (int j = lo_q[0]; j <= hi_q[0]; j++) {
-    	q[j - lo_q[0]] = 0.0;
-    	z[j - lo_q[0]] = 0.0;
-    	r[j - lo_q[0]] = x[j - lo_q[0]];
-    	p[j - lo_q[0]] = r[j - lo_q[0]];
+    for (int j = 0; j <= hi_q[0] - lo_q[0]; j++) {
+    	q[j] = 0.0;
+    	z[j] = 0.0;
+    	r[j] = x[j];
+    	p[j] = r[j];
     }
     NGA_Release_update(g_p, lo_p, hi_p);
     GA_Sync();
@@ -627,8 +627,8 @@ c-------------------------------------------------------------------*/
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
-    for (int j = lo_r[0]; j <= hi_r[0]; j++) {
-	    rho += r[j - lo_r[0]]*r[j - lo_r[0]];
+    for (int j = 0; j <= hi_r[0] - lo_r[0]; j++) {
+	    rho += r[j]*r[j];
     }
     gaSum(&rho, scratch, g_scratch);
 }/* end omp parallel */
@@ -655,9 +655,9 @@ c-------------------------------------------------------------------*/
     C        on the Cray t3d - overall speed of code is 1.5 times faster.
     */
 
-        for (int j = lo_q[0]; j <= hi_q[0]; j++) {
+        for (int j = 0; j <= hi_q[0] - lo_q[0]; j++) {
             sum = 0.0;
-    	    for (size_t k = rowstr[j - lo_q[0]]; k < rowstr[j+1 - lo_q[0]]; k++) {
+    	    for (size_t k = rowstr[j]; k < rowstr[j+1]; k++) {
                     int lo[1];
                     int hi[1];
                     int ld[1] = { 0 };
@@ -675,15 +675,15 @@ c-------------------------------------------------------------------*/
 
     		    sum += aval * vval;
     	    }
-            q[j - lo_q[0]] = sum;
+            q[j] = sum;
     	}
 
     /*--------------------------------------------------------------------
     c  Obtain p.q
     c-------------------------------------------------------------------*/
         NGA_Access(g_p, lo_p, hi_p, &p, ld_p);
-    	for (int j = lo_p[0]; j <= hi_p[0]; j++) {
-                d += p[j - lo_p[0]]*q[j - lo_p[0]];
+    	for (int j = 0; j <= hi_p[0] - lo_p[0]; j++) {
+                d += p[j]*q[j];
     	}
         gaSum(&d, scratch, g_scratch);
     /*--------------------------------------------------------------------
@@ -695,15 +695,15 @@ c-------------------------------------------------------------------*/
     c  Obtain z = z + alpha*p
     c  and    r = r - alpha*q
     c---------------------------------------------------------------------*/
-    	for (int j = lo_z[0]; j <= hi_z[0]; j++) {
-                z[j - lo_z[0]] += alpha*p[j - lo_z[0]];
-                r[j - lo_z[0]] -= alpha*q[j - lo_z[0]];
+    	for (int j = 0; j <= hi_z[0] - lo_z[0]; j++) {
+                z[j] += alpha*p[j];
+                r[j] -= alpha*q[j];
 
     /*---------------------------------------------------------------------
     c  rho = r.r
     c  Now, obtain the norm of r: First, sum squares of r elements locally...
     c---------------------------------------------------------------------*/
-                rho += r[j - lo_z[0]]*r[j - lo_z[0]];
+                rho += r[j]*r[j];
     	}
         gaSum(&rho, scratch, g_scratch);
 
@@ -716,8 +716,8 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  p = r + beta*p
     c-------------------------------------------------------------------*/
-    	for (int j = lo_p[0]; j <= hi_p[0]; j++) {
-                p[j - lo_p[0]] = r[j - lo_p[0]] + beta*p[j - lo_p[0]];
+    	for (int j = 0; j <= hi_p[0] - lo_p[0]; j++) {
+                p[j] = r[j] + beta*p[j];
     	}
         callcount++;
         NGA_Release_update(g_p, lo_p, hi_p);
@@ -733,9 +733,9 @@ c  The partition submatrix-vector multiply
 c---------------------------------------------------------------------*/
     sum = 0.0;
 
-    for (int j = lo_r[0]; j <= hi_r[0]; j++) {
+    for (int j = 0; j <= hi_r[0] - lo_r[0]; j++) {
     	d = 0.0;
-            for (size_t k = rowstr[j - lo_r[0]]; k < rowstr[j+1 - lo_r[0]]; k++) {
+            for (size_t k = rowstr[j]; k < rowstr[j+1]; k++) {
                     int lo[1];
                     int hi[1];
                     int ld[1] = { 0 };
@@ -753,14 +753,14 @@ c---------------------------------------------------------------------*/
 
     		    sum += aval * vval;
             }
-    	r[j - lo_r[0]] = d;
+    	r[j] = d;
     }
 
 /*--------------------------------------------------------------------
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
-    for (int j = lo_x[0]; j <= hi_x[0]; j++) {
-    	d = x[j - lo_x[0]] - r[j - lo_x[0]];
+    for (int j = 0; j <= hi_x[0] - lo_x[0]; j++) {
+    	d = x[j] - r[j];
 	    sum += d*d;
     }
     gaSum(&sum, scratch, g_scratch);
