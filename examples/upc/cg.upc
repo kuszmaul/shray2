@@ -371,7 +371,7 @@ int main(int argc, char **argv) {
 	    zeta_verify_value = 8.5971775078648;
     } else if (!strcmp(class, "W")) {
         NA = 7000;
-        NONZER = 7;
+        NONZER = 8;
         NITER = 15;
         SHIFT = 12.0;
 	    zeta_verify_value = 10.362595087124;

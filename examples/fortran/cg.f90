@@ -130,7 +130,7 @@ contains
       integer   cgit, cgitmax
       integer(8) j, k, naa, nz_block, na_block, nzz, na_local
 
-      double precision   d, sum, rho, rho0, alpha, beta, rnorm, suml, d_acc, sum_acc, rho_acc
+      double precision   d, sumr, rho, rho0, alpha, beta, rnorm, suml, d_acc, sum_acc, rho_acc
       double precision, allocatable :: all_rhos[:], all_ds[:], all_sums[:]
       double precision ::  x(:)[*], p(:)[*], q(:)[*], r(:)[*], z(:)[*], a(:)[*]
       integer(8) ::  colidx(:)[*], rowstr(:)[*]
@@ -149,7 +149,7 @@ contains
       end if
 
       rho = 0.0d0
-      sum = 0.0d0
+      sumr = 0.0d0
 
 !---------------------------------------------------------------------
 !  Initialize the CG algorithm:
@@ -316,19 +316,19 @@ contains
 !---------------------------------------------------------------------
       do j=1, na_local
          suml = x(j) - r(j)
-         sum  = sum + suml*suml
+         sumr  = sumr + suml*suml
       enddo
 
-    all_sums = sum
+    all_sums = sumr
     sync all
     sum_acc = 0
     do j = 1, num_images()
         sum_acc = sum_acc + all_sums[j]
     end do
-    sum = sum_acc
+    sumr = sum_acc
     !write(*, *) "sum is ", sum, " at image ", this_image()
 
-      rnorm = sqrt( sum )
+      rnorm = sqrt( sumr )
 
 
 
@@ -402,7 +402,7 @@ end module conj_mod
           zeta_verify_value = 8.5971775078648d0
       else if (class .eq. 'W') then
           na = 7000
-          nonzer = 7
+          nonzer = 8
           niter = 15
           shift = 12.d0
           zeta_verify_value = 10.362595087124d0

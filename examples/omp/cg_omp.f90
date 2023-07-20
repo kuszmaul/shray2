@@ -315,7 +315,7 @@ end module conj_mod_s
           zeta_verify_value = 8.5971775078648d0
       else if (class .eq. 'W') then
           na = 7000
-          nonzer = 7
+          nonzer = 8
           niter = 15
           shift = 12.d0
           zeta_verify_value = 10.362595087124d0

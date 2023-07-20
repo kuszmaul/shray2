@@ -179,7 +179,7 @@ int main(int argc, char **argv) {
         SHIFT = 10.0;
     } else if (!strcmp(class, "W")) {
         NA = 7000;
-        NONZER = 7;
+        NONZER = 8;
         NITER = 15;
         SHIFT = 12.0;
     } else if (!strcmp(class, "A")) {
