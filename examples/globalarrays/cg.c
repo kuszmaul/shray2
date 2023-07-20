@@ -57,7 +57,7 @@ static double amult;
 static double tran;
 
 /* GA distributions */
-static int lo_a[1], hi_a[1], ld_a[1];
+static int lo_a[1], hi_a[1];
 static int lo_x[1], hi_x[1], ld_x[1];
 static int lo_q[1], hi_q[1], ld_q[1];
 static int lo_z[1], hi_z[1], ld_z[1];
@@ -247,7 +247,7 @@ int main(int argc, char **argv) {
 	    zeta_verify_value = 8.5971775078648;
     } else if (!strcmp(class, "W")) {
         NA = 7000;
-        NONZER = 7;
+        NONZER = 8;
         NITER = 15;
         SHIFT = 12.0;
 	    zeta_verify_value = 10.362595087124;
@@ -311,17 +311,16 @@ c-------------------------------------------------------------------*/
     int na_dimensions[1] = { NA };
     int rowstr_dimensions[1] = { NA + 1 };
 
-    // TODO: check if there is a workaround for GA not having size_t
-    int g_colidx = NGA_Create(C_DBL, 1, nz_dimensions, "colidx", nz_chunks);
+    int g_colidx = NGA_Create(C_LONG, 1, nz_dimensions, "colidx", nz_chunks);
     if (!g_colidx) {
 	GA_Error("Could not allocate array", 1);
     }
-    int g_rowstr = NGA_Create(C_DBL, 1, rowstr_dimensions, "rowstr", rowstr_chunks);
+    int g_rowstr = NGA_Create(C_LONG, 1, rowstr_dimensions, "rowstr", rowstr_chunks);
     if (!g_rowstr) {
 	GA_Error("Could not allocate array", 1);
     }
-    int g_a = NGA_Duplicate(g_colidx, "a");
-    if (!g_colidx) {
+    int g_a = NGA_Create(C_DBL, 1, nz_dimensions, "a", nz_chunks);
+    if (!g_a) {
 	GA_Error("Could not allocate array", 1);
     }
 
@@ -343,7 +342,7 @@ c-------------------------------------------------------------------*/
 	GA_Error("Could not allocate array", 1);
     }
 
-    double *a, *x, *q, *z, *r, *p;
+    double *x, *q, *z, *r, *p;
 
     NGA_Distribution(g_a, rank, lo_a, hi_a);
     NGA_Distribution(g_x, rank, lo_x, hi_x);
@@ -354,7 +353,6 @@ c-------------------------------------------------------------------*/
     NGA_Distribution(g_rowstr, rank, lo_rowstr, hi_rowstr);
     NGA_Distribution(g_colidx, rank, lo_colidx, hi_colidx);
     NGA_Distribution(g_scratch, rank, lo_scratch, hi_scratch);
-    NGA_Access(g_a, lo_a, hi_a, &a, ld_a);
     NGA_Access(g_x, lo_x, hi_x, &x, ld_x);
     NGA_Access(g_q, lo_q, hi_q, &q, ld_q);
     NGA_Access(g_r, lo_r, hi_r, &r, ld_r);
@@ -558,11 +556,11 @@ c-------------------------------------------------------------------*/
         fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
     }
 
+    NGA_Release_update(g_x, lo_x, hi_x);
     NGA_Release_update(g_q, lo_q, hi_q);
-    NGA_Release_update(g_p, lo_p, hi_p);
-    NGA_Release_update(g_z, lo_z, hi_z);
     NGA_Release_update(g_r, lo_r, hi_r);
 
+    NGA_Destroy(g_scratch);
     NGA_Destroy(g_colidx);
     NGA_Destroy(g_rowstr);
     NGA_Destroy(g_a);
@@ -749,9 +747,9 @@ c---------------------------------------------------------------------*/
 
 		    lo[0] = col;
 		    hi[0] = col;
-                    NGA_Get(g_p, lo, hi, &vval, ld);
+                    NGA_Get(g_z, lo, hi, &vval, ld);
 
-    		    sum += aval * vval;
+    		    d += aval * vval;
             }
     	r[j] = d;
     }
