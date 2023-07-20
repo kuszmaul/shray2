@@ -225,11 +225,7 @@ c---------------------------------------------------------------------*/
 
 int main(int argc, char **argv) {
 
-    int prov;
-    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &prov);
-    if (prov != MPI_THREAD_MULTIPLE) {
-    	GA_Error("MPI implementation does not support MPI_THREAD_MULTIPLE\n", 1);
-    }
+    MPI_Init(&argc, &argv);
     GA_Initialize();
 
     if (argc != 3) {
