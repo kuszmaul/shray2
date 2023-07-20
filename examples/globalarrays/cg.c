@@ -748,9 +748,9 @@ c---------------------------------------------------------------------*/
 
 		    lo[0] = col;
 		    hi[0] = col;
-                    NGA_Get(g_p, lo, hi, &vval, ld);
+                    NGA_Get(g_z, lo, hi, &vval, ld);
 
-    		    sum += aval * vval;
+    		    d += aval * vval;
             }
     	r[j] = d;
     }
