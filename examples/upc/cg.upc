@@ -112,11 +112,11 @@ void read_double(char *name, shared double *array, size_t n)
     upc_all_fclose(fd);
 }
 
-void read_size_t(char *name, shared size_t *array, size_t n)
+void read_long(char *name, shared long *array, size_t n)
 {
     upc_file_t *fd = upc_all_fopen(name, UPC_RDONLY|UPC_COMMON_FP, 0, NULL);
 
-    upc_all_fread_shared(fd, array, 1, sizeof(size_t),
+    upc_all_fread_shared(fd, array, 1, sizeof(long),
                          n, UPC_IN_ALLSYNC | UPC_OUT_ALLSYNC);
 
     upc_all_fclose(fd);
@@ -185,8 +185,8 @@ c---------------------------------------------------------------------*/
 }
 
 static void conj_grad (
-    shared size_t *colidx,
-    shared size_t *rowstr,
+    shared long *colidx,
+    shared long *rowstr,
     shared double *x,
     shared double *z,
     shared double *a,
@@ -424,9 +424,9 @@ c-------------------------------------------------------------------*/
 c
 c-------------------------------------------------------------------*/
 
-    shared size_t *colidx = upc_all_alloc(THREADS,
+    shared long *colidx = upc_all_alloc(THREADS,
                             (NZ + THREADS - 1) / THREADS * sizeof(size_t));
-    shared size_t *rowstr = upc_all_alloc(THREADS,
+    shared long *rowstr = upc_all_alloc(THREADS,
                             (NA + 1 + THREADS - 1) / THREADS * sizeof(size_t));
     shared double *a = upc_all_alloc(THREADS,
                             (NZ + THREADS - 1) / THREADS * sizeof(double));
@@ -447,11 +447,11 @@ c-------------------------------------------------------------------*/
     free(name);
 
     name = strcatalloc("colidx.cg");
-    read_size_t(name, colidx, NZ);
+    read_long(name, colidx, NZ);
     free(name);
 
     name = strcatalloc("rowstr.cg");
-    read_size_t(name, rowstr, NA + 1);
+    read_long(name, rowstr, NA + 1);
     free(name);
 
     upc_barrier;

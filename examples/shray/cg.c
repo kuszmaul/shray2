@@ -58,7 +58,7 @@ static double amult;
 static double tran;
 
 /* function declarations */
-static void conj_grad (size_t colidx[], size_t rowstr[], double x[], double z[],
+static void conj_grad (long colidx[], long rowstr[], double x[], double z[],
 		       double a[], double p[], double q[], double r[],
 		       double *rnorm);
 
@@ -275,8 +275,8 @@ c-------------------------------------------------------------------*/
 c
 c-------------------------------------------------------------------*/
 
-    size_t *colidx = ShrayMalloc(NZ, NZ * sizeof(size_t));
-    size_t *rowstr = ShrayMalloc((NA + 1), (NA + 1) * sizeof(size_t));
+    long *colidx = ShrayMalloc(NZ, NZ * sizeof(long));
+    long *rowstr = ShrayMalloc((NA + 1), (NA + 1) * sizeof(long));
     double *a = ShrayMalloc(NZ, NZ * sizeof(double));
 
     double *x = ShrayMalloc(NA, NA * sizeof(double));
@@ -294,14 +294,14 @@ c-------------------------------------------------------------------*/
     free(name);
 
     name = strcatalloc("colidx.cg");
-    if (read_sparse(name, colidx, sizeof(size_t))) {
+    if (read_sparse(name, colidx, sizeof(long))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
     	ShrayFinalize(1);
     }
     free(name);
 
     name = strcatalloc("rowstr.cg");
-    if (read_sparse(name, rowstr, sizeof(size_t))) {
+    if (read_sparse(name, rowstr, sizeof(long))) {
         fprintf(stderr, "Reading %s went wrong\n", name);
 	    ShrayFinalize(1);
     }
@@ -493,8 +493,8 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 static void conj_grad (
-    size_t colidx[],
-    size_t rowstr[],
+    long colidx[],
+    long rowstr[],
     double x[],
     double z[],
     double a[],
@@ -512,7 +512,7 @@ c---------------------------------------------------------------------*/
 {
     static int callcount = 0;
     double d, sum, rho, rho0, alpha, beta;
-    size_t j, k;
+    long k;
     int cgit, cgitmax = 25;
     double *scratch = malloc(ShraySize() * sizeof(double));
     rho = 0.0;
@@ -522,7 +522,7 @@ c  Initialize the CG algorithm:
 c-------------------------------------------------------------------*/
 {
     #pragma omp parallel for
-    for (j = ShrayStart(q); j < ShrayEnd(q); j++) {
+    for (size_t j = ShrayStart(q); j < ShrayEnd(q); j++) {
     	q[j] = 0.0;
     	z[j] = 0.0;
     	r[j] = x[j];
@@ -534,7 +534,7 @@ c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
     #pragma omp parallel for reduction(+:rho)
-    for (j = ShrayStart(r); j < ShrayEnd(r); j++) {
+    for (size_t j = ShrayStart(r); j < ShrayEnd(r); j++) {
 	    rho += r[j]*r[j];
     }
     ShraySync(q, z, r, p);
@@ -564,7 +564,7 @@ c-------------------------------------------------------------------*/
     */
 
         #pragma omp parallel for
-        for (j = ShrayStart(q); j < ShrayEnd(q); j++) {
+        for (size_t j = ShrayStart(q); j < ShrayEnd(q); j++) {
             sum = 0.0;
     	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
     		    sum += a[k]*p[colidx[k]];
@@ -576,7 +576,7 @@ c-------------------------------------------------------------------*/
     c  Obtain p.q
     c-------------------------------------------------------------------*/
         #pragma omp parallel for reduction(+:d)
-    	for (j = ShrayStart(p); j < ShrayEnd(p); j++) {
+    	for (size_t j = ShrayStart(p); j < ShrayEnd(p); j++) {
                 d += p[j]*q[j];
     	}
         ShraySync(q);
@@ -591,7 +591,7 @@ c-------------------------------------------------------------------*/
     c  and    r = r - alpha*q
     c---------------------------------------------------------------------*/
         #pragma omp parallel for reduction(+:rho)
-    	for (j = ShrayStart(z); j < ShrayEnd(z); j++) {
+    	for (size_t j = ShrayStart(z); j < ShrayEnd(z); j++) {
                 z[j] += alpha*p[j];
                 r[j] -= alpha*q[j];
 
@@ -612,7 +612,7 @@ c-------------------------------------------------------------------*/
     c  p = r + beta*p
     c-------------------------------------------------------------------*/
         #pragma omp parallel for
-    	for (j = ShrayStart(p); j < ShrayEnd(p); j++) {
+    	for (size_t j = ShrayStart(p); j < ShrayEnd(p); j++) {
                 p[j] = r[j] + beta*p[j];
     	}
         ShraySync(r, z, p);
@@ -627,7 +627,7 @@ c---------------------------------------------------------------------*/
     sum = 0.0;
 
     #pragma omp parallel for
-    for (j = ShrayStart(r); j < ShrayEnd(r); j++) {
+    for (size_t j = ShrayStart(r); j < ShrayEnd(r); j++) {
     	d = 0.0;
 	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
             d += a[k] * z[colidx[k]];
@@ -640,7 +640,7 @@ c---------------------------------------------------------------------*/
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
     #pragma omp parallel for reduction(+:d)
-    for (j = ShrayStart(x); j < ShrayEnd(x); j++) {
+    for (size_t j = ShrayStart(x); j < ShrayEnd(x); j++) {
     	d = x[j] - r[j];
 	    sum += d*d;
     }
