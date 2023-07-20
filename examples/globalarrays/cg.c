@@ -63,8 +63,8 @@ static int lo_q[1], hi_q[1], ld_q[1];
 static int lo_z[1], hi_z[1], ld_z[1];
 static int lo_r[1], hi_r[1], ld_r[1];
 static int lo_p[1], hi_p[1], ld_p[1];
-static int lo_colidx[1], hi_colidx[1], ld_colidx[1];
-static int lo_rowstr[1], hi_rowstr[1], ld_rowstr[1];
+static int lo_colidx[1], hi_colidx[1];
+static int lo_rowstr[1], hi_rowstr[1];
 static int lo_scratch[1], hi_scratch[1];
 static int rank;
 static int nnodes;
@@ -116,8 +116,16 @@ static char *strcatalloc(const char *s)
     return res;
 }
 
-int read_sparse(char *name, void *array, int typewidth, int lo, int hi, int max)
+int read_sparse(char *name, int g_array, int typewidth, int max)
 {
+    void *array;
+    int lo_d[1], hi_d[1], ld_d[1];
+    NGA_Distribution(g_array, rank, lo_d, hi_d);
+    NGA_Access(g_array, lo_d, hi_d, &array, ld_d);
+
+    int lo = lo_d[0];
+    int hi = hi_d[0];
+
     FILE *stream = fopen(name, "r");
     if (stream == NULL) {
         perror("Opening file failed");
@@ -144,6 +152,7 @@ int read_sparse(char *name, void *array, int typewidth, int lo, int hi, int max)
         return err;
     }
 
+    NGA_Release_update(g_array, lo_d, hi_d);
     return 0;
 }
 
@@ -339,7 +348,6 @@ c-------------------------------------------------------------------*/
     }
 
     double *a, *x, *q, *z, *r, *p;
-    size_t *rowstr, *colidx;
 
     NGA_Distribution(g_a, rank, lo_a, hi_a);
     NGA_Distribution(g_x, rank, lo_x, hi_x);
@@ -354,38 +362,33 @@ c-------------------------------------------------------------------*/
     NGA_Access(g_x, lo_x, hi_x, &x, ld_x);
     NGA_Access(g_q, lo_q, hi_q, &q, ld_q);
     NGA_Access(g_r, lo_r, hi_r, &r, ld_r);
-    NGA_Access(g_rowstr, lo_rowstr, hi_rowstr, &rowstr, ld_rowstr);
-    NGA_Access(g_colidx, lo_colidx, hi_colidx, &colidx, ld_colidx);
 
     char *name = strcatalloc("a.cg");
-    if (read_sparse(name, a, sizeof(double), lo_a[0], hi_a[0], nz_dimensions[0])) {
+    if (read_sparse(name, g_a, sizeof(double), nz_dimensions[0])) {
         fprintf(stderr, "Reading %s went wrong\n", name);
 	    GA_Error("Failed to read file", 1);
     }
-    NGA_Release_update(g_a, lo_a, hi_a);
     free(name);
 
     name = strcatalloc("colidx.cg");
-    if (read_sparse(name, colidx, sizeof(size_t), lo_colidx[0], hi_colidx[0], nz_dimensions[0])) {
+    if (read_sparse(name, g_colidx, sizeof(size_t), nz_dimensions[0])) {
         fprintf(stderr, "Reading %s went wrong\n", name);
 	    GA_Error("Failed to read file", 1);
     }
-    NGA_Release_update(g_colidx, lo_colidx, hi_colidx);
     free(name);
 
     name = strcatalloc("rowstr.cg");
-    if (read_sparse(name, rowstr, sizeof(size_t), lo_rowstr[0], hi_rowstr[0], rowstr_dimensions[0])) {
+    if (read_sparse(name, g_rowstr, sizeof(size_t), rowstr_dimensions[0])) {
         fprintf(stderr, "Reading %s went wrong\n", name);
 	    GA_Error("Failed to read file", 1);
     }
     free(name);
-    NGA_Release_update(g_rowstr, lo_rowstr, hi_rowstr);
     GA_Sync();
 
     // Because rowstr is accessed with + 1 we have overlapping boundaries, so we
     // can not simply use NGA_Access to read. Simply get the chunk of
     // rowstr that we need to calculate the local vector.
-    rowstr= malloc(sizeof(size_t) * rowstr_chunks[0]);
+    size_t *rowstr = malloc(sizeof(size_t) * rowstr_chunks[0]);
     int lo[1] = { lo_q[0] };
     int hi[1] = { hi_q[0] + 1 };
     int ld[1] = { 0 };
