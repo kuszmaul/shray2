@@ -311,17 +311,16 @@ c-------------------------------------------------------------------*/
     int na_dimensions[1] = { NA };
     int rowstr_dimensions[1] = { NA + 1 };
 
-    // TODO: check if there is a workaround for GA not having size_t
-    int g_colidx = NGA_Create(C_DBL, 1, nz_dimensions, "colidx", nz_chunks);
+    int g_colidx = NGA_Create(C_LONG, 1, nz_dimensions, "colidx", nz_chunks);
     if (!g_colidx) {
 	GA_Error("Could not allocate array", 1);
     }
-    int g_rowstr = NGA_Create(C_DBL, 1, rowstr_dimensions, "rowstr", rowstr_chunks);
+    int g_rowstr = NGA_Create(C_LONG, 1, rowstr_dimensions, "rowstr", rowstr_chunks);
     if (!g_rowstr) {
 	GA_Error("Could not allocate array", 1);
     }
-    int g_a = NGA_Duplicate(g_colidx, "a");
-    if (!g_colidx) {
+    int g_a = NGA_Create(C_DBL, 1, nz_dimensions, "a", nz_chunks);
+    if (!g_a) {
 	GA_Error("Could not allocate array", 1);
     }
 
