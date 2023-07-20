@@ -70,8 +70,8 @@ static int rank;
 static int nnodes;
 
 /* function declarations */
-static void conj_grad (size_t colidx[], size_t rowstr[], double x[], int g_z,
-		       double a[], int g_p, double q[], double r[],
+static void conj_grad (int g_colidx, size_t rowstr[], double x[], int g_z,
+		       int g_a, int g_p, double q[], double r[],
 		       double *rnorm, int g_scratch, double *scratch);
 
 /*--------------------------------------------------------------------
@@ -84,7 +84,7 @@ void gaSum(double *number, double *scratch, int g_scratch)
     NGA_Put(g_scratch, lo_scratch, hi_scratch, number, ld);
     GA_Sync();
     int lo[1] = { 0 };
-    int hi[1] = { nnodes } ;
+    int hi[1] = { nnodes - 1 } ;
     NGA_Get(g_scratch, lo, hi, scratch, ld);
 
     for (int i = 0; i < nnodes; i++) {
@@ -124,7 +124,7 @@ int read_sparse(char *name, void *array, int typewidth, int lo, int hi, int max)
         return 1;
     }
 
-    size_t size = MIN((hi - lo) * typewidth, max);
+    size_t size = MIN(hi + 1 - lo , max) * typewidth;
     long offset = lo * typewidth;
     if ((fseek(stream, offset, SEEK_SET)) != 0) {
         perror("fseek failed");
@@ -132,7 +132,7 @@ int read_sparse(char *name, void *array, int typewidth, int lo, int hi, int max)
     }
 
     size_t read_bytes;
-    if ((read_bytes = fread(array + offset, 1, size, stream)) != size) {
+    if ((read_bytes = fread(array, 1, size, stream)) != size) {
         fprintf(stderr, "We could not read in all items\n");
         fprintf(stderr, "Read %zu / %zu bytes\n", read_bytes, size);
         return 1;
@@ -351,7 +351,7 @@ c-------------------------------------------------------------------*/
     NGA_Distribution(g_colidx, rank, lo_colidx, hi_colidx);
     NGA_Distribution(g_scratch, rank, lo_scratch, hi_scratch);
     NGA_Access(g_a, lo_a, hi_a, &a, ld_a);
-    NGA_Access(g_x, lo_a, hi_x, &x, ld_x);
+    NGA_Access(g_x, lo_x, hi_x, &x, ld_x);
     NGA_Access(g_q, lo_q, hi_q, &q, ld_q);
     NGA_Access(g_r, lo_r, hi_r, &r, ld_r);
     NGA_Access(g_rowstr, lo_rowstr, hi_rowstr, &rowstr, ld_rowstr);
@@ -362,6 +362,7 @@ c-------------------------------------------------------------------*/
         fprintf(stderr, "Reading %s went wrong\n", name);
 	    GA_Error("Failed to read file", 1);
     }
+    NGA_Release_update(g_a, lo_a, hi_a);
     free(name);
 
     name = strcatalloc("colidx.cg");
@@ -369,6 +370,7 @@ c-------------------------------------------------------------------*/
         fprintf(stderr, "Reading %s went wrong\n", name);
 	    GA_Error("Failed to read file", 1);
     }
+    NGA_Release_update(g_colidx, lo_colidx, hi_colidx);
     free(name);
 
     name = strcatalloc("rowstr.cg");
@@ -377,26 +379,37 @@ c-------------------------------------------------------------------*/
 	    GA_Error("Failed to read file", 1);
     }
     free(name);
+    NGA_Release_update(g_rowstr, lo_rowstr, hi_rowstr);
+    GA_Sync();
 
+    // Because rowstr is accessed with + 1 we have overlapping boundaries, so we
+    // can not simply use NGA_Access to read. Simply get the chunk of
+    // rowstr that we need to calculate the local vector.
+    rowstr= malloc(sizeof(size_t) * rowstr_chunks[0]);
+    int lo[1] = { lo_q[0] };
+    int hi[1] = { hi_q[0] + 1 };
+    int ld[1] = { 0 };
+    NGA_Get(g_rowstr, lo, hi, rowstr, ld);
     GA_Sync();
 
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
-    #pragma omp parallel for
-    for (size_t i = lo_x[0]; i < hi_x[0]; i++) {
-    	x[i] = 1.0;
+    for (int i = lo_x[0]; i <= hi_x[0]; i++) {
+    	x[i - lo_x[0]] = 1.0;
     }
 
     NGA_Access(g_p, lo_p, hi_p, &p, ld_p);
-    #pragma omp parallel for
-    for (size_t j = lo_q[0]; j < hi_q[0]; j++) {
-       q[j] = 0.0;
-       z[j] = 0.0;
-       r[j] = 0.0;
-       p[j] = 0.0;
+    NGA_Access(g_z, lo_z, hi_z, &z, ld_z);
+
+    for (int j = lo_q[0]; j <= hi_q[0]; j++) {
+       q[j - lo_q[0]] = 0.0;
+       z[j - lo_q[0]] = 0.0;
+       r[j - lo_q[0]] = 0.0;
+       p[j - lo_q[0]] = 0.0;
     }
     NGA_Release_update(g_p, lo_p, hi_p);
+    NGA_Release_update(g_z, lo_z, hi_z);
     GA_Sync();
     zeta  = 0.0;
 
@@ -413,7 +426,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  The call to the conjugate gradient routine:
     c-------------------------------------------------------------------*/
-    	conj_grad (colidx, rowstr, x, g_z, a, g_p, q, r, &rnorm, g_scratch, scratch);
+    	conj_grad (g_colidx, rowstr, x, g_z, g_a, g_p, q, r, &rnorm, g_scratch, scratch);
 
     /*--------------------------------------------------------------------
     c  zeta = shift + 1/(x.z)
@@ -424,10 +437,9 @@ c-------------------------------------------------------------------*/
     	norm_temp11 = 0.0;
     	norm_temp12 = 0.0;
         NGA_Access(g_z, lo_z, hi_z, &z, ld_z);
-        #pragma omp parallel for reduction(+:norm_temp11, norm_temp12)
-    	for (int j = lo_x[0]; j < hi_x[0]; j++) {
-                norm_temp11 = norm_temp11 + x[j]*z[j];
-                norm_temp12 = norm_temp12 + z[j]*z[j];
+    	for (int j = lo_x[0]; j <= hi_x[0]; j++) {
+                norm_temp11 = norm_temp11 + x[j - lo_x[0]]*z[j - lo_x[0]];
+                norm_temp12 = norm_temp12 + z[j - lo_x[0]]*z[j - lo_x[0]];
     	}
 	gaSum(&norm_temp11, scratch, g_scratch);
 	gaSum(&norm_temp12, scratch, g_scratch);
@@ -436,9 +448,8 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  Normalize z to obtain x
     c-------------------------------------------------------------------*/
-        #pragma omp parallel
-    	for (int j = lo_x[0]; j < hi_x[0]; j++) {
-                x[j] = norm_temp12*z[j];
+    	for (int j = lo_x[0]; j <= hi_x[0]; j++) {
+                x[j - lo_x[0]] = norm_temp12*z[j - lo_x[0]];
     	}
 
     	NGA_Release(g_z, lo_z, hi_z);
@@ -447,9 +458,8 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  set starting vector to (1, 1, .... 1)
 c-------------------------------------------------------------------*/
-    #pragma omp parallel
-    for (int i = lo_x[0]; i < hi_x[0]; i++) {
-         x[i] = 1.0;
+    for (int i = lo_x[0]; i <= hi_x[0]; i++) {
+         x[i - lo_x[0]] = 1.0;
     }
     zeta  = 0.0;
 
@@ -467,7 +477,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  The call to the conjugate gradient routine:
     c-------------------------------------------------------------------*/
-    	conj_grad(colidx, rowstr, x, g_z, a, g_p, q, r, &rnorm, g_scratch, scratch);
+    	conj_grad(g_colidx, rowstr, x, g_z, g_a, g_p, q, r, &rnorm, g_scratch, scratch);
 
     /*--------------------------------------------------------------------
     c  zeta = shift + 1/(x.z)
@@ -479,10 +489,9 @@ c-------------------------------------------------------------------*/
     	norm_temp12 = 0.0;
 
         NGA_Access(g_z, lo_z, hi_z, &z, ld_z);
-        #pragma omp parallel for reduction(+:norm_temp11, norm_temp12)
-    	for (int j = lo_x[0]; j < hi_x[0]; j++) {
-                norm_temp11 = norm_temp11 + x[j]*z[j];
-                norm_temp12 = norm_temp12 + z[j]*z[j];
+    	for (int j = lo_x[0]; j <= hi_x[0]; j++) {
+                norm_temp11 = norm_temp11 + x[j - lo_x[0]]*z[j - lo_x[0]];
+                norm_temp12 = norm_temp12 + z[j - lo_x[0]]*z[j - lo_x[0]];
     	}
     	gaSum(&norm_temp11, scratch, g_scratch);
         gaSum(&norm_temp12, scratch, g_scratch);
@@ -501,9 +510,8 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  Normalize z to obtain x
     c-------------------------------------------------------------------*/
-        #pragma omp parallel for
-    	for (int j = lo_x[0]; j < hi_x[0]; j++) {
-                x[j] = norm_temp12*z[j];
+    	for (int j = lo_x[0]; j <= hi_x[0]; j++) {
+                x[j - lo_x[0]] = norm_temp12*z[j - lo_x[0]];
     	}
     	NGA_Release(g_z, lo_z, hi_z);
         GA_Sync();
@@ -551,9 +559,6 @@ c-------------------------------------------------------------------*/
         fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
     }
 
-    NGA_Release(g_colidx, lo_colidx, hi_colidx);
-    NGA_Release(g_rowstr, lo_rowstr, hi_rowstr);
-    NGA_Release(g_a, lo_a, hi_a);
     NGA_Release_update(g_q, lo_q, hi_q);
     NGA_Release_update(g_p, lo_p, hi_p);
     NGA_Release_update(g_z, lo_z, hi_z);
@@ -570,6 +575,7 @@ c-------------------------------------------------------------------*/
     NGA_Destroy(g_r);
 
     free(scratch);
+    free(rowstr);
 
     GA_Terminate();
     MPI_Finalize();
@@ -578,11 +584,11 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 static void conj_grad (
-    size_t colidx[],
+    int g_colidx,
     size_t rowstr[],
     double x[],
     int g_z,
-    double a[],
+    int g_a,
     int g_p,
     double q[],
     double r[],
@@ -599,7 +605,6 @@ c---------------------------------------------------------------------*/
 {
     static int callcount = 0;
     double d, sum, rho, rho0, alpha, beta;
-    size_t j, k;
     double *p, *z;
     int cgit, cgitmax = 25;
     rho = 0.0;
@@ -610,12 +615,11 @@ c-------------------------------------------------------------------*/
 {
     NGA_Access(g_p, lo_p, hi_p, &p, ld_p);
     NGA_Access(g_z, lo_z, hi_z, &z, ld_z);
-    #pragma omp parallel for
-    for (j = lo_q[0]; j < hi_q[0]; j++) {
-    	q[j] = 0.0;
-    	z[j] = 0.0;
-    	r[j] = x[j];
-    	p[j] = r[j];
+    for (int j = lo_q[0]; j <= hi_q[0]; j++) {
+    	q[j - lo_q[0]] = 0.0;
+    	z[j - lo_q[0]] = 0.0;
+    	r[j - lo_q[0]] = x[j - lo_q[0]];
+    	p[j - lo_q[0]] = r[j - lo_q[0]];
     }
     NGA_Release_update(g_p, lo_p, hi_p);
     GA_Sync();
@@ -624,9 +628,8 @@ c-------------------------------------------------------------------*/
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
-    #pragma omp parallel for reduction(+:rho)
-    for (j = lo_r[0]; j < hi_r[0]; j++) {
-	    rho += r[j]*r[j];
+    for (int j = lo_r[0]; j <= hi_r[0]; j++) {
+	    rho += r[j - lo_r[0]]*r[j - lo_r[0]];
     }
     gaSum(&rho, scratch, g_scratch);
 }/* end omp parallel */
@@ -653,28 +656,35 @@ c-------------------------------------------------------------------*/
     C        on the Cray t3d - overall speed of code is 1.5 times faster.
     */
 
-        #pragma omp parallel for
-        for (j = lo_q[0]; j < hi_q[0]; j++) {
+        for (int j = lo_q[0]; j <= hi_q[0]; j++) {
             sum = 0.0;
-    	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
-                    double val;
-                    size_t col = colidx[k];
-                    int lo_val[1] = { col };
-                    int hi_val[1] = { col };
-                    int ld_val[1] = { 0 };
-                    NGA_Get(g_p, lo_val, hi_val, &val, ld_val);
-    		    sum += a[k] * val;
+    	    for (size_t k = rowstr[j - lo_q[0]]; k < rowstr[j+1 - lo_q[0]]; k++) {
+                    int lo[1];
+                    int hi[1];
+                    int ld[1] = { 0 };
+                    size_t col;
+                    double vval, aval;
+
+		    lo[0] = k;
+		    hi[0] = k;
+                    NGA_Get(g_colidx, lo, hi, &col, ld);
+                    NGA_Get(g_a, lo, hi, &aval, ld);
+
+		    lo[0] = col;
+		    hi[0] = col;
+                    NGA_Get(g_p, lo, hi, &vval, ld);
+
+    		    sum += aval * vval;
     	    }
-            q[j] = sum;
+            q[j - lo_q[0]] = sum;
     	}
 
     /*--------------------------------------------------------------------
     c  Obtain p.q
     c-------------------------------------------------------------------*/
         NGA_Access(g_p, lo_p, hi_p, &p, ld_p);
-        #pragma omp parallel for reduction(+:d)
-    	for (j = lo_p[0]; j < hi_p[0]; j++) {
-                d += p[j]*q[j];
+    	for (int j = lo_p[0]; j <= hi_p[0]; j++) {
+                d += p[j - lo_p[0]]*q[j - lo_p[0]];
     	}
         gaSum(&d, scratch, g_scratch);
     /*--------------------------------------------------------------------
@@ -686,16 +696,15 @@ c-------------------------------------------------------------------*/
     c  Obtain z = z + alpha*p
     c  and    r = r - alpha*q
     c---------------------------------------------------------------------*/
-        #pragma omp parallel for reduction(+:rho)
-    	for (j = lo_z[0]; j < hi_z[0]; j++) {
-                z[j] += alpha*p[j];
-                r[j] -= alpha*q[j];
+    	for (int j = lo_z[0]; j <= hi_z[0]; j++) {
+                z[j - lo_z[0]] += alpha*p[j - lo_z[0]];
+                r[j - lo_z[0]] -= alpha*q[j - lo_z[0]];
 
     /*---------------------------------------------------------------------
     c  rho = r.r
     c  Now, obtain the norm of r: First, sum squares of r elements locally...
     c---------------------------------------------------------------------*/
-                rho += r[j]*r[j];
+                rho += r[j - lo_z[0]]*r[j - lo_z[0]];
     	}
         gaSum(&rho, scratch, g_scratch);
 
@@ -708,9 +717,8 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  p = r + beta*p
     c-------------------------------------------------------------------*/
-        #pragma omp parallel for
-    	for (j = lo_p[0]; j < hi_p[0]; j++) {
-                p[j] = r[j] + beta*p[j];
+    	for (int j = lo_p[0]; j <= hi_p[0]; j++) {
+                p[j - lo_p[0]] = r[j - lo_p[0]] + beta*p[j - lo_p[0]];
     	}
         callcount++;
         NGA_Release_update(g_p, lo_p, hi_p);
@@ -726,28 +734,34 @@ c  The partition submatrix-vector multiply
 c---------------------------------------------------------------------*/
     sum = 0.0;
 
-    // TODO: Z needs to be updated afterwards
-    #pragma omp parallel for
-    for (j = lo_r[0]; j < hi_r[0]; j++) {
+    for (int j = lo_r[0]; j <= hi_r[0]; j++) {
     	d = 0.0;
-	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
-                    double val;
-                    size_t col = colidx[k];
-                    int lo_val[1] = { col };
-                    int hi_val[1] = { col };
-                    int ld_val[1] = { 0 };
-                    NGA_Get(g_z, lo_val, hi_val, &val, ld_val);
-                    d += a[k] * val;
-	    }
-    	r[j] = d;
+            for (size_t k = rowstr[j - lo_r[0]]; k < rowstr[j+1 - lo_r[0]]; k++) {
+                    int lo[1];
+                    int hi[1];
+                    int ld[1] = { 0 };
+                    size_t col;
+                    double vval, aval;
+
+		    lo[0] = k;
+		    hi[0] = k;
+                    NGA_Get(g_colidx, lo, hi, &col, ld);
+                    NGA_Get(g_a, lo, hi, &aval, ld);
+
+		    lo[0] = col;
+		    hi[0] = col;
+                    NGA_Get(g_p, lo, hi, &vval, ld);
+
+    		    sum += aval * vval;
+            }
+    	r[j - lo_r[0]] = d;
     }
 
 /*--------------------------------------------------------------------
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
-    #pragma omp parallel for reduction(+:d)
-    for (j = lo_x[0]; j < hi_x[0]; j++) {
-    	d = x[j] - r[j];
+    for (int j = lo_x[0]; j <= hi_x[0]; j++) {
+    	d = x[j - lo_x[0]] - r[j - lo_x[0]];
 	    sum += d*d;
     }
     gaSum(&sum, scratch, g_scratch);
