@@ -283,6 +283,9 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 	runtest shray cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
 ]]], [[[m4_dnl
 	runtest shray cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
+	runtest globalarrays cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
+	runtest upc cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
+	runtest fortran cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
 ]]])m4_dnl
 
 done
