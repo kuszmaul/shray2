@@ -178,6 +178,8 @@ cd "$curdir"
 
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 export OMP_NUM_THREADS="__NTASKS_PER_NODE__"
+]]], [[[m4_dnl
+export OMP_NUM_THREADS="1"
 ]]])m4_dnl
 
 # Run all tests.
