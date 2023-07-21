@@ -471,7 +471,9 @@ void ShrayInit(int *argc, char ***argv)
     }
 
     char *thread_env = getenv("SHRAY_PAR");
-    multiThreaded = thread_env != NULL;
+    multiThreaded = thread_env == NULL
+                || strlen(thread_env) == 0
+                || (thread_env[0] != 'N' && thread_env[0] != 'n' );
     if (multiThreaded) {
         DBUG_PRINT("Running multi threaded %d", 1);
         atomic_clear(&thread_lock);

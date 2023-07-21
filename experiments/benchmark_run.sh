@@ -109,9 +109,9 @@ runtest()
 	gflopsfile="$resultdir/__NTASKS__.gflops"
 
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
-	export SHRAY_PAR=y
-]]], [[[m4_dnl
 	unset SHRAY_PAR
+]]], [[[m4_dnl
+	export SHRAY_PAR=N
 ]]])m4_dnl
 
 	if [ "$test_type" = shray ]; then
