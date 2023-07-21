@@ -174,11 +174,6 @@ scriptdirabs=$(realpath -s "$scriptdir")
 curdir="$PWD"
 cd "$cgdatadir"
 "$bindirabs/examples/util/makea" "$cgclass"
-m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
-"$scriptdirabs/cg_dist.sh" "$cgclass" "__NODES__"
-]]], [[[m4_dnl
-"$scriptdirabs/cg_dist.sh" "$cgclass" "__NTASKS__"
-]]])m4_dnl
 cd "$curdir"
 
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
