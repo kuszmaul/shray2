@@ -242,7 +242,7 @@ static void handlePageFault(void *address)
         queue_entry_t *entry = queue_find_prefetch(alloc->prefetchCaches, roundedAddress);
 
         if (entry == NULL) {
-            fprintf(stderr, 
+            fprintf(stderr,
                     "%p set to prefetched, but was not in the prefetch queue",
                     (void *)roundedAddress);
             gasnet_exit(1);
@@ -359,7 +359,7 @@ static void registerHandlers(void)
 
 /* Gets [get.start, get.end[ asynchronously to the allocation shadow
  * start, end are page-aligned and not owned by our rank. Adds gets to the queue. */
-static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *alloc)
+static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *alloc, uintptr_t prefetch_start)
 {
     if (end <= start) return;
 
@@ -391,7 +391,7 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
             DBUG_PRINT("We set this to prefetched (pages [%zu, %zu[)",
                 (start_r - location) / Shray_Pagesz, (end_r - location) / Shray_Pagesz);
 
-            if (queue_queue_prefetch(alloc->prefetchCaches, alloc, start_r, end_r, handle)) {
+            if (queue_queue_prefetch(alloc->prefetchCaches, alloc, start_r, end_r, handle, prefetch_start)) {
                 fprintf(stderr, "ERROR: could not add prefetch to queue, %d", 1);
                 gasnet_exit(1);
             }
@@ -684,8 +684,8 @@ void ShrayPrefetch(void *address, size_t size)
 
     DBUG_PRINT("Prefetch issued for [%p, %p[.", address, (void *)((uintptr_t)address + size));
 
-    helpPrefetch(prefetch.start1, prefetch.end1, prefetch.alloc);
-    helpPrefetch(prefetch.start2, prefetch.end2, prefetch.alloc);
+    helpPrefetch(prefetch.start1, prefetch.end1, prefetch.alloc, prefetch.start1);
+    helpPrefetch(prefetch.start2, prefetch.end2, prefetch.alloc, prefetch.start1);
     unlockIfMultithread();
 }
 
@@ -716,16 +716,10 @@ static void DiscardGet(queue_entry_t *get, size_t index)
     queue_remove_at(alloc->prefetchCaches, index);
 }
 
-/* Returns true iff [subStart, subEnd[ \subseteq [start, end[. */
-static int IsSubset(uintptr_t subStart, uintptr_t subEnd, uintptr_t start, uintptr_t end)
-{
-    return (subStart >= start && subStart < end && subEnd <= end && subEnd > subStart);
-}
-
-void ShrayDiscard(void *address, size_t size)
+void ShrayDiscard(void *address)
 {
     lockIfMultithread();
-    PrefetchStruct prefetch = GetPrefetchStruct(address, size);
+    uintptr_t prefetch_start = roundUpPage((uintptr_t)address);
 
     /* Walk through the prefetch-queue, and delete everything prefetched by the
      * issue [address, address + size[. */
@@ -734,9 +728,7 @@ void ShrayDiscard(void *address, size_t size)
     while (next_index != NOLINK) {
         queue_entry_t *entry = &(alloc->prefetchCaches->data[next_index]);
 
-        if (IsSubset(entry->prefetch.start, entry->prefetch.end, prefetch.start1, prefetch.end1) ||
-            IsSubset(entry->prefetch.start, entry->prefetch.end, prefetch.start2, prefetch.end2))
-        {
+        if (entry->prefetch.prefetch_start == prefetch_start) {
             DiscardGet(entry, next_index);
         }
 

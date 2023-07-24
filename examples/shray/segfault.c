@@ -39,7 +39,7 @@ double reduce(double *arr, size_t n)
             sum += arr[i + rank * n / p];
         }
 
-        ShrayDiscard(arr + rank * n / p, n / p * sizeof(double));
+        ShrayDiscard(arr + rank * n / p);
     }
 
     return sum;

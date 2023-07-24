@@ -105,7 +105,7 @@ static queue_entry_t *queue_queue(queue_t *queue)
 
 }
 
-int queue_queue_prefetch(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, gasnet_handle_t handle)
+int queue_queue_prefetch(queue_t *queue, void *alloc, uintptr_t start, uintptr_t end, gasnet_handle_t handle, uintptr_t prefetch_start)
 {
 	queue_entry_t *entry = queue_queue(queue);
 	if (!entry) {
@@ -117,20 +117,7 @@ int queue_queue_prefetch(queue_t *queue, void *alloc, uintptr_t start, uintptr_t
 	entry->prefetch.end = end;
 	entry->prefetch.handle = handle;
 	entry->prefetch.gottem = 0;
-	return 0;
-}
-
-int queue_queue_thread(queue_entry_t **result, queue_t *queue, uintptr_t address, pthread_t id, int req)
-{
-	queue_entry_t *entry = queue_queue(queue);
-	if (!entry) {
-	    return 1;
-	}
-
-	entry->threading.address = address;
-	entry->threading.id = id;
-	entry->threading.request = req;
-	*result = entry;
+	entry->prefetch.prefetch_start = prefetch_start;
 	return 0;
 }
 

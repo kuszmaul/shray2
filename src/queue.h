@@ -9,19 +9,13 @@
 
 typedef struct
 {
-	uintptr_t address;
-	pthread_t id;
-	int request;
-} threading_entry_t;
-
-typedef struct
-{
 	uintptr_t start;
 	uintptr_t end;
+	void *alloc;
+	uintptr_t prefetch_start;
 	gasnet_handle_t handle;
 	/* True iff gasnet_wait_syncnb(handle) has been called. */
 	int gottem;
-	void *alloc;
 } prefetch_entry_t;
 
 typedef struct
@@ -30,10 +24,7 @@ typedef struct
 	size_t prev;
 	size_t next;
 
-	union {
-	    prefetch_entry_t prefetch;
-	    threading_entry_t threading;
-	};
+	prefetch_entry_t prefetch;
 } queue_entry_t;
 
 typedef struct
@@ -58,9 +49,7 @@ queue_t *queue_alloc(size_t size);
 void queue_free(queue_t *queue);
 
 int queue_queue_prefetch(queue_t *queue, void *alloc, uintptr_t start,
-        uintptr_t end, gasnet_handle_t handle);
-
-int queue_queue_thread(queue_entry_t **result, queue_t *queue, uintptr_t address, pthread_t id, int req);
+        uintptr_t end, gasnet_handle_t handle, uintptr_t prefetch_start);
 
 queue_entry_t *queue_find_prefetch(const queue_t *queue, uintptr_t address);
 
