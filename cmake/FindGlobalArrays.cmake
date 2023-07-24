@@ -10,14 +10,14 @@
 #                             specified then this search path will be used.
 # ARMCI_LIB_DIR             - Directory to use when searching for ARMCI libs. If
 #                             specified then this search path will be used.
-if(MPI_BACKEND STREQUAL "openmpi")
-	set(GA_LIB_NAME "ga-openmpi")
-	set(ARMCI_LIB_NAME "armci-openmpi")
-	set(SCALAPACK_LIB_NAME "scalapack-openmpi")
-else()
+if(MPI_BACKEND STREQUAL "mpich")
 	set(GA_LIB_NAME "ga-mpich")
 	set(ARMCI_LIB_NAME "armci-mpich")
 	set(SCALAPACK_LIB_NAME "scalapack-mpich")
+else()
+	set(GA_LIB_NAME "ga-openmpi")
+	set(ARMCI_LIB_NAME "armci-openmpi")
+	set(SCALAPACK_LIB_NAME "scalapack-openmpi")
 endif()
 
 if(NOT GlobalArrays_FOUND)

@@ -1,7 +1,7 @@
-if(MPI_BACKEND STREQUAL "openmpi")
-	set(LIBCAF_FLAGS "-lcaf_openmpi")
-else()
+if(MPI_BACKEND STREQUAL "mpich")
 	set(LIBCAF_FLAGS "-lcaf_mpich")
+else()
+	set(LIBCAF_FLAGS "-lcaf_openmpi")
 endif()
 
 # example fortran binaries
