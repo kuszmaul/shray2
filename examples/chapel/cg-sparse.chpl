@@ -2,7 +2,7 @@
 //   618.233 with default arguments, linear search for sparse domain this()
 //    62.169 with --cflags=-O3, linear search
 //    25.4556 with --cflags=-O3, binary search
-use LayoutCS, CGMakeA, Time;
+use LayoutCS, CGMakeA, Time, IO;
 
 type elemType = real(64);
 
@@ -57,31 +57,33 @@ proc main() {
 
       zeta = shift + 1.0 / + reduce (X*Z);
 
-      if verbose then writeln(it, " ", rnorm, " ", zeta);
+      if verbose then stderr.writeln(it, " ", rnorm, " ", zeta);
 
       X = (1.0 / sqrt(+ reduce(Z*Z))) * Z;
     }
 
     const runtime = timeSinceEpoch().totalSeconds() - startTime;
 
-    if printTiming then writeln("Execution time = ", runtime);
-    if printTiming then writeln("Mflops/s = ",
-          1e-6 * 2 * niter * n * (3 + nonzer * (nonzer + 1) +
-            25 * (5 + nonzer * (nonzer + 1) + 3)) / runtime);
+    var mflops: elemType = 1e-6 * 2 * niter * n * (3 + nonzer * (nonzer + 1) +
+            25 * (5 + nonzer * (nonzer + 1) + 3)) / runtime;
+
+    if printTiming then stderr.writeln("Execution time = ", runtime);
+    if printTiming then stderr.writeln("Mflops/s = ", mflops);
+    if printTiming then writeln(mflops);
 
     if (zetaVerifyValue != 0.0) {
       const epsilon = 1.0e-10;
       if (abs(zeta - zetaVerifyValue) <= epsilon) {
-        writeln("Verification successful");
-        writeln("Zeta is: ", zeta);
-        if printError then writeln("Error is: ", zeta - zetaVerifyValue);
+        stderr.writeln("Verification successful");
+        stderr.writeln("Zeta is: ", zeta);
+        if printError then stderr.writeln("Error is: ", zeta - zetaVerifyValue);
       } else {
-        writeln("Verification failed");
-        writeln("Zeta is: ", zeta);
-        writeln("The correct zeta is: ", zetaVerifyValue);
+        stderr.writeln("Verification failed");
+        stderr.writeln("Zeta is: ", zeta);
+        stderr.writeln("The correct zeta is: ", zetaVerifyValue);
       }
     } else {
-      writeln("No verification performed");
+      stderr.writeln("No verification performed");
     }
   }
 }
