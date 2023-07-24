@@ -36,7 +36,11 @@ if(${SANITISE})
 	include(sanitise)
 endif()
 
-set(MPI_EXECUTABLE_SUFFIX ".openmpi")
+if(MPI_BACKEND STREQUAL "openmpi")
+	set(MPI_EXECUTABLE_SUFFIX ".openmpi")
+else()
+	set(MPI_EXECUTABLE_SUFFIX ".mpich")
+endif()
 find_package(MPI REQUIRED COMPONENTS C)
 
 if(NOT DEFINED ENV{GASNet_ROOT} AND NOT GASNet_ROOT_DIR)

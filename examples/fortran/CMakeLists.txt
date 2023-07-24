@@ -1,13 +1,19 @@
+if(MPI_BACKEND STREQUAL "openmpi")
+	set(LIBCAF_FLAGS "-lcaf_openmpi")
+else()
+	set(LIBCAF_FLAGS "-lcaf_mpich")
+endif()
+
 # example fortran binaries
 foreach(file
-        blas
+		blas
 		matrix
-        cg
-        dist_module
-        monopoly
-        monopoly_mt
-        1dstencil
-        1dstencil_mt)
+		cg
+		dist_module
+		monopoly
+		monopoly_mt
+		1dstencil
+		1dstencil_mt)
 	set(EXAMPLE_TARGET "${file}_fortran")
 
 	add_executable("${EXAMPLE_TARGET}"
@@ -18,14 +24,13 @@ foreach(file
 		PRIVATE
 			${PROJECT_FLAGS}
 			-cpp
-            -fcheck=all
-            -fcoarray=lib
+			-fcheck=all
+			-fcoarray=lib
         )
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 			${PROJECT_LINKER_FLAGS}
-            #-lcaf_mpich
-            -lcaf_openmpi
+			${LIBCAF_FLAGS}
 			BLAS::BLAS
 			-fopenmp)
 endforeach(file)
