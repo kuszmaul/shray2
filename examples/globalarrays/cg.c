@@ -552,8 +552,8 @@ c-------------------------------------------------------------------*/
     	mflops = 0.0;
         }
 
-        printf("%lf", mflops / 1000.0);
-        fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
+        printf("%lf", mflops);
+        fprintf(stderr, "%lf Mflops/s\n");
     }
 
     NGA_Release_update(g_x, lo_x, hi_x);

@@ -366,7 +366,7 @@ end module conj_mod
       double precision   norm_temp1,norm_temp2,norm_temp3, norm_temp1_acc, norm_temp2_acc
       double precision, allocatable :: all_norm_temp1[:], all_norm_temp2[:]
 
-      double precision   t, gflops
+      double precision   t, mflops
       character          class
       logical            verified
       double precision   zeta_verify_value, epsilon, err
@@ -738,12 +738,12 @@ end module conj_mod
       endif
 
 
-       gflops = 1.0d-9 * 2*niter*dble( na )  &
+       mflops = 1.0d-6 * 2*niter*dble( na )  &
      &               * ( 3.+nonzer*dble(nonzer+1)  &
      &                 + 25.*(5.+nonzer*dble(nonzer+1))  &
      &                 + 3. ) / t
 
-    write(*, *) gflops, " Gflops/s"
+    write(*, *) mflops, " Mflops/s"
     end if
       end                              ! end main
 

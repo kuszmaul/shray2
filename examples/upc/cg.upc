@@ -617,8 +617,8 @@ c-------------------------------------------------------------------*/
     	mflops = 0.0;
         }
 
-        printf("%.17lf", mflops / 1000.0);
-        fprintf(stderr, "%.17lf Gflops/s\n", mflops / 1000.0);
+        printf("%.17lf", mflops);
+        fprintf(stderr, "%.17lf Mflops/s\n", mflops);
     }
 
     upc_barrier;

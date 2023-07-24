@@ -467,8 +467,9 @@ c-------------------------------------------------------------------*/
     	mflops = 0.0;
         }
 
-        printf("%lf", mflops / 1000.0);
-        fprintf(stderr, "%lf Gflops/s\n", mflops / 1000.0);
+        printf("%lf", mflops);
+        fprintf(stderr, "Execution time: %lfs\n", t);
+        fprintf(stderr, "%lf Mflops/s\n", mflops);
     }
 
     ShrayFree(colidx);
