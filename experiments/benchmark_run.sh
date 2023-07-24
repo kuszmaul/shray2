@@ -307,5 +307,13 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 
 done
 
+printf '\nBenchmark CG (run 1-%s, %s, %s tasks, %s nodes, class %s )\n' \
+	"$benchmarkruns" \
+	"__THREADTYPE__" \
+	"__NTASKS__" \
+	"__NODES__" \
+	"$cgclass"
+runtest chapel ompi cg "$cgclass" "$i" "--probClass=$cgclass --numTrials=$benchmarkruns"
+
 # Clean up CG data.
 rm -r "$cgdatadir"
