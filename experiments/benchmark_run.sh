@@ -26,7 +26,6 @@ set -eu
 hash mpirun.openmpi
 hash mpirun.mpich
 hash seq
-hash realpath
 
 # Chapel.
 hash chpl
@@ -168,13 +167,9 @@ export UPC_SHARED_HEAP_SIZE="4G"
 # Generate matrix required for CG benchmark.
 cgclass="A"
 cgdatadir="$datadir/cgdata"
+"$bindir_ompi/examples/util/makea" "$cgclass"
 mkdir -p "$cgdatadir"
-bindirabs=$(realpath -s "$bindir")
-scriptdirabs=$(realpath -s "$scriptdir")
-curdir="$PWD"
-cd "$cgdatadir"
-"$bindirabs/examples/util/makea" "$cgclass"
-cd "$curdir"
+mv "a.cg.$cgclass" "colidx.cg.$cgclass" "rowstr.cg.$cgclass" "$cgdatadir"
 
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 export OMP_NUM_THREADS="__NTASKS_PER_NODE__"
