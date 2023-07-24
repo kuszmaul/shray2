@@ -163,7 +163,7 @@ static int findAllocIndex(void *segfault)
     }
 
     if (!inRange(segfault, middle)) {
-        DBUG_PRINT("%p is not in an allocation.\n", segfault);
+        fprintf(stderr, "%p is not in an allocation.\n", segfault);
         gasnet_exit(1);
     }
 
@@ -242,7 +242,8 @@ static void handlePageFault(void *address)
         queue_entry_t *entry = queue_find_prefetch(alloc->prefetchCaches, roundedAddress);
 
         if (entry == NULL) {
-            DBUG_PRINT("%p set to prefetched, but was not in the prefetch queue",
+            fprintf(stderr, 
+                    "%p set to prefetched, but was not in the prefetch queue",
                     (void *)roundedAddress);
             gasnet_exit(1);
         }
@@ -391,7 +392,7 @@ static inline void helpPrefetch(uintptr_t start, uintptr_t end, Allocation *allo
                 (start_r - location) / Shray_Pagesz, (end_r - location) / Shray_Pagesz);
 
             if (queue_queue_prefetch(alloc->prefetchCaches, alloc, start_r, end_r, handle)) {
-                DBUG_PRINT("ERROR: could not add prefetch to queue, %d", 1);
+                fprintf(stderr, "ERROR: could not add prefetch to queue, %d", 1);
                 gasnet_exit(1);
             }
 
