@@ -553,7 +553,7 @@ c-------------------------------------------------------------------*/
         }
 
         printf("%lf", mflops);
-        fprintf(stderr, "%lf Mflops/s\n");
+        fprintf(stderr, "%lf Mflops/s\n", mflops);
     }
 
     NGA_Release_update(g_x, lo_x, hi_x);
