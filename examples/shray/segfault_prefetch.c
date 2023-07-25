@@ -14,7 +14,7 @@ void init(double *arr)
 double reduce(double *arr, size_t n, size_t lookahead)
 {
     double sum = 0.0;
-    
+
     ShrayPrefetch(arr + ShrayEnd(arr), lookahead * sizeof(double));
     for (size_t ib = ShrayEnd(arr); ib < n; ib += lookahead) {
         if (ib + 2 * lookahead < n) {
@@ -23,7 +23,7 @@ double reduce(double *arr, size_t n, size_t lookahead)
         for (size_t i = ib; i < ib + lookahead && i < n; i++) {
             sum += arr[i];
         }
-        ShrayDiscard(&arr[ib], lookahead * sizeof(double));
+        ShrayDiscard(&arr[ib]);
     }
 
     return sum;

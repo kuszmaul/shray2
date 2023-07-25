@@ -23,7 +23,7 @@ __attribute__((pure)) unsigned int ShrayRank_debug(void);
 __attribute__((pure)) unsigned int ShraySize_debug(void);
 void ShrayFinalize_debug(int exit_code) __attribute__ ((noreturn));
 void ShrayPrefetch_debug(void *address, size_t size);
-void ShrayDiscard_debug(void *address, size_t size);
+void ShrayDiscard_debug(void *address);
 void ShrayBroadcast_debug(void *buffer, size_t size, int root);
 void ShrayBarrier_debug(void);
 
@@ -39,7 +39,7 @@ __attribute__((pure)) unsigned int ShrayRank_profile(void);
 __attribute__((pure)) unsigned int ShraySize_profile(void);
 void ShrayFinalize_profile(int exit_code) __attribute__ ((noreturn));
 void ShrayPrefetch_profile(void *address, size_t size);
-void ShrayDiscard_profile(void *address, size_t size);
+void ShrayDiscard_profile(void *address);
 void ShrayBroadcast_profile(void *buffer, size_t size, int root);
 void ShrayBarrier_profile(void);
 
@@ -55,7 +55,7 @@ __attribute__((pure)) unsigned int ShrayRank_normal(void);
 __attribute__((pure)) unsigned int ShraySize_normal(void);
 void ShrayFinalize_normal(int exit_code) __attribute__ ((noreturn));
 void ShrayPrefetch_normal(void *address, size_t size);
-void ShrayDiscard_normal(void *address, size_t size);
+void ShrayDiscard_normal(void *address);
 void ShrayBroadcast_normal(void *buffer, size_t size, int root);
 void ShrayBarrier_normal(void);
 
@@ -72,7 +72,7 @@ void ShrayBarrier_normal(void);
 #define ShraySize() ShraySize_debug()
 #define ShrayFinalize(exit_code) ShrayFinalize_debug(exit_code)
 #define ShrayPrefetch(address, size) ShrayPrefetch_debug(address, size)
-#define ShrayDiscard(address, size) ShrayDiscard_debug(address, size)
+#define ShrayDiscard(address) ShrayDiscard_debug(address)
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_debug(buffer, size, root)
 #define ShrayBarrier() ShrayBarrier_debug()
 
@@ -90,7 +90,7 @@ void ShrayBarrier_normal(void);
 #define ShraySize() ShraySize_profile()
 #define ShrayFinalize(exit_code) ShrayFinalize_profile(exit_code)
 #define ShrayPrefetch(address, size) ShrayPrefetch_profile(address, size)
-#define ShrayDiscard(address, size) ShrayDiscard_profile(address, size)
+#define ShrayDiscard(address) ShrayDiscard_profile(address)
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_profile(buffer, size, root)
 #define ShrayBarrier() ShrayBarrier_profile()
 
@@ -106,7 +106,7 @@ void ShrayBarrier_normal(void);
 #define ShraySize() ShraySize_normal()
 #define ShrayFinalize(exit_code) ShrayFinalize_normal(exit_code)
 #define ShrayPrefetch(address, size) ShrayPrefetch_normal(address, size)
-#define ShrayDiscard(address, size) ShrayDiscard_normal(address, size)
+#define ShrayDiscard(address) ShrayDiscard_normal(address)
 #define ShrayBroadcast(buffer, size, root) ShrayBroadcast_normal(buffer, size, root)
 #define ShrayBarrier() ShrayBarrier_normal()
 #endif /* PROFILE */
@@ -239,7 +239,7 @@ void ShrayBarrier_normal(void);
 
 /** <!--********************************************************************-->
  *
- * @fn void ShrayDiscard(void *address, size_t size);
+ * @fn void ShrayDiscard(void *address);
  *
  *   @brief Hint to free prefetched memory [address, address + size[.
  *

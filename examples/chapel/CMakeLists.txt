@@ -10,12 +10,10 @@ get_filename_component(BLAS_TDIR ${BLAS_LIB_ACTUAL} DIRECTORY)
 get_filename_component(BLAS_TNAME ${BLAS_LIB_ACTUAL} NAME)
 
 foreach(file
-        #1dstencil
-		#1dstencil_combi
-        matrix
-		matrix_combi
-        #monopoly
-		#monopoly_combi
+		cg
+		1dstencil
+		matrix
+		monopoly
 	 )
 	set(EXAMPLE_TARGET "${file}_chapel")
 
@@ -32,13 +30,3 @@ foreach(file
 			-L${BLAS_TDIR}
 			-l:${BLAS_TNAME})
 endforeach(file)
-
-add_custom_command(
-  OUTPUT  ${PROJECT_BINARY_DIR}/cg_chapel
-  DEPENDS cg-sparse.chpl cg-makea.chpl
-  COMMAND cp ${PROJECT_SOURCE_DIR}/examples/chapel/cg-sparse.chpl ${PROJECT_SOURCE_DIR}/examples/chapel/cg-makea.chpl ${PROJECT_BINARY_DIR}/examples/chapel && chpl --ccflags -Ofast --fast --no-ieee-float -O cg-sparse.chpl cg-makea.chpl -o ${PROJECT_BINARY_DIR}/examples/chapel/cg_chapel
-  )
-
-add_custom_target(cg_chpl ALL
-    DEPENDS ${PROJECT_BINARY_DIR}/cg_chapel
-)

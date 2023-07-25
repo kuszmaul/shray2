@@ -32,13 +32,14 @@ void matmul(double *A, double *B, double *C, size_t n)
 
     /* Add A[s][t] B[t] to C. */
     for (unsigned int t = 0; t < p; t++) {
-        ShrayPrefetch(B + n / p * n * t, n / p * n * sizeof(double));
+	void *b = B + n / p * n * t;
+        ShrayPrefetch(b, n / p * n * sizeof(double));
 
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                 n / p, n, n / p, 1.0, &A[s * n / p * n + t * n / p], n,
                 &B[t * n / p * n], n, 1.0, &C[s * n / p * n], n);
 
-        ShrayDiscard(B + n / p * n * t, n / p * n * sizeof(double));
+        ShrayDiscard(b);
     }
 }
 
