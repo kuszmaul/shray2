@@ -143,11 +143,6 @@ for thread_type in single multi; do
 
 			# Generate the plot for this specific benchmark.
 			filtered=$(printf '%s' "$example" | tr _ ' ')
-			if [ "$thread_type" = multi ]; then
-				xaxis="Number of threads"
-			else
-				xaxis="Number of ranks"
-			fi
 			gnuplot -c benchmark_gflops.gpi \
 				"$filtered ($params)" \
 				"$datadir/plots/$thread_type" \
@@ -157,7 +152,7 @@ for thread_type in single multi; do
 				"$paramsdir/shray/graph.data" \
 				"$paramsdir/scala/graph.data" \
 				"$paramsdir/upc/graph.data" \
-				"$xaxis"
+				"Number of processors"
 		done
 	done
 done
