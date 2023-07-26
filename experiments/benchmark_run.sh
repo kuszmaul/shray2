@@ -4,17 +4,18 @@ m4_changequote(`[[[',`]]]')m4_dnl
 
 #SBATCH --account=csmpi
 #SBATCH --nodes=__NODES__
+#SBATCH --threads-per-core=1
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
-#SBATCH --cpus-per-task=__NTASKS_PER_NODE__
+#SBATCH --cpus-per-task=8
 #SBATCH --ntasks-per-node=1
 ]]], [[[m4_dnl
 #SBATCH --ntasks=__NTASKS__
 #SBATCH --ntasks-per-node=__NTASKS_PER_NODE__
-#SBATCH --threads-per-core=1
 ]]])m4_dnl
 #SBATCH --partition=csmpi_long
 #SBATCH --time=08:00:00
 #SBATCH --output=benchmark.__THREADTYPE__.__NODES__.__NTASKS__.txt
+
 
 # A script to automatically benchmark test programs.
 
@@ -106,10 +107,12 @@ runtest()
 		ompi)
 			mpibin="mpirun.openmpi"
 			mpibindir="$bindir_ompi"
+			mpibinargs="m4_ifelse(__THREADTYPE__, multi, --bind-to none)"
 			;;
 		mpich)
-			mpibin="mpirun.mpich"
+			mpibin="mpiexec.hydra"
 			mpibindir="$bindir_mpich"
+			mpibinargs="m4_ifelse(__THREADTYPE__, multi, -bind-to core:8)"
 			;;
 		*)
 			printf 'Unknown MPI implementation: %s' "$mpi_impl" >&2
@@ -135,7 +138,7 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 	case "$test_type" in
 		shray)
 			runtest_wrapper "$outfile" "$gflopsfile" \
-				"$mpibin" m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
+				"$mpibin" $mpibinargs \
 				"$mpibindir/examples/$test_type/${example}_profile_${test_type}" \
 				"$@"
 			;;
@@ -147,13 +150,13 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 			;;
 		fortran|globalarrays)
 			runtest_wrapper "$outfile" "$gflopsfile" \
-				"$mpibin" m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
+				"$mpibin" $mpibinargs \
 				"$mpibindir/examples/$test_type/${example}_$test_type" \
 				"$@"
 			;;
 		upc)
 			runtest_wrapper "$outfile" "$gflopsfile" \
-				"$mpibin" m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
+				"$mpibin" $mpibinargs \
 				"$mpibindir/examples/$test_type/${example}_$test_type" \
 				"$@"
 			# Filter out UPC-specific stderr messages
@@ -162,7 +165,7 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 		scala)
 			"$scriptdir/scalapack_generator.sh" ${ntasks} 250 "$@"
 			runtest_wrapper "$outfile" "$gflopsfile" \
-				"$mpbin" m4_ifelse(__THREADTYPE__, multi, --bind-to none) \
+				"$mpbin" $mpibinargs \
 				xdpblas3tim
 			;;
 		*)
@@ -172,11 +175,16 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 	esac
 }
 
-## Inform GASNet how to start.
+# Inform GASNet how to start.
 export GASNET_SPAWNFN="C"
+m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
+export GASNET_CSPAWN_CMD="srun -N %N --threads-per-core=1 --cpus-per-task=8 %C"
+]]], [[[m4_dnl
 export GASNET_CSPAWN_CMD="srun -N %N %C"
+]]])m4_dnl
 
-export CHPL_RT_NUM_THREADS_PER_LOCALE="__NTASKS_PER_NODE__"
+# TODO: this actually lowers chapel performance if set?
+#export CHPL_RT_NUM_THREADS_PER_LOCALE="__NTASKS_PER_NODE__"
 
 ## UDP-conduit max timeout in microseconds, default is 30000000 (30 seconds)
 ## 0 is infinite timeout.
@@ -307,13 +315,15 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 
 done
 
+m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 printf '\nBenchmark CG (run 1-%s, %s, %s tasks, %s nodes, class %s )\n' \
 	"$benchmarkruns" \
 	"__THREADTYPE__" \
 	"__NTASKS__" \
 	"__NODES__" \
 	"$cgclass"
-runtest chapel ompi cg "$cgclass" "$i" "--probClass=$cgclass --numTrials=$benchmarkruns"
+runtest chapel ompi cg "$cgclass" "1" "--probClass=$cgclass" "--numTrials=$benchmarkruns"
+]]])m4_dnl
 
 # Clean up CG data.
 rm -r "$cgdatadir"
