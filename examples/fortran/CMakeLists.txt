@@ -25,6 +25,7 @@ foreach(file
 			${PROJECT_FLAGS}
 			-cpp
 			-fcheck=all
+            -fexternal-blas
 			-fcoarray=lib
         )
 	target_link_libraries("${EXAMPLE_TARGET}"

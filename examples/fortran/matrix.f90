@@ -2,7 +2,7 @@
 ! locally each processor has a n x n / p array.
 
 program main
-    external :: dgemm
+    implicit none
 
     real(KIND=8), allocatable :: A(:,:)[:], B(:,:)[:], C(:,:)[:], Bl(:,:)
     character(len=12), allocatable :: args(:)
@@ -32,8 +32,7 @@ program main
 
     do l = 1, num_images()
         Bl = B(:,:)[l]
-        call dgemm('N', 'N', n / p, n, n / p, 1.0, A(1, 1 + (l - 1) * n / p), &
-                   n / p, Bl, n / p, 1.0, C, n / p)
+        C = C + matmul(A(1:n/p, 1 + (l - 1) * n / p: l * n / p), Bl)
     end do
 
     sync all
