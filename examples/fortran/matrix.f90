@@ -32,7 +32,8 @@ program main
 
     do l = 1, num_images()
         Bl = B(:,:)[l]
-        call dgemm('N', 'N', n / p, n, n / p, 1.0, A(1, 1 + (l - 1) * n / p), &
+        call dgemm('N', 'N', n / p, n / p, n / p, 1.0, &
+                   A(1, 1 + (l - 1) * n / p), &
                    n / p, Bl, n / p, 1.0, C, n / p)
     end do
 
