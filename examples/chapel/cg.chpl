@@ -3,7 +3,7 @@
 //    62.169 with --cflags=-O3, linear search
 //    25.4556 with --cflags=-O3, binary search
 prototype module CG {
-use LayoutCS, CGMakeA, Time, IO, BlockDist;
+use LayoutCS, CGMakeA, Time, IO, BlockDist, AllLocalesBarriers;
 
 type elemType = real(64);
 
@@ -43,20 +43,41 @@ proc main() {
                    = genAIndsSorted(elemType, n, nonzer, shift);
   var A: [MatrixSpace] elemType;
 
+    stderr.writeln("Start program");
+
   for (ind, v) in makea(elemType, n, nonzer, shift) {
     A(ind) += v;
   }
 
+    stderr.writeln("A initialized");
+
   const DenseSpaceD: domain(2) dmapped Block(boundingBox=DenseSpace) 
     = DenseSpace;
-  const MatrixSpaceD: sparse subdomain(DenseSpaceD) = MatrixSpace;
+  var MatrixSpaceD: sparse subdomain(DenseSpaceD);// = MatrixSpace;
+
+  /* Assignment is not supported, adding directly is O(n^2) to account 
+   * for duplicates? */
+  var idxBuf = MatrixSpace.createIndexBuffer(size=2 * nonzer);
+  for i in MatrixSpace {
+      idxBuf.add(i);
+  }
+  idxBuf.commit();
+
+    stderr.writeln("MatrixSpaceD initialized");
+
   var AD: [MatrixSpaceD] elemType;
 
-  coforall loc in Locales do on loc {
-    for i in AD.localSubdomain() {
-        AD(i) = A(i);
+    coforall loc in Locales do on loc {
+        AD(AD.localSubdomain()) = A(AD.localSubdomain());
+        //for i in AD.localSubdomain() {
+        //    writeln("Locale ", here.id, " AD(", i, ") = ", AD(i));
+        //    AD(i) = A(i);
+        //}
     }
-  }
+
+    allLocalesBarrier.barrier();
+
+    stderr.writeln("AD initialized");
 
   const VectorSpace = {1..n};
 //  var X: [VectorSpace] elemType,
@@ -127,6 +148,7 @@ proc conjGrad(A: [?MatDom], X: [?VectDom]) {
             Q(i) = + reduce [j in MatDom.dimIter(1, i)] (A(i, j) * P(j));
         }
     }
+    allLocalesBarrier.barrier();
 
     const alpha = rho / + reduce (P*Q);
     Z += alpha*P;
@@ -148,6 +170,7 @@ proc conjGrad(A: [?MatDom], X: [?VectDom]) {
         R(i) = + reduce [j in MatDom.dimIter(1, i)] (A(i, j) * Z(j));
     }
   }
+  allLocalesBarrier.barrier();
   const rnorm = sqrt(+ reduce ((X-R)**2));
 
   return (Z, rnorm);
