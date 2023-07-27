@@ -35,8 +35,10 @@ config const numTrials = 1,
 
 
 proc main() {
-  const FullSpace = {1..n, 1..n};
-  const DenseSpace: domain(2) dmapped Block(boundingBox=FullSpace) = FullSpace;
+  /* To reduce the chance of me messing up, we first build A redundantly on each node,
+     and then copy the local parts over to a distributed Ad. This limits the size of A to 
+     the physical memory of one node, but that is enough for our experiments. */
+  const DenseSpace = {1..n, 1..n};
   const MatrixSpace: sparse subdomain(DenseSpace) dmapped(new dmap(new CS()))
                    = genAIndsSorted(elemType, n, nonzer, shift);
   var A: [MatrixSpace] elemType;
@@ -45,10 +47,23 @@ proc main() {
     A(ind) += v;
   }
 
-  const VSFull = {1..n};
-  const VectorSpace: domain(1) dmapped Block(boundingBox=VSFull) = VSFull;
-  var X: [VectorSpace] elemType,
-      zeta = 0.0;
+  const DenseSpaceD: domain(2) dmapped Block(boundingBox=DenseSpace) 
+    = DenseSpace;
+  const MatrixSpaceD: sparse subdomain(DenseSpaceD) = MatrixSpace;
+  var AD: [MatrixSpaceD] elemType;
+
+  coforall loc in Locales do on loc {
+    for i in AD.localSubdomain() {
+        AD(i) = A(i);
+    }
+  }
+
+  const VectorSpace = {1..n};
+//  var X: [VectorSpace] elemType,
+//      zeta = 0.0;
+  const VSD: domain(1) dmapped Block(boundingBox=VectorSpace) = VectorSpace;
+  var X: [VSD] elemType,
+        zeta = 0.0;
 
   for trial in 1..numTrials {
     X = 1.0;
@@ -105,8 +120,13 @@ proc conjGrad(A: [?MatDom], X: [?VectDom]) {
     //    const Q = + reduce(dim=2) [(i,j) in MatDom] (A(i,j) * P(j));
     // INSTEAD OF:
     var Q: [VectDom] elemType;
-    [i in MatDom.dim(0)] Q(i) = + reduce [j in MatDom.dimIter(1,i)] (A(i,j) * P(j));
+//    [i in MatDom.dim(0)] Q(i) = + reduce [j in MatDom.dimIter(1,i)] (A(i,j) * P(j));
     //
+    coforall loc in Locales do on loc {
+        for i in VectDom.localSubdomain() {
+            Q(i) = + reduce [j in MatDom.dimIter(1, i)] (A(i, j) * P(j));
+        }
+    }
 
     const alpha = rho / + reduce (P*Q);
     Z += alpha*P;
@@ -120,9 +140,14 @@ proc conjGrad(A: [?MatDom], X: [?VectDom]) {
   // WANT (a partial reduction):
   //      R = + reduce(dim=2) [(i,j) in MatDom] (A(i,j) * Z(j));
   // INSTEAD OF:
-  [i in MatDom.dim(0)] R(i) = + reduce [j in MatDom.dimIter(1,i)] (A(i,j) * Z(j));
+//  [i in MatDom.dim(0)] R(i) = + reduce [j in MatDom.dimIter(1,i)] (A(i,j) * Z(j));
   //
 
+  coforall loc in Locales do on loc {
+    for i in VectDom.localSubdomain() {
+        R(i) = + reduce [j in MatDom.dimIter(1, i)] (A(i, j) * Z(j));
+    }
+  }
   const rnorm = sqrt(+ reduce ((X-R)**2));
 
   return (Z, rnorm);
