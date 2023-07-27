@@ -3,7 +3,7 @@
 //    62.169 with --cflags=-O3, linear search
 //    25.4556 with --cflags=-O3, binary search
 prototype module CG {
-use LayoutCS, CGMakeA, Time, IO;
+use LayoutCS, CGMakeA, Time, IO, BlockDist;
 
 type elemType = real(64);
 
@@ -35,7 +35,8 @@ config const numTrials = 1,
 
 
 proc main() {
-  const DenseSpace = {1..n, 1..n};
+  const FullSpace = {1..n, 1..n};
+  const DenseSpace: domain(2) dmapped Block(boundingBox=FullSpace) = FullSpace;
   const MatrixSpace: sparse subdomain(DenseSpace) dmapped(new dmap(new CS()))
                    = genAIndsSorted(elemType, n, nonzer, shift);
   var A: [MatrixSpace] elemType;
@@ -44,7 +45,8 @@ proc main() {
     A(ind) += v;
   }
 
-  const VectorSpace = {1..n};
+  const VSFull = {1..n};
+  const VectorSpace: domain(1) dmapped Block(boundingBox=VSFull) = VSFull;
   var X: [VectorSpace] elemType,
       zeta = 0.0;
 
