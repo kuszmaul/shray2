@@ -40,8 +40,6 @@
 #include <omp.h>
 #include <shray2/shray.h>
 #include <string.h>
-#include <gasnet.h>
-#include <gasnet_coll.h>
 
 /* For random numbers */
 #define r23 pow(0.5, 23.0)
@@ -60,22 +58,20 @@ static double tran;
 /* function declarations */
 static void conj_grad (long colidx[], long rowstr[], double x[], double z[],
 		       double a[], double p[], double q[], double r[],
-		       double *rnorm);
+		       double *rnorm, double *scratch);
 
 /*--------------------------------------------------------------------
  * Utilities
 ----------------------------------------------------------------------*/
 
-void gasnetSum(double *number, double *scratch)
+double shraySum(double *scratch)
 {
-    /* We could optimise multiple of these calls after each other by using a
-     * non-blocking variant. */
-    gasnet_coll_gather_all(gasnete_coll_team_all, scratch, number,
-            sizeof(double), GASNET_COLL_DST_IN_SEGMENT);
+    double sum = 0.0;
     for (size_t i = 0; i < ShraySize(); i++) {
-        if (i == ShrayRank()) continue;
-        *number += scratch[i];
+        sum += scratch[i];
     }
+
+    return sum;
 }
 
 static char *strcatalloc(const char *s)
@@ -278,6 +274,8 @@ c-------------------------------------------------------------------*/
     long *colidx = ShrayMalloc(NZ, NZ * sizeof(long));
     long *rowstr = ShrayMalloc((NA + 1), (NA + 1) * sizeof(long));
     double *a = ShrayMalloc(NZ, NZ * sizeof(double));
+    double *scratch = ShrayMalloc(ShraySize(), ShraySize() * sizeof(double));
+    double *scratch2 = ShrayMalloc(ShraySize(), ShraySize() * sizeof(double));
 
     double *x = ShrayMalloc(NA, NA * sizeof(double));
     double *z = ShrayMalloc(NA, NA * sizeof(double));
@@ -332,14 +330,12 @@ c  Do one iteration untimed to init all code and data page tables
 c---->                    (then reinit, start timing, to niter its)
 c-------------------------------------------------------------------*/
 
-    double *scratch = malloc(ShraySize() * sizeof(double));
-
     for (int it = 1; it <= 1; it++) {
 
     /*--------------------------------------------------------------------
     c  The call to the conjugate gradient routine:
     c-------------------------------------------------------------------*/
-    	conj_grad (colidx, rowstr, x, z, a, p, q, r, &rnorm);
+    	conj_grad (colidx, rowstr, x, z, a, p, q, r, &rnorm, scratch);
 
     /*--------------------------------------------------------------------
     c  zeta = shift + 1/(x.z)
@@ -354,8 +350,11 @@ c-------------------------------------------------------------------*/
                 norm_temp11 = norm_temp11 + x[j]*z[j];
                 norm_temp12 = norm_temp12 + z[j]*z[j];
     	}
-        gasnetSum(&norm_temp11, scratch);
-        gasnetSum(&norm_temp12, scratch);
+    	scratch[ShrayStart(scratch)] = norm_temp11;
+    	scratch2[ShrayStart(scratch2)] = norm_temp12;
+    	ShraySync(scratch, scratch2);
+        norm_temp11 = shraySum(scratch);
+        norm_temp12 = shraySum(scratch2);
     	norm_temp12 = 1.0 / sqrt( norm_temp12 );
 
     /*--------------------------------------------------------------------
@@ -390,7 +389,7 @@ c-------------------------------------------------------------------*/
     /*--------------------------------------------------------------------
     c  The call to the conjugate gradient routine:
     c-------------------------------------------------------------------*/
-    	conj_grad(colidx, rowstr, x, z, a, p, q, r, &rnorm);
+    	conj_grad(colidx, rowstr, x, z, a, p, q, r, &rnorm, scratch);
 
     /*--------------------------------------------------------------------
     c  zeta = shift + 1/(x.z)
@@ -406,8 +405,12 @@ c-------------------------------------------------------------------*/
                 norm_temp11 = norm_temp11 + x[j]*z[j];
                 norm_temp12 = norm_temp12 + z[j]*z[j];
     	}
-        gasnetSum(&norm_temp11, scratch);
-        gasnetSum(&norm_temp12, scratch);
+
+    	scratch[ShrayStart(scratch)] = norm_temp11;
+    	scratch2[ShrayStart(scratch2)] = norm_temp12;
+    	ShraySync(scratch, scratch2);
+        norm_temp11 = shraySum(scratch);
+        norm_temp12 = shraySum(scratch2);
 
     	norm_temp12 = 1.0 / sqrt( norm_temp12 );
 
@@ -475,14 +478,14 @@ c-------------------------------------------------------------------*/
     ShrayFree(colidx);
     ShrayFree(rowstr);
     ShrayFree(a);
+    ShrayFree(scratch);
+    ShrayFree(scratch2);
 
     ShrayFree(x);
     ShrayFree(z);
     ShrayFree(p);
     ShrayFree(q);
     ShrayFree(r);
-
-    free(scratch);
 
     ShrayFinalize(0);
 }
@@ -498,7 +501,8 @@ static void conj_grad (
     double p[],
     double q[],
     double r[],
-    double *rnorm)
+    double *rnorm,
+    double *scratch)
 /*--------------------------------------------------------------------
 c-------------------------------------------------------------------*/
 
@@ -511,7 +515,6 @@ c---------------------------------------------------------------------*/
     double d, sum, rho, rho0, alpha, beta;
     long k;
     int cgit, cgitmax = 25;
-    double *scratch = malloc(ShraySize() * sizeof(double));
     rho = 0.0;
 
 /*--------------------------------------------------------------------
@@ -534,8 +537,9 @@ c-------------------------------------------------------------------*/
     for (size_t j = ShrayStart(r); j < ShrayEnd(r); j++) {
 	    rho += r[j]*r[j];
     }
-    ShraySync(p);
-    gasnetSum(&rho, scratch);
+    scratch[ShrayStart(scratch)] = rho;
+    ShraySync(p, scratch);
+    rho = shraySum(scratch);
 }/* end omp parallel */
 /*--------------------------------------------------------------------
 c---->
@@ -576,8 +580,9 @@ c-------------------------------------------------------------------*/
     	for (size_t j = ShrayStart(p); j < ShrayEnd(p); j++) {
                 d += p[j]*q[j];
     	}
-        ShrayBarrier();
-        gasnetSum(&d, scratch);
+        scratch[ShrayStart(scratch)] = d;
+        ShraySync(scratch);
+    	d = shraySum(scratch);
     /*--------------------------------------------------------------------
     c  Obtain alpha = rho / (p.q)
     c-------------------------------------------------------------------*/
@@ -598,8 +603,9 @@ c-------------------------------------------------------------------*/
     c---------------------------------------------------------------------*/
                 rho += r[j]*r[j];
     	}
-        ShraySync(z);
-        gasnetSum(&rho, scratch);
+        scratch[ShrayStart(scratch)] = rho;
+        ShraySync(z, scratch);
+        rho = shraySum(scratch);
 
     /*--------------------------------------------------------------------
     c  Obtain beta:
@@ -641,8 +647,8 @@ c-------------------------------------------------------------------*/
     	d = x[j] - r[j];
 	    sum += d*d;
     }
-    gasnetSum(&sum, scratch);
+    scratch[ShrayStart(scratch)] = sum;
+    ShraySync(scratch);
+    sum = shraySum(scratch);
     (*rnorm) = sqrt(sum);
-
-    free(scratch);
 }
