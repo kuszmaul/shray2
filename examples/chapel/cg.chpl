@@ -36,7 +36,7 @@ config const numTrials = 1,
 
 proc main() {
   /* To reduce the chance of me messing up, we first build A redundantly on each node,
-     and then copy the local parts over to a distributed Ad. This limits the size of A to 
+     and then copy the local parts over to a distributed Ad. This limits the size of A to
      the physical memory of one node, but that is enough for our experiments. */
   const DenseSpace = {1..n, 1..n};
   const MatrixSpace: sparse subdomain(DenseSpace) dmapped(new dmap(new CS()))
@@ -51,11 +51,11 @@ proc main() {
 
     stderr.writeln("A initialized");
 
-  const DenseSpaceD: domain(2) dmapped Block(boundingBox=DenseSpace) 
+  const DenseSpaceD: domain(2) dmapped Block(boundingBox=DenseSpace)
     = DenseSpace;
   var MatrixSpaceD: sparse subdomain(DenseSpaceD);// = MatrixSpace;
 
-  /* Assignment is not supported, adding directly is O(n^2) to account 
+  /* Assignment is not supported, adding directly is O(n^2) to account
    * for duplicates? */
   var idxBuf = MatrixSpace.createIndexBuffer(size=2 * nonzer);
   for i in MatrixSpace {
