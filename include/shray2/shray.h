@@ -202,4 +202,35 @@ void ShrayFinalize_normal(int exit_code) __attribute__ ((noreturn));
  *
  ******************************************************************************/
 
+/** <!--********************************************************************-->
+ *
+ * @fn void * ShrayWriteBuf(void *address, size_t size)
+ *
+ *   @brief         If you want to do gasnet communication on
+ *                  [address, address + size[ not a subset of the partition you
+ *                  own, you can do it on the buffer returned by this call.
+ *                  When done, commit your result with a call to
+ *                  ShrayCommit(buf, address, size). The memory can be
+ *                  freed up after ShrayCommit by ShrayUncommit
+ *
+ *   @return buf    Buffer you can write to
+ *
+ ******************************************************************************/
+
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayCommit(void * buf, void *address, size_t size)
+ *
+ *   @brief         See ShrayWriteBuf
+ *
+ ******************************************************************************/
+
+/** <!--********************************************************************-->
+ *
+ * @fn void ShrayUncommit(void *address, size_t size)
+ *
+ *   @brief         See ShrayWriteBuf
+ *
+ ******************************************************************************/
+
 #endif /* SHRAY__GUARD */
