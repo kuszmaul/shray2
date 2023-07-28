@@ -142,7 +142,7 @@ int main(int argc, char **argv)
     }
 
     if (gasnet_mynode() == 0) {
-        printf(" & %lf & %lf & ", mean, sqrt(m2 / count));
+        printf("%d & %lf & %lf & ", p, mean, sqrt(m2 / count));
     }
 
     gasnetBarrier();

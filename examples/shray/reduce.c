@@ -54,7 +54,7 @@ double reduceAuto(double *arr, size_t n)
 {
     double sum = 0.0;
 
-    for (size_t i = ShrayStart(arr); i < n; i++) {
+    for (size_t i = ShrayEnd(arr); i < n; i++) {
         sum += arr[i];
     }
 
@@ -72,10 +72,14 @@ int main(int argc, char **argv)
     size_t n = atol(argv[1]);
     int niter = atoi(argv[2]);
 
-    double *bandwidths = (double *)malloc(niter * sizeof(double));
+    /* Wellfords algorithm may be overkill, but numerical stability is nice. */
+    int count = 0;
+    double mean = 0;
+    double m2 = 0;
 
     for (int t = 0; t < niter; t++) {
         double *arr = (double *)ShrayMalloc(n, n * sizeof(double));
+        double bandwidth = 0;
 
         init(arr);
         ShraySync(arr);
@@ -86,27 +90,20 @@ int main(int argc, char **argv)
             TIME(duration, result = reduceAuto(arr, n););
             fprintf(stderr, (result == n - ShrayStart(arr)) ?
                     "Success\n" : "Failure\n");
-            bandwidths[t] = 8.0 * (n - ShrayStart(arr))  / 1e6 / duration;
+            bandwidth = 8.0 * (n - ShrayStart(arr))  / 1e6 / duration;
         }
+        count++;
+        double delta_pre = bandwidth - mean;
+        mean += delta_pre / count;
+        double delta_post = bandwidth - mean;
+        m2 += delta_pre * delta_post;
 
         ShrayFree(arr);
     }
 
-    /* Wellfords algorithm may be overkill, but numerical stability is nice. */
-    int count = 0;
-    double mean = 0;
-    double m2 = 0;
-    for (int t = 0; t < niter; t++) {
-        count++;
-        double delta_pre = bandwidths[t] - mean;
-        mean += delta_pre / count;
-        double delta_post = bandwidths[t] - mean;
-        m2 += delta_pre * delta_post;
+    if (ShrayRank() == 0) {
+        printf(" %lf & %lf \\\\\n", mean, sqrt(m2 / count));
     }
-
-    printf(" %lf & %lf \\\\\n", mean, sqrt(m2 / count));
-
-    free(bandwidths);
 
     ShrayReport();
 
