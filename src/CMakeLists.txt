@@ -36,7 +36,6 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS shray.c)
 set(LIB_TARGET "${PROJECT_NAME}")
 add_library("${LIB_TARGET}" SHARED
 	bitmap.c
-	queue.c
 	ringbuffer.c
 	"${PROJECT_BINARY_DIR}/shray_debug.c"
 	"${PROJECT_BINARY_DIR}/shray_normal.c"
