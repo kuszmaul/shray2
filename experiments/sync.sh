@@ -1,56 +1,11 @@
 #!/bin/sh
 
-#SBATCH --account=csmpi
-#SBATCH --partition=csmpi_short
-#SBATCH --nodes=8
-#SBATCH --ntasks-per-node=8
-#SBATCH --output=sync.out
-#SBATCH --time=0:10:00
+NODES=1
+while [ $NODES -le 8 ]
+do
+    sed "s/NODES/$NODES/g" sync.sh.template > sync_"$NODES".sh
+    sbatch sync_"$NODES".sh
+    rm sync_"$NODES".sh
 
-set -eu
-
-# Ensure required programs exist.
-hash time
-
-export GASNET_SPAWNFN="C"
-export GASNET_CSPAWN_CMD="srun -n %N %C"
-
-bindir="../build/examples"
-outputdir="./results/sync"
-
-# Create the new data directory.
-curdate=$(date -u '+%Y-%m-%dT%H:%M:%S+00:00')
-datadir="$outputdir/$curdate"
-mkdir -p "$datadir"
-
-# Create a file with the system parameters.
-{
-	printf 'Benchmark system configuration on %s\n' "$curdate"
-
-	printf '\nMPI:\n'
-	mpirun.mpich --version
-	if hash ompi_info 2>/dev/null; then
-		printf '\nOpenMPI:\n'
-		ompi_info
-	fi
-	if hash mpichversion 2>/dev/null; then
-		printf '\nMPICH:\n'
-		mpichversion
-	fi
-}>"$datadir/system.txt"
-
-runsync()
-{
-    nproc="$1"
-    printf '%s & ' "${nproc}";
-    "${bindir}/shray/sync_normal_shray" "${nproc}" 1000000;
-    printf ' \\\\\n';
-}
-
-{
-printf '\\begin{tabular}{c|c}\n\hline\nProcesses & time (us) \\\\\n';
-for nproc in 8 16 32 64; do
-    runsync "${nproc}"
+    NODES=$(( 2 * NODES ))
 done
-printf '\\end{tabular}';
-} > "${datadir}/sync.csv" 2> "${datadir}/errors.txt"

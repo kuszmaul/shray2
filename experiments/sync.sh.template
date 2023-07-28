@@ -1,0 +1,14 @@
+#!/bin/sh
+
+#SBATCH --account=csmpi
+#SBATCH --partition=csmpi_long
+#SBATCH --nodes=NODES
+#SBATCH --cpus-per-task=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --threads-per-core=1
+#SBATCH --time=08:00:00
+#SBATCH --output=sync_NODES.out
+#SBATCH --exclusive
+
+mpirun ../build/examples/gasnet/barrier_gasnet 100000 10 >> sync_NODES.tex 
+mpirun ../build/examples/shray/sync_normal_shray 100000 10 >> sync_NODES.tex
