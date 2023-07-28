@@ -1,0 +1,14 @@
+#!/bin/sh
+
+#SBATCH --account=csmpi
+#SBATCH --partition=csmpi_long
+#SBATCH --nodes=NODES
+#SBATCH --cpus-per-task=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --threads-per-core=1
+#SBATCH --time=08:00:00
+#SBATCH --output=reduce_NODES.out
+#SBATCH --exclusive
+
+mpirun ../build/examples/gasnet/reduce_gasnet 10000000 10 PAGE >> reduce_PAGE_NODES.tex 
+SHRAY_CACHELINE=PAGE mpirun ../build/examples/shray/reduce_normal_shray 10000000 10 >> reduce_PAGE_NODES.tex
