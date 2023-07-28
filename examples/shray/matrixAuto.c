@@ -1,4 +1,5 @@
 #include <shray2/shray.h>
+#include "../util/time.h"
 
 #ifdef __cplusplus
 extern "C" {

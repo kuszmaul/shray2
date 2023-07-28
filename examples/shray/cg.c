@@ -40,6 +40,7 @@
 #include <omp.h>
 #include <shray2/shray.h>
 #include <string.h>
+#include "../util/time.h"
 
 /* For random numbers */
 #define r23 pow(0.5, 23.0)

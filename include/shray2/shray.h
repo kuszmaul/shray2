@@ -22,10 +22,6 @@ void ShrayReport_debug(void);
 __attribute__((pure)) unsigned int ShrayRank_debug(void);
 __attribute__((pure)) unsigned int ShraySize_debug(void);
 void ShrayFinalize_debug(int exit_code) __attribute__ ((noreturn));
-void ShrayPrefetch_debug(void *address, size_t size);
-void ShrayDiscard_debug(void *address);
-void ShrayBroadcast_debug(void *buffer, size_t size, int root);
-void ShrayBarrier_debug(void);
 
 /* Profile declarations */
 void ShrayInit_profile(int *argc, char ***argv);
@@ -38,10 +34,6 @@ void ShrayReport_profile(void);
 __attribute__((pure)) unsigned int ShrayRank_profile(void);
 __attribute__((pure)) unsigned int ShraySize_profile(void);
 void ShrayFinalize_profile(int exit_code) __attribute__ ((noreturn));
-void ShrayPrefetch_profile(void *address, size_t size);
-void ShrayDiscard_profile(void *address);
-void ShrayBroadcast_profile(void *buffer, size_t size, int root);
-void ShrayBarrier_profile(void);
 
 /* Normal declarations */
 void ShrayInit_normal(int *argc, char ***argv);
@@ -54,10 +46,6 @@ void ShrayReport_normal(void);
 __attribute__((pure)) unsigned int ShrayRank_normal(void);
 __attribute__((pure)) unsigned int ShraySize_normal(void);
 void ShrayFinalize_normal(int exit_code) __attribute__ ((noreturn));
-void ShrayPrefetch_normal(void *address, size_t size);
-void ShrayDiscard_normal(void *address);
-void ShrayBroadcast_normal(void *buffer, size_t size, int root);
-void ShrayBarrier_normal(void);
 
 #ifdef DEBUG
 
@@ -71,10 +59,6 @@ void ShrayBarrier_normal(void);
 #define ShrayRank() ShrayRank_debug()
 #define ShraySize() ShraySize_debug()
 #define ShrayFinalize(exit_code) ShrayFinalize_debug(exit_code)
-#define ShrayPrefetch(address, size) ShrayPrefetch_debug(address, size)
-#define ShrayDiscard(address) ShrayDiscard_debug(address)
-#define ShrayBroadcast(buffer, size, root) ShrayBroadcast_debug(buffer, size, root)
-#define ShrayBarrier() ShrayBarrier_debug()
 
 #else
 #ifdef PROFILE
@@ -89,10 +73,6 @@ void ShrayBarrier_normal(void);
 #define ShrayRank() ShrayRank_profile()
 #define ShraySize() ShraySize_profile()
 #define ShrayFinalize(exit_code) ShrayFinalize_profile(exit_code)
-#define ShrayPrefetch(address, size) ShrayPrefetch_profile(address, size)
-#define ShrayDiscard(address) ShrayDiscard_profile(address)
-#define ShrayBroadcast(buffer, size, root) ShrayBroadcast_profile(buffer, size, root)
-#define ShrayBarrier() ShrayBarrier_profile()
 
 #else
 #define ShrayInit(argc, argv) ShrayInit_normal(argc, argv)
@@ -105,10 +85,6 @@ void ShrayBarrier_normal(void);
 #define ShrayRank() ShrayRank_normal()
 #define ShraySize() ShraySize_normal()
 #define ShrayFinalize(exit_code) ShrayFinalize_normal(exit_code)
-#define ShrayPrefetch(address, size) ShrayPrefetch_normal(address, size)
-#define ShrayDiscard(address) ShrayDiscard_normal(address)
-#define ShrayBroadcast(buffer, size, root) ShrayBroadcast_normal(buffer, size, root)
-#define ShrayBarrier() ShrayBarrier_normal()
 #endif /* PROFILE */
 #endif /* DEBUG */
 
@@ -226,61 +202,4 @@ void ShrayBarrier_normal(void);
  *
  ******************************************************************************/
 
-/** <!--********************************************************************-->
- *
- * @fn void ShrayPrefetch(void *address, size_t size);
- *
- *   @brief Asynchronous prefetches subset of [address, address + size[.
- *
- *   @param address   Start of the memory we get (the system will round this up).
- *          size      Number of bytes we get (system will round this down).
- *
- ******************************************************************************/
-
-/** <!--********************************************************************-->
- *
- * @fn void ShrayDiscard(void *address);
- *
- *   @brief Hint to free prefetched memory [address, address + size[.
- *
- *   @param address  start of memory we free.
- *          size     number of bytes starting from address to free.
- *
- ******************************************************************************/
-
-/** <!--********************************************************************-->
- *
- * @fn void ShrayBroadcast(void *address, size_t size, int root);
- *
- *   @brief Lets node 'root' broadcast information to all other nodes,
- *          mainly useful if root gets some input that other nodes need.
- *
- *   @param buffer
- *          size
- *          root     Node 'root' communicates [buffer, buffer + size[ to
- *                   buffer on all other nodes.
- *
- ******************************************************************************/
-
-/* Example
- *
- * double duration;
- * TIME(duration, f(in, out); ShraySync(out););
- * printf("Executing f took %lf seconds.\n", duration);
- *
- * */
-#define TIME(duration, fncalls)                                        \
-    {                                                                  \
-        struct timeval tv1, tv2;                                       \
-        gettimeofday(&tv1, NULL);                                      \
-        fncalls                                                        \
-        gettimeofday(&tv2, NULL);                                      \
-        duration = (double) (tv2.tv_usec - tv1.tv_usec) / 1000000 +    \
-         (double) (tv2.tv_sec - tv1.tv_sec);                           \
-    }
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+#endif /* SHRAY__GUARD */

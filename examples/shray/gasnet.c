@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <sched.h>
 #include <gasnet.h>
+#include "../util/time.h"
 
 /* Takes care of error handling for GASNet functions that
  * return a success value. */
@@ -27,7 +28,7 @@ int main(int argc, char **argv)
     char host[80];
     if(gethostname(host, 80) != 0)
         host[0] = '\0';
-    printf("Hello world from %s! node %d/%d running on CPU %d!\n", 
+    printf("Hello world from %s! node %d/%d running on CPU %d!\n",
         host, gasnet_mynode(), gasnet_nodes(), sched_getcpu());
 
     gasnet_exit(0);

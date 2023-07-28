@@ -1,5 +1,6 @@
 #include <shray2/shray.h>
 #include "../util/csr.h"
+#include "../util/time.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,7 +86,7 @@ int main(int argc, char **argv)
     }
     fprintf(stderr, "The state vector should converge to all %10e's.\n"
                     "The maximum error after %ld iterations is in state %ld,\n"
-                    "with %10e (error %10e)\n", 
+                    "with %10e (error %10e)\n",
                     1.0 / n, iterations, argmax, vector[argmax], max);
 #endif
 

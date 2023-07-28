@@ -11,21 +11,14 @@ foreach(suffix
 
 	foreach(file
 			cg
-			norm
 			1dstencil
 			1dstencil_mt
 			bandwidth
-			matrix
 			matrixAuto
 			monopoly
 			monopoly_mt
-			gasnet
-			random
 			reduce
-			segfault
-			segfault_prefetch
 			sync
-			synctest
 			spmv
 			spmv_mt
 		)

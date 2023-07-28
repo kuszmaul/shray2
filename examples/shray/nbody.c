@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <shray2/shray.h>
+#include "../util/time.h"
 
 #define min(a, b) ((a) < (b) ? a : b)
 
@@ -82,9 +83,6 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
         accel[i].z = 0.0;
     }
 
-    ShrayPrefetch(&positions[(s + 1) % p * n / p], n / p * sizeof(Point));
-    ShrayPrefetch(&masses[(s + 1) % p * n / p], n / p * sizeof(double));
-
     accelerateHelp(accel, positions, masses, localStart, localEnd, block);
 
     /* Accelerate with respect to P(t) and prefetch the next block (we pretend we have a loop, so
@@ -95,14 +93,9 @@ void accelerateAll(Point *accel, Point *positions, double *masses, size_t n)
 
         if ((t + 1) % p != s) {
             size_t startNext = (t + 1) % p * n / p;
-            ShrayPrefetch(&positions[startNext], n / p * sizeof(Point));
-            ShrayPrefetch(&masses[startNext], n / p * sizeof(double));
         }
 
         accelerateHelp(accel, positions, masses, startT, endT, block);
-
-        ShrayDiscard(&positions[startT], n / p * sizeof(Point));
-        ShrayDiscard(&masses[startT], n / p * sizeof(double));
     }
 }
 

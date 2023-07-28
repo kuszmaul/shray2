@@ -4,6 +4,7 @@
 #include <string.h>
 #include <omp.h>
 #include <shray2/shray.h>
+#include "../util/time.h"
 
 #define T float
 

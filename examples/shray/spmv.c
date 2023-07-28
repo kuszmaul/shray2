@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include "../util/time.h"
 
 void init(double *a)
 {

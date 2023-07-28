@@ -1,5 +1,6 @@
 #include <shray2/shray.h>
 #include "../util/csr.h"
+#include "../util/time.h"
 
 #include <stdio.h>
 #include <stdlib.h>

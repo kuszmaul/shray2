@@ -10,15 +10,10 @@ foreach(fn
 		ShrayEnd
 		ShraySync
 		ShrayFree
-		ShrayPrefetch
-		ShrayDiscard
-		ShrayRunWorker
 		ShrayReport
 		ShrayRank
 		ShraySize
 		ShrayFinalize
-		ShrayBroadcast
-		ShrayBarrier
 	)
 	string(REPLACE "${fn}" "${fn}_debug" FILE_CONTENTS_DEBUG
 		"${FILE_CONTENTS_DEBUG}")

@@ -3,6 +3,7 @@
 #include <gasnet.h>
 #include <gasnet_coll.h>
 #include <shray2/shray.h>
+#include "../util/time.h"
 
 void gasnetBarrier(void)
 {

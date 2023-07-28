@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <omp.h>
+#include "../util/time.h"
 
 void init(double *a)
 {
