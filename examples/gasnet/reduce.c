@@ -132,6 +132,7 @@ int main(int argc, char **argv)
             TIME(duration, result = reduce(A, n);)
             bandwidth = 8.0 * (n - (n + p - 1) / p) / 1e6 / duration;
             fprintf(stderr, "Sum is %lf\n", result);
+            fprintf(stderr, "%lf\n", duration);
         }
         count++;
         double delta_pre = bandwidth - mean;

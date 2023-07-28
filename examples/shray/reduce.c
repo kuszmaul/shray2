@@ -88,9 +88,10 @@ int main(int argc, char **argv)
             double duration;
             double result;
             TIME(duration, result = reduceAuto(arr, n););
-            fprintf(stderr, (result == n - ShrayStart(arr)) ?
+            fprintf(stderr, (result == n - ShrayEnd(arr)) ?
                     "Success\n" : "Failure\n");
-            bandwidth = 8.0 * (n - ShrayStart(arr))  / 1e6 / duration;
+            fprintf(stderr, "%lf\n", duration);
+           bandwidth = 8.0 * (n - ShrayEnd(arr))  / 1e6 / duration;
         }
         count++;
         double delta_pre = bandwidth - mean;
