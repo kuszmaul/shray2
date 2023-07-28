@@ -14,6 +14,9 @@ foreach(fn
 		ShrayRank
 		ShraySize
 		ShrayFinalize
+        ShrayWriteBuf
+        ShrayCommit
+        ShrayUncommit
 	)
 	string(REPLACE "${fn}" "${fn}_debug" FILE_CONTENTS_DEBUG
 		"${FILE_CONTENTS_DEBUG}")
