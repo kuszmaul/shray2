@@ -10,5 +10,5 @@
 #SBATCH --output=reduce_NODES.out
 #SBATCH --exclusive
 
-mpirun ../build/examples/gasnet/reduce_gasnet 1000000 10 PAGE >> reduce_PAGE_NODES.tex 
-SHRAY_CACHELINE=PAGE mpirun ../build/examples/shray/reduce_normal_shray 1000000 10 >> reduce_PAGE_NODES.tex
+mpirun ../build/examples/gasnet/reduce_gasnet 10000000 10 PAGE >> reduce_PAGE_NODES.tex 
+SHRAY_CACHELINE=PAGE mpirun ../build/examples/shray/reduce_normal_shray 10000000 10 >> reduce_PAGE_NODES.tex
