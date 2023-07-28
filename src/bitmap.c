@@ -159,7 +159,7 @@ void BitmapReset(Bitmap *bitmap)
     MUNMAP_SAFE(bitmap->bits, roundUp(bitmap->size, 64) * sizeof(uint64_t));
     MMAP_SAFE(bitmap->bits, mmap(NULL, roundUp(bitmap->size, 64)
                 * sizeof(uint64_t),
-                * PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+                PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
 }
 
 void BitmapPrint(Bitmap *bitmap)
