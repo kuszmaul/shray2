@@ -73,9 +73,9 @@ proc main() {
         //    writeln("Locale ", here.id, " AD(", i, ") = ", AD(i));
         //    AD(i) = A(i);
         //}
+        allLocalesBarrier.barrier();
     }
 
-    allLocalesBarrier.barrier();
 
     stderr.writeln("AD initialized");
 
@@ -147,8 +147,8 @@ proc conjGrad(A: [?MatDom], X: [?VectDom]) {
         for i in VectDom.localSubdomain() {
             Q(i) = + reduce [j in MatDom.dimIter(1, i)] (A(i, j) * P(j));
         }
+        allLocalesBarrier.barrier();
     }
-    allLocalesBarrier.barrier();
 
     const alpha = rho / + reduce (P*Q);
     Z += alpha*P;
@@ -169,8 +169,8 @@ proc conjGrad(A: [?MatDom], X: [?VectDom]) {
     for i in VectDom.localSubdomain() {
         R(i) = + reduce [j in MatDom.dimIter(1, i)] (A(i, j) * Z(j));
     }
+    allLocalesBarrier.barrier();
   }
-  allLocalesBarrier.barrier();
   const rnorm = sqrt(+ reduce ((X-R)**2));
 
   return (Z, rnorm);
