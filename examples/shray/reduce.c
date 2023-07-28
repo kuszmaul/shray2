@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+#include "../util/time.h"
 
 void init(double *arr)
 {
@@ -52,7 +54,7 @@ double reduceAuto(double *arr, size_t n)
 {
     double sum = 0.0;
 
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = ShrayStart(arr); i < n; i++) {
         sum += arr[i];
     }
 
@@ -63,29 +65,50 @@ int main(int argc, char **argv)
 {
     ShrayInit(&argc, &argv);
 
-    if (argc != 2) {
-        printf("Usage: n\n");
+    if (argc != 3) {
+        printf("Usage: n NITER\n");
         ShrayFinalize(1);
     }
     size_t n = atol(argv[1]);
-    assert(n % ShraySize() == 0);
+    int niter = atoi(argv[2]);
 
-    double *arr = (double *)ShrayMalloc(n, n * sizeof(double));
+    double *bandwidths = (double *)malloc(niter * sizeof(double));
 
-    init(arr);
-    ShraySync(arr);
+    for (int t = 0; t < niter; t++) {
+        double *arr = (double *)ShrayMalloc(n, n * sizeof(double));
 
-    double result = reduce(arr, n);
-    ShrayFree(arr);
+        init(arr);
+        ShraySync(arr);
+
+        if (ShrayRank() == 0) {
+            double duration;
+            double result;
+            TIME(duration, result = reduceAuto(arr, n););
+            fprintf(stderr, (result == n - ShrayStart(arr)) ?
+                    "Success\n" : "Failure\n");
+            bandwidths[t] = 8.0 * (n - ShrayStart(arr))  / 1e6 / duration;
+        }
+
+        ShrayFree(arr);
+    }
+
+    /* Wellfords algorithm may be overkill, but numerical stability is nice. */
+    int count = 0;
+    double mean = 0;
+    double m2 = 0;
+    for (int t = 0; t < niter; t++) {
+        count++;
+        double delta_pre = bandwidths[t] - mean;
+        mean += delta_pre / count;
+        double delta_post = bandwidths[t] - mean;
+        m2 += delta_pre * delta_post;
+    }
+
+    printf(" %lf & %lf \\\\\n", mean, sqrt(m2 / count));
+
+    free(bandwidths);
 
     ShrayReport();
-
-    if (result == n) {
-        printf("Success from node %d\n", ShrayRank());
-    } else {
-        printf("Failure from node %d (%lf != %lf)\n", ShrayRank(), result,
-               (double)n);
-    }
 
     ShrayFinalize(0);
 }
