@@ -8,32 +8,33 @@
 
 size_t pagesz;
 
-#define GASNET_SAFE(fncall)                                                              \
-    {                                                                                    \
-        int retval;                                                                      \
-        if ((retval = fncall) != GASNET_OK) {                                            \
-            printf("Error during GASNet call\n");                                        \
-            gasnet_exit(1);                                                              \
-        }                                                                                \
+#define GASNET_SAFE(fncall)                                                   \
+    {                                                                         \
+        int retval;                                                           \
+        if ((retval = fncall) != GASNET_OK) {                                 \
+            printf("Error during GASNet call\n");                             \
+            gasnet_exit(1);                                                   \
+        }                                                                     \
     }
 
-#define MMAP_SAFE(variable, address, length, prot)                                      \
-    {                                                                                   \
-        variable = mmap(address, length, prot, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);     \
-        if (variable == MAP_FAILED) {                                                   \
-            fprintf(stderr, "mmap failed");                                             \
-            gasnet_exit(1);                                                             \
-        }                                                                               \
+#define MMAP_SAFE(variable, address, length, prot)                            \
+    {                                                                         \
+        variable = mmap(address, length, prot,                                \
+                MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);                          \
+        if (variable == MAP_FAILED) {                                         \
+            fprintf(stderr, "mmap failed");                                   \
+            gasnet_exit(1);                                                   \
+        }                                                                     \
     }
 
-#define MMAP_FIXED_SAFE(address, length, prot)                                          \
-    {                                                                                   \
-        void *success = mmap(address, length, prot,                                     \
-                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);                        \
-        if (success == MAP_FAILED) {                                                    \
-            printf("mmap failed");                                                      \
-            gasnet_exit(1);                                                             \
-        }                                                                               \
+#define MMAP_FIXED_SAFE(address, length, prot)                                \
+    {                                                                         \
+        void *success = mmap(address, length, prot,                           \
+                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);              \
+        if (success == MAP_FAILED) {                                          \
+            printf("mmap failed");                                            \
+            gasnet_exit(1);                                                   \
+        }                                                                     \
     }
 
 void gasnetBarrier()
@@ -79,20 +80,18 @@ double reduce(double *A, size_t n)
     size_t double_per_page = pagesz / sizeof(double);
     size_t blocksize = (n + p - 1) / p;
 
-    if (gasnet_mynode() == 0) {
-        double *buffer = malloc(pagesz);
+    double *buffer = malloc(pagesz);
 
-        /* Remote parts */
-        for (size_t j = blocksize; j < n; j += double_per_page) {
-            int processor = j / blocksize;
-            gasnet_get(buffer, processor, A + j, pagesz);
-            for (size_t i = 0; i < double_per_page; i++) {
-                result += buffer[i];
-            }
+    /* Remote parts */
+    for (size_t j = blocksize; j < n; j += double_per_page) {
+        int processor = j / blocksize;
+        gasnet_get(buffer, processor, A + j, pagesz);
+        for (size_t i = 0; i < double_per_page; i++) {
+            result += buffer[i];
         }
-
-        free(buffer);
     }
+
+    free(buffer);
 
     return result;
 }
