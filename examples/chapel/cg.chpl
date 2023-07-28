@@ -33,7 +33,6 @@ config const numTrials = 1,
              printTiming = true,
              printError = true;
 
-
 proc main() {
   /* To reduce the chance of me messing up, we first build A redundantly on each node,
      and then copy the local parts over to a distributed Ad. This limits the size of A to
@@ -69,10 +68,6 @@ proc main() {
 
     coforall loc in Locales do on loc {
         AD(AD.localSubdomain()) = A(AD.localSubdomain());
-        //for i in AD.localSubdomain() {
-        //    writeln("Locale ", here.id, " AD(", i, ") = ", AD(i));
-        //    AD(i) = A(i);
-        //}
         allLocalesBarrier.barrier();
     }
 
@@ -80,8 +75,6 @@ proc main() {
     stderr.writeln("AD initialized");
 
   const VectorSpace = {1..n};
-//  var X: [VectorSpace] elemType,
-//      zeta = 0.0;
   const VSD: domain(1) dmapped Block(boundingBox=VectorSpace) = VectorSpace;
   var X: [VSD] elemType,
         zeta = 0.0;
@@ -144,7 +137,7 @@ proc conjGrad(A: [?MatDom], X: [?VectDom]) {
 //    [i in MatDom.dim(0)] Q(i) = + reduce [j in MatDom.dimIter(1,i)] (A(i,j) * P(j));
     //
     coforall loc in Locales do on loc {
-        for i in VectDom.localSubdomain() {
+        forall i in VectDom.localSubdomain() {
             Q(i) = + reduce [j in MatDom.dimIter(1, i)] (A(i, j) * P(j));
         }
         allLocalesBarrier.barrier();
@@ -166,7 +159,7 @@ proc conjGrad(A: [?MatDom], X: [?VectDom]) {
   //
 
   coforall loc in Locales do on loc {
-    for i in VectDom.localSubdomain() {
+    forall i in VectDom.localSubdomain() {
         R(i) = + reduce [j in MatDom.dimIter(1, i)] (A(i, j) * Z(j));
     }
     allLocalesBarrier.barrier();
