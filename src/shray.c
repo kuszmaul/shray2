@@ -561,7 +561,8 @@ void ShrayFinalize(int exit_code)
 
 void * ShrayWriteBuf(void *address, size_t size)
 {
-    if ((address % Shray_Pagesz != 0) || (size % Shray_Pagesz != 0)) {
+    if (((uintptr_t)address % Shray_Pagesz != 0) ||
+         (size % Shray_Pagesz != 0)) {
         fprintf(stderr, "ShrayWriteBuf: [address, address + size[ must "
                         "have alignment %zu\n", Shray_Pagesz);
     }
