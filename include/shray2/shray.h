@@ -68,6 +68,9 @@ void ShrayUncommit_normal(void *address, size_t size);
 #define ShrayRank() ShrayRank_debug()
 #define ShraySize() ShraySize_debug()
 #define ShrayFinalize(exit_code) ShrayFinalize_debug(exit_code)
+#define ShrayWriteBuf(address, size) ShrayWriteBuf_debug(address, size)
+#define ShrayCommit(buf, address, size) ShrayCommit_debug(buf, address, size)
+#define ShrayUncommit(address, size) ShrayUncommit_debug(address, size)
 
 #else
 #ifdef PROFILE
@@ -82,6 +85,9 @@ void ShrayUncommit_normal(void *address, size_t size);
 #define ShrayRank() ShrayRank_profile()
 #define ShraySize() ShraySize_profile()
 #define ShrayFinalize(exit_code) ShrayFinalize_profile(exit_code)
+#define ShrayWriteBuf(address, size) ShrayWriteBuf_profile(address, size)
+#define ShrayCommit(buf, address, size) ShrayCommit_profile(buf, address, size)
+#define ShrayUncommit(address, size) ShrayUncommit_profile(address, size)
 
 #else
 #define ShrayInit(argc, argv) ShrayInit_normal(argc, argv)
@@ -94,6 +100,9 @@ void ShrayUncommit_normal(void *address, size_t size);
 #define ShrayRank() ShrayRank_normal()
 #define ShraySize() ShraySize_normal()
 #define ShrayFinalize(exit_code) ShrayFinalize_normal(exit_code)
+#define ShrayWriteBuf(address, size) ShrayWriteBuf_normal(address, size)
+#define ShrayCommit(buf, address, size) ShrayCommit_normal(buf, address, size)
+#define ShrayUncommit(address, size) ShrayUncommit_normal(address, size)
 #endif /* PROFILE */
 #endif /* DEBUG */
 
