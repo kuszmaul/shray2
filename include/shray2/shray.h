@@ -22,6 +22,9 @@ void ShrayReport_debug(void);
 __attribute__((pure)) unsigned int ShrayRank_debug(void);
 __attribute__((pure)) unsigned int ShraySize_debug(void);
 void ShrayFinalize_debug(int exit_code) __attribute__ ((noreturn));
+void * ShrayWriteBuf_debug(void *address, size_t size);
+void ShrayCommit_debug(void * buf, void *address, size_t size);
+void ShrayUncommit_debug(void *address, size_t size);
 
 /* Profile declarations */
 void ShrayInit_profile(int *argc, char ***argv);
@@ -34,6 +37,9 @@ void ShrayReport_profile(void);
 __attribute__((pure)) unsigned int ShrayRank_profile(void);
 __attribute__((pure)) unsigned int ShraySize_profile(void);
 void ShrayFinalize_profile(int exit_code) __attribute__ ((noreturn));
+void * ShrayWriteBuf_profile(void *address, size_t size);
+void ShrayCommit_profile(void * buf, void *address, size_t size);
+void ShrayUncommit_profile(void *address, size_t size);
 
 /* Normal declarations */
 void ShrayInit_normal(int *argc, char ***argv);
@@ -46,6 +52,9 @@ void ShrayReport_normal(void);
 __attribute__((pure)) unsigned int ShrayRank_normal(void);
 __attribute__((pure)) unsigned int ShraySize_normal(void);
 void ShrayFinalize_normal(int exit_code) __attribute__ ((noreturn));
+void * ShrayWriteBuf_normal(void *address, size_t size);
+void ShrayCommit_normal(void * buf, void *address, size_t size);
+void ShrayUncommit_normal(void *address, size_t size);
 
 #ifdef DEBUG
 
