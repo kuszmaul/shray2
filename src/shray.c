@@ -561,58 +561,27 @@ void ShrayFinalize(int exit_code)
 
 void * ShrayWriteBuf(void *address, size_t size)
 {
-    /* If the start or end of [address, address + size[ are not page-aligned,
-     * we fill them up asynchronously. We allocate an extra page to store
-     * the handle in. */
+    if ((address % Shray_Pagesz != 0) || (size % Shray_Pagesz != 0)) {
+        fprintf(stderr, "ShrayWriteBuf: [address, address + size[ must "
+                        "have alignment %zu\n", Shray_Pagesz);
+    }
+
     void *result;
-    uintptr_t pagestart = roundDownPage((uintptr_t)address);
-    uintptr_t pageend = roundUpPage((uintptr_t)address + size);
-    MMAP_SAFE(result, NULL, pageend - pagestart + 2 * sizeof(gasnet_handle_t),
-            PROT_WRITE);
+    MMAP_SAFE(result, NULL, size, PROT_WRITE);
 
-    Allocation *alloc = findAlloc(address);
-    uintptr_t difference = pagestart - alloc->location;
-    unsigned int owner = difference / alloc->bytesPerBlock;
-    size_t nbytes = (uintptr_t)address - pagestart;
-    gasnet_handle_t *handle = (gasnet_handle_t *)
-                        ((uintptr_t)result + pageend - pagestart);
-    if (nbytes != 0) {
-        *handle = gasnet_get_nb_bulk(result, owner, (void *)pagestart, nbytes);
-    }
-
-    uintptr_t offset = (uintptr_t)address - pagestart;
-    difference = pageend - Shray_Pagesz - alloc->location;
-    owner = difference / alloc->bytesPerBlock;
-    nbytes = pageend - ((uintptr_t)address + size);
-    handle = (gasnet_handle_t *)((uintptr_t)result + pageend - pagestart
-            + sizeof(gasnet_handle_t));
-    if (nbytes != 0) {
-        *handle = gasnet_get_nb_bulk((void *)((uintptr_t)result + offset +
-                    size), owner, (void *)((uintptr_t)address + size), nbytes);
-    }
-
-    return (void *)((uintptr_t)result + offset);
+    return result;
 }
 
 void ShrayCommit(void *buf, void *address, size_t size)
 {
-    uintptr_t pagestart = roundDownPage((uintptr_t)address);
-    uintptr_t pageend = roundUpPage((uintptr_t)address + size);
-    if (pagestart != (uintptr_t)address) {
-        gasnet_handle_t *handle = (gasnet_handle_t *)((uintptr_t)buf + size);
-        gasnet_wait_syncnb(*handle);
-    }
-    if (pageend != (uintptr_t)address + size) {
-        gasnet_handle_t *handle = (gasnet_handle_t *)((uintptr_t)buf + size +
-            sizeof(gasnet_handle_t));
-        gasnet_wait_syncnb(*handle);
-    }
-
-    MREMAP_MOVE((void *)roundDownPage((uintptr_t)address), buf,
-        pageend - pagestart);
+    lock();
+    MREMAP_MOVE(address, buf, size);
+    unlock();
 }
 
 void ShrayUncommit(void *address, size_t size)
 {
-    freeRAM(roundDownPage((uintptr_t)address), (uintptr_t)address + size);
+    lock();
+    freeRAM((uintptr_t)address, (uintptr_t)address + size);
+    unlock();
 }

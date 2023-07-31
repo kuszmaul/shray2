@@ -206,7 +206,7 @@ void ShrayFinalize_normal(int exit_code) __attribute__ ((noreturn));
  *
  * @fn void * ShrayWriteBuf(void *address, size_t size)
  *
- *   @brief         If you want to do gasnet communication on
+ *   @brief         If you want to do gasnet communication on page-aligned
  *                  [address, address + size[ not a subset of the partition you
  *                  own, you can do it on the buffer returned by this call.
  *                  When done, commit your result with a call to
