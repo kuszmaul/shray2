@@ -671,9 +671,8 @@ c-------------------------------------------------------------------*/
         NGA_Access(g_p, lo_p, hi_p, &p, ld_tmp);
         NGA_Access(g_colidx, lo_colidx, hi_colidx, &colidx, ld_tmp);
         NGA_Access(g_a, lo_a, hi_a, &a, ld_tmp);
-	int diff = hi_q[0] - lo_q[0] + 1;
-	#pragma omp parallel for
-        for (int j = 0; j < diff; j++) {
+	#pragma omp parallel for private(sum)
+        for (int j = 0; j <= hi_q[0] - lo_q[0]; j++) {
             sum = 0.0;
     	    for (size_t k = rowstr[j]; k < rowstr[j+1]; k++) {
                     int lo[1];
@@ -685,7 +684,7 @@ c-------------------------------------------------------------------*/
 		    lo[0] = k;
 		    hi[0] = k;
 
-		    if (lo_colidx[0] <= k && k <= hi_colidx[0]) {
+		    if ((size_t)lo_colidx[0] <= k && k <= (size_t)hi_colidx[0]) {
 			col = colidx[k - lo_colidx[0]];
 		    } else {
 			#pragma omp critical
@@ -693,7 +692,7 @@ c-------------------------------------------------------------------*/
                     	NGA_Get(g_colidx, lo, hi, &col, ld);
 			}
 		    }
-		    if (lo_a[0] <= k && k <= hi_a[0]) {
+		    if ((size_t)lo_a[0] <= k && k <= (size_t)hi_a[0]) {
 			aval = a[k - lo_a[0]];
 		    } else {
 			#pragma omp critical
@@ -706,7 +705,7 @@ c-------------------------------------------------------------------*/
 		    lo[0] = col;
 		    hi[0] = col;
 
-		    if (lo_p[0] <= col && col <= hi_p[0]) {
+		    if ((size_t)lo_p[0] <= col && col <= (size_t)hi_p[0]) {
 			vval = p[col - lo_p[0]];
 		    } else {
 			#pragma omp critical
@@ -800,7 +799,7 @@ c---------------------------------------------------------------------*/
 		    lo[0] = k;
 		    hi[0] = k;
 
-		    if (lo_colidx[0] <= k && k <= hi_colidx[0]) {
+		    if ((size_t)lo_colidx[0] <= k && k <= (size_t)hi_colidx[0]) {
 			col = colidx[k - lo_colidx[0]];
 		    } else {
 			#pragma omp critical
@@ -808,7 +807,7 @@ c---------------------------------------------------------------------*/
                     	NGA_Get(g_colidx, lo, hi, &col, ld);
 			}
 		    }
-		    if (lo_a[0] <= k && k <= hi_a[0]) {
+		    if ((size_t)lo_a[0] <= k && k <= (size_t)hi_a[0]) {
 			aval = a[k - lo_a[0]];
 		    } else {
 			#pragma omp critical
@@ -821,7 +820,7 @@ c---------------------------------------------------------------------*/
 		    lo[0] = col;
 		    hi[0] = col;
 
-		    if (lo_z[0] <= col && col <= hi_z[0]) {
+		    if ((size_t)lo_z[0] <= col && col <= (size_t)hi_z[0]) {
 			vval = z[col - lo_p[0]];
 		    } else {
 			#pragma omp critical
