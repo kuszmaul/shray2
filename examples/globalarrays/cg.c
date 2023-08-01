@@ -548,7 +548,7 @@ c-------------------------------------------------------------------*/
     	        fprintf(stderr, " VERIFICATION FAILED\n");
     	        fprintf(stderr, " Zeta                %20.12e\n", zeta);
     	        fprintf(stderr, " The correct zeta is %20.12e\n", zeta_verify_value);
-		//GA_Error("Failed verification", 1);
+		GA_Error("Failed verification", 1);
     	    }
         } else {
     	    fprintf(stderr, " Problem size unknown\n");
