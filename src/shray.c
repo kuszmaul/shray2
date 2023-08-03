@@ -218,7 +218,7 @@ static void handlePageFault(void *address)
 
     DBUG_PRINT("We set page %zu to locally available.", pageNumber);
 
-    BitmapSetOnes(alloc->local, pageNumber, pageNumber + 1);
+    BitmapSetOne(alloc->local, pageNumber);
     ringbuffer_add(alloc->autoCaches, alloc, (void*)roundedAddress);
 }
 

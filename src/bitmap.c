@@ -123,35 +123,10 @@ void BitmapSetZeroes(Bitmap *bitmap, size_t start, size_t end)
     }
 }
 
-/* Sets [start, end[ to one. */
-void BitmapSetOnes(Bitmap *bitmap, size_t start, size_t end)
+void BitmapSetOne(Bitmap *bitmap, size_t index)
 {
-    /* Number of bits to be set to one in the first / last uint64_t. */
-    int firstOnes = 64 - bit(start);
-    int lastOnes = 1 + bit(end - 1);
-    size_t startIndex = integer(start);
-    size_t endIndex = integer(end - 1);
-    /* Has ones at the bits we want to set to one. */
-    uint64_t firstOnesMask = (firstOnes == 64) ?
-        0xFFFFFFFFFFFFFFFFu : ~(0xFFFFFFFFFFFFFFFFu << firstOnes);
-    uint64_t lastOneMask = (lastOnes == 64) ?
-        0xFFFFFFFFFFFFFFFFu : ~(0xFFFFFFFFFFFFFFFFu >> lastOnes);
-
-    if (startIndex == endIndex) {
-        bitmap->bits[startIndex] |= firstOnesMask & lastOneMask;
-        return;
-    }
-
-    bitmap->bits[startIndex] |= firstOnesMask;
-
-    bitmap->bits[endIndex] |= lastOneMask;
-
-    /* Sets the rest of the bits to 1, one integer at a time. Did not use
-     * memset as it uses char, whose size and representation is implementation
-     * defined */
-    for (long i = integer(start) + 1; i < (long)integer(end - 1); i++) {
-        bitmap->bits[i] = 0xFFFFFFFFFFFFFFFFu;
-    }
+    uint64_t mask = 0x8000000000000000u >> bit(index);
+    bitmap->bits[integer(index)] |= mask;
 }
 
 void BitmapReset(Bitmap *bitmap)

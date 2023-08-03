@@ -22,8 +22,8 @@ void BitmapFree(Bitmap *bitmap);
 /* Sets [start, end[ to zero. */
 void BitmapSetZeroes(Bitmap *bitmap, size_t start, size_t end);
 
-/* Sets [start, end[ to one. */
-void BitmapSetOnes(Bitmap *bitmap, size_t start, size_t end);
+/* Sets index'th bit to one. */
+void BitmapSetOne(Bitmap *bitmap, size_t index);
 
 /* Sets everything to zero, more performant than BitmapSetZeroes and frees
  * up memory. */
