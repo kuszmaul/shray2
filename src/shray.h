@@ -30,9 +30,6 @@ typedef struct Allocation {
     /* The number of bytes owned by each node except the last one. */
     size_t bytesPerBlock;
     Bitmap *local;
-    /* We put all fetched stuff here until it is remapped to the
-     * proper position. */
-    void *shadowPage;
     /* Cache for segfaults. */
     ringbuffer_t *autoCaches;
 } Allocation;

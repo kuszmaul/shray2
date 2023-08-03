@@ -198,10 +198,11 @@ static void handlePageFault(uintptr_t roundedAddress, Allocation *alloc)
 
     DBUG_PRINT("Segfault is owned by node %d.", owner);
 
-    gasnet_get(alloc->shadowPage, owner, (void *)roundedAddress, Shray_Pagesz);
+    void *shadowPage;
+    MMAP_SAFE(shadowPage, NULL, Shray_Pagesz, PROT_WRITE);
+    gasnet_get(shadowPage, owner, (void *)roundedAddress, Shray_Pagesz);
 
-    MREMAP_MOVE((void *)roundedAddress, alloc->shadowPage, Shray_Pagesz);
-    MMAP_FIXED_SAFE(alloc->shadowPage, Shray_Pagesz, PROT_READ | PROT_WRITE);
+    MREMAP_MOVE((void *)roundedAddress, shadowPage, Shray_Pagesz);
 }
 
 static inline void atomic_clear(bool *p)
@@ -357,10 +358,6 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
         MMAP_FIXED_SAFE(location, totalSize + Shray_Pagesz, PROT_NONE);
     }
 
-    void *shadowPage;
-    MMAP_SAFE(shadowPage, NULL, Shray_Pagesz, PROT_WRITE);
-    DBUG_PRINT("We allocate shadow %p", shadowPage);
-
     /* Insert allocation into the heap, making sure allocs stays sorted. */
     heap.numberOfAllocs++;
     if (heap.numberOfAllocs > heap.size / sizeof(Allocation)) {
@@ -384,7 +381,6 @@ void *ShrayMalloc(size_t firstDimension, size_t totalSize)
     alloc->location = (uintptr_t)location;
     alloc->size = totalSize;
     alloc->bytesPerBlock = bytesPerBlock;
-    alloc->shadowPage = shadowPage;
 
     size_t segmentLength = endRead(alloc, Shray_rank) -
                            startRead(alloc, Shray_rank);
