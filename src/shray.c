@@ -235,11 +235,12 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
     DBUG_PRINT("Segfault %p", address);
 
     uintptr_t roundedAddress = roundDownPage((uintptr_t)address);
-    Allocation *alloc = findAlloc((void *)roundedAddress);
-    size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
 
     bool mine = false;
     lock();
+    Allocation *alloc = findAlloc((void *)roundedAddress);
+    size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
+
     if (!BitmapCheck(alloc->local, pageNumber)) {
         SEGFAULTCOUNT;
         mine = true;
