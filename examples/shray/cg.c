@@ -241,8 +241,14 @@ int main(int argc, char **argv) {
         NITER = 75;
         SHIFT = 110.0;
 	    zeta_verify_value = 28.973605592845;
+    } else if (!strcmp(class, "D")) {
+        NA = 1500000;
+        NONZER = 21;
+        NITER = 100;
+        SHIFT = 500.0;
+	    zeta_verify_value = 52.5145321058;
     } else {
-        fprintf(stderr, "Error, class should be in {S, W, A, B, C}\n");
+        fprintf(stderr, "Error, class should be in {S, W, A, B, C, D}\n");
         return EXIT_FAILURE;
     }
 
