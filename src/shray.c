@@ -191,21 +191,8 @@ static inline int isNextPage(void *x, void *y)
     return (uintptr_t)y - (uintptr_t)x == Shray_Pagesz;
 }
 
-static void handlePageFault(void *address)
+static void handlePageFault(uintptr_t roundedAddress, Allocation *alloc)
 {
-    uintptr_t roundedAddress = roundDownPage((uintptr_t)address);
-
-    Allocation *alloc = findAlloc((void *)roundedAddress);
-
-    size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
-    DBUG_PRINT("Page %zu", pageNumber);
-
-    if (ringbuffer_full(alloc->autoCaches)) {
-        cache_entry_t *entry = ringbuffer_front(alloc->autoCaches);
-        DBUG_PRINT("Cache buffer is full, evicting %p", entry->start);
-        evictCacheEntry(alloc, (uintptr_t)entry->start, 1);
-    }
-
     uintptr_t difference = roundedAddress - alloc->location;
     unsigned int owner = difference / alloc->bytesPerBlock;
 
@@ -215,11 +202,6 @@ static void handlePageFault(void *address)
 
     MREMAP_MOVE((void *)roundedAddress, alloc->shadowPage, Shray_Pagesz);
     MMAP_FIXED_SAFE(alloc->shadowPage, Shray_Pagesz, PROT_READ | PROT_WRITE);
-
-    DBUG_PRINT("We set page %zu to locally available.", pageNumber);
-
-    BitmapSetOne(alloc->local, pageNumber);
-    ringbuffer_add(alloc->autoCaches, alloc, (void*)roundedAddress);
 }
 
 static inline void atomic_clear(bool *p)
@@ -242,14 +224,6 @@ static inline void unlock()
     atomic_clear(&thread_lock);
 }
 
-static inline int pageFaultHandled(uintptr_t address)
-{
-    uintptr_t roundedAddress = roundDownPage(address);
-    Allocation *alloc = findAlloc((void *)roundedAddress);
-    size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
-    return BitmapCheck(alloc->local, pageNumber);
-}
-
 static void SegvHandler(int sig, siginfo_t *si, void *unused)
 {
     (void)sig;
@@ -259,12 +233,28 @@ static void SegvHandler(int sig, siginfo_t *si, void *unused)
 
     DBUG_PRINT("Segfault %p", address);
 
+    uintptr_t roundedAddress = roundDownPage((uintptr_t)address);
+    Allocation *alloc = findAlloc((void *)roundedAddress);
+    size_t pageNumber = (roundedAddress - alloc->location) / Shray_Pagesz;
+
+    bool mine = false;
     lock();
-    SEGFAULTCOUNT;
-    if (!pageFaultHandled((uintptr_t)address)) {
-        handlePageFault(address);
+    if (!BitmapCheck(alloc->local, pageNumber)) {
+        SEGFAULTCOUNT;
+        mine = true;
+        BitmapSetOne(alloc->local, pageNumber);
+        if (ringbuffer_full(alloc->autoCaches)) {
+            cache_entry_t *entry = ringbuffer_front(alloc->autoCaches);
+            DBUG_PRINT("Cache buffer is full, evicting %p", entry->start);
+            evictCacheEntry(alloc, (uintptr_t)entry->start, 1);
+        }
+        ringbuffer_add(alloc->autoCaches, alloc, (void*)roundedAddress);
     }
     unlock();
+
+    if (mine) {
+        handlePageFault(roundedAddress, alloc);
+    }
 }
 
 static void registerHandlers(void)

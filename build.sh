@@ -22,7 +22,7 @@ cmake \
 	-DEXAMPLES=ON \
 	-DChapel_ROOT_DIR="${HOME}/.local" \
 	-DGASNet_CONDUIT=mpi \
-	-DGASNet_THREADING=parsync \
+	-DGASNet_THREADING=par \
 	-DGASNet_ROOT_DIR="${HOME}/.local" \
 	-DSANITISE=OFF \
 	-S . \
