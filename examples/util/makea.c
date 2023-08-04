@@ -202,7 +202,12 @@ int main(int argc, char **argv) {
         NONZER = 21;
         NITER = 100;
         SHIFT = 500.0;
-    } else {
+    } else if (!strcmp(class, "E")) {
+        NA = 9000000;
+        NONZER = 26;
+        NITER = 100;
+        SHIFT = 1.5;
+    }else {
         fprintf(stderr, "Error, class should be in {S, W, A, B, C}\n");
         return EXIT_FAILURE;
     }
