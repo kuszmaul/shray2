@@ -239,32 +239,6 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 		done
 	done
 
-	# Sparse matrix-vector multiplication (monopoly)
-	for size in 204800; do # 20480000; do
-		for iterations in 5; do
-			printf '\nBenchmark spmv monopoly (run %s, %s, %s tasks, %s nodes, %s x %s, %s iter)\n' \
-				"$i" \
-				"__THREADTYPE__" \
-				"__NTASKS__" \
-				"__NODES__" \
-				"$size" \
-				"$size" \
-				"$iterations"
-
-m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
-			runtest shray ompi monopoly_mt "$size $iterations" "$i" "$size" "$iterations"
-			runtest globalarrays mpich monopoly_mt "$size $iterations" "$i" "$size" "$iterations"
-			runtest fortran mpich monopoly_mt "$size $iterations" "$i" "$size" "$iterations"
-			runtest chapel ompi monopoly "$size $iterations" "$i" "--n=$size" "--iterations=$iterations"
-]]], [[[m4_dnl
-			runtest shray ompi monopoly "$size $iterations" "$i" "$size" "$iterations"
-			runtest globalarrays mpich monopoly "$size $iterations" "$i" "$size" "$iterations"
-			runtest fortran mpich monopoly "$size $iterations" "$i" "$size" "$iterations"
-			runtest upc ompi monopoly "$size $iterations" "$i" "$size" "$iterations"
-]]])m4_dnl
-		done
-	done
-
 	# Matrix, weak scaling.
 	testdirname="2146 3036 4296 6080 8608 12192 17280"
 	case "__NTASKS__" in
