@@ -137,7 +137,12 @@ for thread_type in single multi; do
 					nproc=$(basename "$nproc_result" .raw)
 					python3 calc.py "$resultdir/$nproc_result" "$resultdir/$nproc.result"
 					result=$(cat "$resultdir/$nproc.result")
-					printf '%s, %s\n' "$nproc" "$result" >>"$resultdir/graph.data"
+					if [ "$nproc" -lt "$max_ntasks_per_node" ]; then
+						nodes=1
+					else
+						nodes=$((nproc / max_ntasks_per_node))
+					fi
+					printf '%s_{%s}, %s\n' "$nproc" "$nodes" "$result" >>"$resultdir/graph.data"
 				done
 			done
 
@@ -146,13 +151,13 @@ for thread_type in single multi; do
 			gnuplot -c benchmark_gflops.gpi \
 				"$filtered ($params)" \
 				"$datadir/plots/$thread_type" \
+				"$paramsdir/scala/graph.data" \
 				"$paramsdir/chapel/graph.data" \
-				"$paramsdir/fortran/graph.data" \
 				"$paramsdir/globalarrays/graph.data" \
 				"$paramsdir/shray/graph.data" \
-				"$paramsdir/scala/graph.data" \
+				"$paramsdir/fortran/graph.data" \
 				"$paramsdir/upc/graph.data" \
-				"Number of processors"
+				"Number of processors_{number of nodes}"
 		done
 	done
 done
