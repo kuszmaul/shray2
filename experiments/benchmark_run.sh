@@ -180,13 +180,11 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 # Inform GASNet how to start.
 export GASNET_SPAWNFN="C"
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
-export GASNET_CSPAWN_CMD="srun -N %N --threads-per-core=1 --cpus-per-task=8 %C"
+# TODO: --cpus-per-task=__NTASKS_PER_NODE__ should be set to '=8' for matrix multiply
+export GASNET_CSPAWN_CMD="srun -N %N --threads-per-core=1 --cpus-per-task=__NTASKS_PER_NODE__ %C"
 ]]], [[[m4_dnl
 export GASNET_CSPAWN_CMD="srun -N %N %C"
 ]]])m4_dnl
-
-# TODO: this actually lowers chapel performance if set?
-#export CHPL_RT_NUM_THREADS_PER_LOCALE="__NTASKS_PER_NODE__"
 
 ## UDP-conduit max timeout in microseconds, default is 30000000 (30 seconds)
 ## 0 is infinite timeout.
@@ -225,6 +223,7 @@ for i in $(seq 1 "$benchmarkruns"); do
 				"$size" \
 				"$iter"
 
+			export SHRAY_CACHELINE=1
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 			runtest shray ompi 1dstencil_mt "$size $iter" "$i" "$size" "$iter"
 			runtest globalarrays mpich 1dstencil_mt "$size $iter" "$i" "$size" "$iter"
@@ -261,10 +260,14 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 	export BLIS_NUM_THREADS="__NTASKS_PER_NODE__"
 	export OPENBLAS_NUM_THREADS="__NTASKS_PER_NODE__"
-	runtest shray ompi matrix "$testdirname" "$i" "$size"
+
+	export SHRAY_CACHELINE=$((size * size * 8 / 4096 / __NTASKS__ / 100))
+	runtest shray ompi matrixAuto "$testdirname" "$i" "$size"
+
 	runtest globalarrays mpich matrix "$testdirname" "$i" "$size"
 	runtest fortran mpich matrix "$testdirname" "$i" "$size"
 	runtest chapel ompi matrix "$testdirname" "$i" "--n=$size"
+	runtest upc ompi matrix "$testdirname" "$i" "$size"
 ]]], [[[m4_dnl
 	export BLIS_NUM_THREADS=1
 	export OPENBLAS_NUM_THREADS=1
@@ -283,7 +286,9 @@ m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
 		"__NODES__" \
 		"$cgclass"
 m4_ifelse(__THREADTYPE__, multi, [[[m4_dnl
+	export SHRAY_CACHELINE=10
 	runtest shray ompi cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
+	runtest globalarrays mpich cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
 ]]], [[[m4_dnl
 	runtest shray ompi cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
 	runtest globalarrays mpich cg "$cgclass" "$i" "$cgclass" "$cgdatadir"
