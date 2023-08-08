@@ -56,7 +56,7 @@ void * ShrayWriteBuf_normal(void *address, size_t size);
 void ShrayCommit_normal(void * buf, void *address, size_t size);
 void ShrayUncommit_normal(void *address, size_t size);
 
-#ifdef DEBUG
+#ifdef SHRAY_DEBUG
 
 #define ShrayInit(argc, argv) ShrayInit_debug(argc, argv)
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_debug(firstDimension, totalSize)
@@ -73,7 +73,7 @@ void ShrayUncommit_normal(void *address, size_t size);
 #define ShrayUncommit(address, size) ShrayUncommit_debug(address, size)
 
 #else
-#ifdef PROFILE
+#ifdef SHRAY_PROFILE
 
 #define ShrayInit(argc, argv) ShrayInit_profile(argc, argv)
 #define ShrayMalloc(firstDimension, totalSize) ShrayMalloc_profile(firstDimension, totalSize)
@@ -103,8 +103,8 @@ void ShrayUncommit_normal(void *address, size_t size);
 #define ShrayWriteBuf(address, size) ShrayWriteBuf_normal(address, size)
 #define ShrayCommit(buf, address, size) ShrayCommit_normal(buf, address, size)
 #define ShrayUncommit(address, size) ShrayUncommit_normal(address, size)
-#endif /* PROFILE */
-#endif /* DEBUG */
+#endif /* SHRAY_PROFILE */
+#endif /* SHRAY_DEBUG */
 
 /** <!--********************************************************************-->
  *

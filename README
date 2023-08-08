@@ -1,0 +1,69 @@
+Installation using GNU make
+===========================
+
+Make sure you have installed GASNet.
+Edit config.mk to match your system.
+
+$ make clean install
+
+If your installation directory is not a standard system location, make sure that
+$PREFIX/lib is in LD_LIBRARY_PATH and LD_RUN_PATH, and that
+$PREFIX/include is in CPATH.
+
+Usage
+=====
+
+Build your program with a C compiler and link with -lshray
+Define preprocessor macro PROFILE for profiling information or DEBUG for
+debugging information.
+
+
+Example program
+===============
+
+This program allocates an m x n array and increments its (garbage)
+values by one.
+
+#include <stdlib.h>
+#include <stddef.h>
+#include <shray.h>
+
+void arr_inc(size_t m, size_t n, double (*x)[n]) {
+    for (size_t i = ShrayStart(x); i < ShrayEnd(x); i++) {
+        for (size_t j = 0; j < n; j++) {
+            x[i][j]++;
+        }
+    }
+    ShraySync(x);
+}
+
+int main(int argc, char **argv)
+{
+  ShrayInit(&argc, &argv);
+
+  size_t m = 1000;
+  size_t n = 2000;
+  double (*x)[n] = ShrayMalloc(m,
+            m * n * sizeof(double));
+
+  arr_inc(m, n, x);
+
+  ShrayFree(x);
+  ShrayFinalize(0);
+}
+
+# Functions
+
+This is a list of functions, see the man pages for a description.
+
+ShrayInit
+ShrayMalloc
+ShrayFree
+ShrayStart
+ShrayEnd
+ShraySync
+ShrayFinalize
+ShrayBuf
+ShrayCommit
+ShrayUncommit
+ShrayReport
