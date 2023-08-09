@@ -4,9 +4,9 @@ foreach(suffix
 		_debug
 		_profile)
 	if(suffix STREQUAL "_debug")
-		set(EXTRA_DEFINES DEBUG)
+		set(EXTRA_DEFINES SHRAY_DEBUG)
 	elseif(suffix STREQUAL "_profile")
-		set(EXTRA_DEFINES PROFILE)
+		set(EXTRA_DEFINES SHRAY_PROFILE)
 	endif()
 
 	foreach(file
