@@ -21,7 +21,7 @@
 /* We need this global in cases functions with different
  * SHRAY_SUFFIX'es are called in one program. */
 
-#if !(DEBUG || PROFILE)
+#if !(SHRAY_DEBUG || SHRAY_PROFILE)
 /* TODO: move cache stuff to its own file */
 
 unsigned int Shray_rank;
