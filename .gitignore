@@ -5,6 +5,8 @@ bin/*
 *.o
 *.mod
 build/
+build_openmpi/
+build_mpich/
 CMakeCache.txt
 *.asm
 experiments/results

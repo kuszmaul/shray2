@@ -4,12 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-
-typedef struct {
-    csr_t *matrix;
-    double *vector;
-    double *out;
-} matrix_t;
+#include <omp.h>
+#include "../util/time.h"
 
 void init(double *a)
 {
@@ -18,14 +14,13 @@ void init(double *a)
 	}
 }
 
-void spmv_mt(worker_info_t *info)
+void spmv(csr_t *matrix, double *vector, double *out)
 {
-    matrix_t *arguments = (matrix_t *)info->args;
-    csr_t *matrix = arguments->matrix;
-    double *vector = arguments->vector;
-    double *out = arguments->out;
-
-	for (size_t i = info->start, k = 0; i < info->end; ++i, ++k) {
+    size_t start = ShrayStart(out);
+    size_t end = ShrayEnd(out);
+    size_t k = 0;
+    #pragma omp parallel for
+	for (size_t i = start; i < end; ++i) {
 		double outval = 0;
 
 		size_t row_start = matrix->row_indices[k];
@@ -38,22 +33,18 @@ void spmv_mt(worker_info_t *info)
 		}
 
 		out[i] = outval;
+        k++;
 	}
 }
 
 void steady_state(csr_t *matrix, double *vector, double *out, size_t iterations)
 {
-    matrix_t matrixInfo;
-    matrixInfo.matrix = matrix;
-    matrixInfo.vector = vector;
-    matrixInfo.out = out;
-
 	for (size_t i = 0; i < iterations; ++i) {
-		ShrayRunWorker(spmv_mt, out, &matrixInfo);
-		ShraySync(matrixInfo.out);
-		double *tmp = matrixInfo.vector;
-		matrixInfo.vector = matrixInfo.out;
-		matrixInfo.out = tmp;
+		spmv(matrix, vector, out);
+		ShraySync(out);
+		double *tmp = vector;
+		vector = out;
+		out = tmp;
 	}
 }
 
@@ -71,11 +62,17 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Could not parse matrix for %s\n", argv[1]);
 		ShrayFinalize(1);
 	}
+	if (matrix->n != matrix->m_total) {
+		fprintf(stderr, "Expected a square matrix (%zu x %zu)\n",
+				matrix->n,
+				matrix->m_total);
+		ShrayFinalize(1);
+	}
 
 	size_t iterations = atoll(argv[2]);
 
 	double *vector = (double *)ShrayMalloc(matrix->n, matrix->n * sizeof(double));
-	double *out = (double *)ShrayMalloc(matrix->m_total, matrix->m_total * sizeof(double));
+	double *out = (double *)ShrayMalloc(matrix->n, matrix->n * sizeof(double));
 
 	init(vector);
 	ShraySync(vector);
@@ -85,7 +82,7 @@ int main(int argc, char **argv)
 	TIME(duration, steady_state(matrix, vector, out, iterations););
 
 	if (ShrayOutput) {
-	    printf("%lf\n", matrix->nnz_total * 2.0 / 1000000000 / duration);
+	    printf("%lf\n", matrix->nnz_total * iterations * 2.0 / 1000000000 / duration);
 	}
 
 	ShrayFree(out);

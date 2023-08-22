@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <shray2/shray.h>
+#include "../util/time.h"
 
 #define min(a, b) ((a) < (b) ? a : b)
 

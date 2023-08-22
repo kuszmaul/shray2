@@ -9,6 +9,7 @@
 #include <string.h>
 #include <assert.h>
 #include <shray2/shray.h>
+#include "../util/time.h"
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) > (b)) ? (b) : (a))

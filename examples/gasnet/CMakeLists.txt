@@ -1,5 +1,5 @@
 foreach(file
-        segfault
+        reduce
         barrier)
 	set(EXAMPLE_TARGET "${file}_gasnet")
 
@@ -9,5 +9,6 @@ foreach(file
 	target_link_libraries("${EXAMPLE_TARGET}"
 		PRIVATE
 		    GASNet::GASNet
+            -g
 			cinterface)
 endforeach(file)

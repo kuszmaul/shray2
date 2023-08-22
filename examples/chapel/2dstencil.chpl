@@ -39,7 +39,7 @@ proc stencil(input: [1..n, 1..n] real)
 }
 
 var input: [1..n, 1..n] real = 1;
-var watch: Timer;
+var watch: stopwatch;
 watch.start();
 
 input = stencil(input);

@@ -4,34 +4,24 @@ foreach(suffix
 		_debug
 		_profile)
 	if(suffix STREQUAL "_debug")
-		set(EXTRA_DEFINES DEBUG)
+		set(EXTRA_DEFINES SHRAY_DEBUG)
 	elseif(suffix STREQUAL "_profile")
-		set(EXTRA_DEFINES PROFILE)
+		set(EXTRA_DEFINES SHRAY_PROFILE)
 	endif()
 
 	foreach(file
+			cg
 			1dstencil
 			1dstencil_mt
-			2dstencil
-			2dstencilAuto
 			bandwidth
-			matrix
-            broadcast
 			matrixAuto
-			matrix_mt
-            monopoly
-			gasnet
-			nbody
-			nbodyAuto
-			nbody_mt
-			random
+			monopoly
+			monopoly_mt
 			reduce
-			segfault
-            segfault_prefetch
 			sync
-            synctest
 			spmv
-			spmv_mt)
+			spmv_mt
+		)
 		set(SHRAY_TARGET "${PROJECT_NAME}")
 		set(EXAMPLE_TARGET "${file}${suffix}_shray")
 

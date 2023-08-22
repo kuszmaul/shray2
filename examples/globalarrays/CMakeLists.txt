@@ -1,12 +1,12 @@
 find_package(GlobalArrays REQUIRED)
 
 foreach(file
-		hello
-        1dstencil
+		cg
+		1dstencil
+		1dstencil_mt
 		matrix
-		nbody
-		spmv
-        monopoly)
+		monopoly
+		monopoly_mt)
 	set(EXAMPLE_TARGET "${file}_globalarrays")
 
 	add_executable("${EXAMPLE_TARGET}"

@@ -9,10 +9,9 @@ unset(PROJECT_INCLUDE_DIRS)
 set(PROJECT_FLAGS
 	-march=native
 	-mtune=native
-	-ffast-math
 	-fno-math-errno
-	-O3
-	-fno-unswitch-loops
+	-Ofast
+    -fopenmp
 	)
 
 # set warning flags for debug
@@ -37,7 +36,11 @@ if(${SANITISE})
 	include(sanitise)
 endif()
 
-set(MPI_EXECUTABLE_SUFFIX ".openmpi")
+if(MPI_BACKEND STREQUAL "mpich")
+	set(MPI_EXECUTABLE_SUFFIX ".mpich")
+else()
+	set(MPI_EXECUTABLE_SUFFIX ".openmpi")
+endif()
 find_package(MPI REQUIRED COMPONENTS C)
 
 if(NOT DEFINED ENV{GASNet_ROOT} AND NOT GASNet_ROOT_DIR)
@@ -52,6 +55,6 @@ find_package(GASNet REQUIRED)
 add_library(cinterface INTERFACE)
 target_compile_options(cinterface INTERFACE ${PROJECT_FLAGS})
 target_include_directories(cinterface INTERFACE ${PROJECT_INCLUDE_DIRS})
-target_link_options(cinterface INTERFACE ${PROJECT_LINKER_FLAGS})
+target_link_options(cinterface INTERFACE ${PROJECT_LINKER_FLAGS} -fopenmp)
 
 add_subdirectory(src)

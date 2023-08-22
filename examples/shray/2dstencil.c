@@ -9,6 +9,7 @@
 #include <string.h>
 #include <assert.h>
 #include <shray2/shray.h>
+#include "../util/time.h"
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) > (b)) ? (b) : (a))
@@ -33,8 +34,6 @@ void relax(size_t n, double **in, double **out)
 {
     size_t start = MAX(ShrayStart(*out), 1);
     size_t end = MIN(ShrayEnd(*out), n - 1);
-    ShrayPrefetch((*in) + (start - 1) * n, n * sizeof(double));
-    ShrayPrefetch((*in) + end * n, n * sizeof(double));
 
     /* Inner part */
     for (size_t i = start + 1; i < end - 1; i++) {
@@ -64,9 +63,6 @@ void relax(size_t n, double **in, double **out)
                          d * (*in)[(end - 1) * n + j + 1] +
                          e * (*in)[(end - 1 + 1) * n + j];
     }
-
-    ShrayDiscard((*in) + (start - 1) * n, n * sizeof(double));
-    ShrayDiscard((*in) + end * n, n * sizeof(double));
 }
 
 void stencil(size_t n, double **in, double **out, int iterations)

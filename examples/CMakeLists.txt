@@ -1,6 +1,6 @@
 include(language_standard)
 
-set(BLA_VENDOR FLAME)
+set(BLA_VENDOR OpenBLAS)
 set(BLA_SIZEOF_INTEGER 8)
 find_package(BLAS REQUIRED)
 
@@ -27,3 +27,6 @@ add_subdirectory(upc)
 
 # gasnet examples
 add_subdirectory(gasnet)
+
+# omp reference example (cg)
+add_subdirectory(omp)

@@ -74,8 +74,8 @@ int main(int argc, char **argv)
 		GA_Error("MA_init failed", 1);
 	}
 
-    size_t n = atoll(argv[1]);
-    size_t iterations = atoll(argv[2]);
+	size_t n = atoll(argv[1]);
+	size_t iterations = atoll(argv[2]);
 
 	csr_t *matrix = monopoly(n, GA_Nnodes(), GA_Nodeid());
 	if (!matrix) {

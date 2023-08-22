@@ -1,6 +1,7 @@
 use IO;
 use BlockDist;
 use Time;
+use AllLocalesBarriers;
 
 config const fileName = "cage11.mtx";
 config const iterations = 10;
@@ -27,7 +28,7 @@ proc spmv(m: int, n: int, nz: int, val: [1..nz] real, row_ptr: [1..m + 1] int,
 {
   var result: [1..m] real = 0.0;
 
-  forall row in 1..m {
+  for row in 1..m {
     for j in row_ptr(row)..row_ptr(row + 1) - 1 {
       result(row) += val(j) * vec(col_ind(j));
     }
@@ -45,11 +46,12 @@ proc steady_state(m: int, n: int, nz: int, val: [1..nz] real, row_ptr: [1..m + 1
 
   var vec: [BlockSpace] real = 1 / n;
 
-  sync for t in 1..iterations do
+  for t in 1..iterations do
     /* As a stochastic matrix is square and we distributed the matrix blockwise along the first
      * dimension, mat.m is precisely the size of the local part of the vector. */
     vec(here.id * blockSize + 1 .. here.id * blockSize + m) =
       spmv(m, n, nz, val, row_ptr, col_ind, vec);
+    allLocalesBarrier.barrier();
 
   return vec;
 }
@@ -62,7 +64,7 @@ proc main()
   var mat: CSRMatrix;
 
   var infoName = fileName + "_info" + (here.id + 1) : string;
-  var infoFile = open(infoName, iomode.r);
+  var infoFile = open(infoName, ioMode.r);
   var infoChannel = infoFile.reader();
   var m: int;
   var n: int;
@@ -86,7 +88,7 @@ proc main()
 
 
   var valuesName = fileName + "_values" + (here.id + 1) : string;
-  var valuesFile = open(valuesName, iomode.r);
+  var valuesFile = open(valuesName, ioMode.r);
   var valuesChannel = valuesFile.reader();
   var val: [1..nz] real;
 
@@ -99,7 +101,7 @@ proc main()
 
 
   var rowName = fileName + "_row" + (here.id + 1) : string;
-  var rowFile = open(rowName, iomode.r);
+  var rowFile = open(rowName, ioMode.r);
   var rowChannel = rowFile.reader();
   var row_ptr: [1..m + 1] int;
 
@@ -112,7 +114,7 @@ proc main()
 
 
   var columnName = fileName + "_column" + (here.id + 1) : string;
-  var columnFile = open(columnName, iomode.r);
+  var columnFile = open(columnName, ioMode.r);
   var columnChannel = columnFile.reader();
   var col_ind: [1..nz] int;
 
@@ -134,10 +136,12 @@ proc main()
   const BlockSpace = Space dmapped Block(boundingBox=Space);
   var vec: [BlockSpace] real = 1 / mat.n;
 
-  var watch: Timer;
+  var watch: stopwatch;
   watch.start();
 
-  vec = steady_state(m, n, nz, val, row_ptr, col_ind, iterations);
+  coforall loc in Locales do on loc {
+    vec = steady_state(m, n, nz, val, row_ptr, col_ind, iterations);
+  }
 
   watch.stop();
 

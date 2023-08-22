@@ -1,0 +1,38 @@
+set title ARG1 font "Helvetica,26"
+
+set datafile separator comma
+
+set lmargin 16
+set bmargin 5
+
+# Configure font size.
+set tics font "Helvetica,26"
+set xtics offset 0, -0.5, 0
+
+# Configura axis.
+set xlabel ARG9.' ' font "Helvetica,26" offset 0, -1
+set ylabel 'Mflops/s' font "Helvetica,26" offset -3,0
+
+set format y '%.2f'
+set logscale y 2
+
+# Configure legend.
+set key inside top right font "Helvetica,26"
+
+# Configure output.
+set terminal pngcairo size 1024,1024
+set output ARG2.'/'.ARG1.'.png'
+
+# Plot the actual data.
+plot ARG6 using (log($1)):2:3:xticlabel(1) with yerrorbars linestyle 4 linewidth 3 title 'Shray', \
+        ''   using (log($1)):2:xticlabel(1)   with lines linestyle 4 linewidth 3 notitle, \
+        ARG4    using (log($1)):2:3:xticlabel(1) with yerrorbars linestyle 1 linewidth 3 dashtype '_ -' title 'Chapel', \
+        ''   using (log($1)):2:xticlabel(1)   with lines linestyle 1 linewidth 3 dashtype '_ -' notitle, \
+        ARG7 using (log($1)):2:3:xticlabel(1) with yerrorbars linestyle 2 linewidth 3 dashtype 2 title 'Fortran', \
+        ''   using (log($1)):2:xticlabel(1)   with lines linestyle 2 linewidth 3 dashtype 2 notitle, \
+        ARG8 using (log($1)):2:3:xticlabel(1) with yerrorbars linestyle 6 linewidth 3 dashtype 5 title 'UPC', \
+        ''   using (log($1)):2:xticlabel(1)   with lines linestyle 6 linewidth 3 dashtype 5 notitle, \
+        ARG5 using (log($1)):2:3:xticlabel(1) with yerrorbars linestyle 3 linewidth 3 dashtype 3 title 'GlobalArrays', \
+        ''   using (log($1)):2:xticlabel(1)   with lines linestyle 3 linewidth 3 dashtype 3 notitle, \
+        ARG3 using (log($1)):2:3:xticlabel(1) with yerrorbars linestyle 5 linewidth 3 dashtype 4 title 'Scalapack', \
+        ''   using (log($1)):2:xticlabel(1)   with lines linestyle 5 linewidth 3 dashtype 4 notitle

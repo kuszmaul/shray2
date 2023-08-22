@@ -1,6 +1,7 @@
 use IO;
 use BlockDist;
 use Time;
+use AllLocalesBarriers;
 
 config const n = 100;
 config const iterations = 1;
@@ -30,11 +31,12 @@ proc steady_state(m: int, n: int, nz: int, val: [0..nz - 1] real, row_ptr: [0..m
 
   var vec: [BlockSpace] real = 1 / n;
 
-  sync for t in 1..iterations do
+  for t in 1..iterations do
     /* As a stochastic matrix is square and we distributed the matrix blockwise along the first
      * dimension, mat.m is precisely the size of the local part of the vector. */
     vec(here.id * blockSize .. here.id * blockSize + m - 1) =
       spmv(m, n, nz, val, row_ptr, col_ind, vec);
+    allLocalesBarrier.barrier();
 
   return vec;
 }
@@ -81,10 +83,12 @@ proc main()
   const BlockSpace = Space dmapped Block(boundingBox=Space);
   var vec: [BlockSpace] real = 1 / n;
 
-  var watch: Timer;
+  var watch: stopwatch;
   watch.start();
 
-  vec = steady_state(m, n, nz, val, row_ptr, col_ind, iterations);
+  coforall loc in Locales do on loc {
+    vec = steady_state(m, n, nz, val, row_ptr, col_ind, iterations);
+  }
 
   watch.stop();
 

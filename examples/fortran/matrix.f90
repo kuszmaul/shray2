@@ -4,10 +4,9 @@
 program main
     implicit none
 
-    integer :: n, p, l
-    real(KIND=8), dimension(:,:), codimension[:], allocatable :: A, B, C
-    character(len=12), dimension(:), allocatable :: args
-    integer :: cpu_count, cpu_count2, count_rate, count_max
+    real(KIND=8), allocatable :: A(:,:)[:], B(:,:)[:], C(:,:)[:], Bl(:,:)
+    character(len=12), allocatable :: args(:)
+    integer :: n, p, l, cpu_count, cpu_count2, count_rate, count_max
 
     allocate(args(1))
     call get_command_argument(1, args(1))
@@ -22,6 +21,7 @@ program main
     allocate(A(n / p, n)[*])
     allocate(B(n / p, n)[*])
     allocate(C(n / p, n)[*])
+    allocate(Bl(n / p, n))
 
     A = 1
     B = 1
@@ -31,11 +31,17 @@ program main
     call system_clock(cpu_count, count_rate, count_max)
 
     do l = 1, num_images()
-        C = C + matmul(A(:,1 + (l - 1) * n / p: l * n / p), B(:, :)[l])
+        Bl = B(:,:)[l]
+        C = C + matmul(A(1:n/p, 1 + (l - 1) * n / p: l * n / p), Bl)
     end do
 
     sync all
     call system_clock(cpu_count2, count_rate, count_max)
+
+    deallocate(A)
+    deallocate(B)
+    deallocate(C)
+    deallocate(Bl)
 
     if (this_image() .eq. 1) then
         write (*, *) 2.0 * n * n * n / (real(cpu_count2 - cpu_count) / count_rate) / 1000000000.0
