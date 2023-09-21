@@ -137,8 +137,8 @@ static inline void freeRAM(uintptr_t start, uintptr_t end)
 
     DBUG_PRINT("We free [%p, %p[", (void *)start, (void *)end);
 
-    MUNMAP_SAFE((void *)start, end - start);
-    MMAP_FIXED_SAFE((void *)start, end - start, PROT_NONE);
+    MPROTECT_SAFE((void*)start, end - start, PROT_NONE);
+    MadviseDontNeedSafe((void*)start, end - start);
 }
 
 /* Simple binary search, assumes heap.allocs is sorted. */
