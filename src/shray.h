@@ -158,8 +158,8 @@ extern Heap heap;
     }
 
 static inline void MadviseDontNeedSafe(void *addr, size_t size) {
-  int r = madvise(addr, size, prot);
-  DBUG_PRINT("madvise: %d = madvise(%p, %zu, MADV_DONTNEED);,
+  int r = madvise(addr, size, MADV_DONTNEED);
+  DBUG_PRINT("madvise: %d = madvise(%p, %zu, MADV_DONTNEED);",
              r, addr, size);
   if (r != 0) {
     perror("madvise failed");
