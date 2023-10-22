@@ -156,3 +156,13 @@ extern Heap heap;
             gasnet_exit(1);                                                   \
         }                                                                     \
     }
+
+static inline void MadviseDontNeedSafe(void *addr, size_t size) {
+  int r = madvise(addr, size, MADV_DONTNEED);
+  DBUG_PRINT("madvise: %d = madvise(%p, %zu, MADV_DONTNEED);",
+             r, addr, size);
+  if (r != 0) {
+    perror("madvise failed");
+    gasnet_exit(1);
+  }
+}
